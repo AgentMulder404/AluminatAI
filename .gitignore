@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Environment files
+.env
+.env.local
+.env.production
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Next.js
+.next/
+out/
+
+# Agent runtime data
+agent/data/
+agent/logs/
+
+# Package locks (root level only - subproject locks are kept)
+/package-lock.json
+/package.json

@@ -1,0 +1,13 @@
+# GPU Energy Agent - Python Dependencies
+
+# NVML Python bindings for GPU metrics
+pynvml>=11.5.0
+
+# HTTP requests for API communication
+requests>=2.31.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Rich console formatting (optional but recommended)
+rich>=13.0.0
