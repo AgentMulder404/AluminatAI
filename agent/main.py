@@ -25,11 +25,18 @@ except ImportError:
 
 try:
     from uploader import MetricsUploader
-    from config import UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY
+    from config import UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY, SCHEDULER_POLL_INTERVAL
     UPLOADER_AVAILABLE = True
 except ImportError:
     UPLOADER_AVAILABLE = False
     UPLOAD_ENABLED = False
+    SCHEDULER_POLL_INTERVAL = 30
+
+try:
+    from schedulers import detect_scheduler
+    SCHEDULER_AVAILABLE = True
+except ImportError:
+    SCHEDULER_AVAILABLE = False
 
 
 class EnergyAgent:
@@ -70,6 +77,16 @@ class EnergyAgent:
                 print("✅ API upload enabled")
         elif not quiet and UPLOADER_AVAILABLE:
             print("⚠️  API upload disabled (no API key)")
+
+        # Initialize scheduler adapter for job attribution
+        self.scheduler = None
+        self.last_scheduler_poll = 0.0
+        if SCHEDULER_AVAILABLE:
+            self.scheduler = detect_scheduler()
+            if not quiet:
+                print(f"🔗 Scheduler: {self.scheduler.name}")
+        elif not quiet:
+            print("⚠️  Scheduler integration unavailable")
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -129,9 +146,28 @@ class EnergyAgent:
             while self.running:
                 loop_start = time.time()
 
+                # Poll scheduler for job attribution (every SCHEDULER_POLL_INTERVAL)
+                if self.scheduler and (loop_start - self.last_scheduler_poll >= SCHEDULER_POLL_INTERVAL):
+                    try:
+                        self.scheduler.discover_jobs()
+                        self.last_scheduler_poll = loop_start
+                    except Exception as e:
+                        if not self.quiet:
+                            print(f"⚠️  Scheduler poll failed: {e}")
+
                 # Collect metrics
                 metrics = self.collector.collect()
                 self.sample_count += 1
+
+                # Enrich metrics with job attribution
+                if self.scheduler:
+                    for m in metrics:
+                        job = self.scheduler.gpu_to_job(m.gpu_index)
+                        if job:
+                            m.job_id = job.job_id
+                            m.team_id = job.team_id
+                            m.model_tag = job.model_tag
+                            m.scheduler_source = job.scheduler_source
 
                 # Update total energy
                 for m in metrics:

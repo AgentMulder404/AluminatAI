@@ -21,6 +21,9 @@ ENABLE_LOCAL_BACKUP = os.getenv('ENABLE_LOCAL_BACKUP', 'true').lower() == 'true'
 # Sampling
 SAMPLE_INTERVAL = float(os.getenv('SAMPLE_INTERVAL', '5.0'))  # seconds
 
+# Scheduler integration
+SCHEDULER_POLL_INTERVAL = int(os.getenv('SCHEDULER_POLL_INTERVAL', '30'))  # seconds
+
 # Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 LOG_DIR = Path(os.getenv('LOG_DIR', './logs'))

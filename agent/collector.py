@@ -46,9 +46,17 @@ class GPUMetrics:
     memory_used_mb: float = 0
     memory_total_mb: float = 0
 
+    # Attribution (set by scheduler adapter, not NVML)
+    job_id: Optional[str] = None
+    team_id: Optional[str] = None
+    model_tag: Optional[str] = None
+    scheduler_source: Optional[str] = None
+
     def to_dict(self) -> Dict:
-        """Convert to dictionary for serialization"""
-        return asdict(self)
+        """Convert to dictionary for serialization, omitting None attribution fields."""
+        d = asdict(self)
+        # Drop None values so the payload stays backward-compatible
+        return {k: v for k, v in d.items() if v is not None}
 
     def to_csv_row(self) -> List:
         """Convert to CSV row (without optional fields)"""
