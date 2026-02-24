@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 AluminatiAI Energy Dashboard Benchmark — Apple Silicon (M5) Edition
