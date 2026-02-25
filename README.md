@@ -4,7 +4,7 @@
 
 AluminatAI is an open-source GPU energy monitoring platform that gives AI teams real-time visibility into power consumption, energy costs, and utilization across their GPU fleet. A lightweight Python agent runs on your GPU machines and streams metrics to a cloud dashboard where you can track spending, compare jobs, and optimize workloads.
 
-**Live:** [aluminatiai-landing.vercel.app](https://aluminatiai-landing.vercel.app)
+**Live:** [https://www.aluminatiai.com/](https://aluminatiai-landing.vercel.app)
 
 ---
 
