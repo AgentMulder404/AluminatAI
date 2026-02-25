@@ -42,11 +42,14 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import json
 import logging
 import os
 import signal
 import sys
 import time
+import urllib.request
+import urllib.error
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -462,6 +465,55 @@ class HeartbeatTracker:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  API helper — signal job completion to AluminatiAI backend
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def signal_job_complete(
+    endpoint: str,
+    api_key: str,
+    job_uuid: str,
+    end_time: Optional[str] = None,
+) -> bool:
+    """
+    POST /api/metrics/jobs/complete to mark a job finished in the DB.
+    The server-side DB trigger then auto-generates the energy manifest.
+
+    Returns True on success, False on any error (non-fatal).
+    """
+    url = endpoint.rstrip("/") + "/api/metrics/jobs/complete"
+    payload = {"job_id": job_uuid}
+    if end_time:
+        payload["end_time"] = end_time
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "X-API-Key": api_key,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = json.loads(resp.read())
+            log.info(
+                "Job completion signalled: job_uuid=%s  end_time=%s  msg=%s",
+                job_uuid,
+                body.get("end_time", "?"),
+                body.get("message", ""),
+            )
+            return True
+    except urllib.error.HTTPError as exc:
+        log.warning("Job complete HTTP %s: %s", exc.code, exc.read().decode())
+    except Exception as exc:
+        log.warning("Job complete signal failed (non-fatal): %s", exc)
+    return False
+
+
 class AgentCore:
     """
     Production background monitoring agent.
@@ -485,12 +537,18 @@ class AgentCore:
         duration_s: Optional[float] = None,
         heartbeat_s: float = 30.0,
         quiet: bool = False,
+        api_key: Optional[str] = None,
+        endpoint: str = "https://aluminatiai-landing.vercel.app",
+        job_uuid: Optional[str] = None,
     ):
         self._job_id = job_id
         self._interval = 1.0 / freq_hz
         self._gpu_indices = gpu_indices
         self._duration = duration_s
         self._quiet = quiet
+        self._api_key = api_key
+        self._endpoint = endpoint
+        self._job_uuid = job_uuid
 
         # Resolve output path
         if output_dir is None:
@@ -579,6 +637,15 @@ class AgentCore:
             if not self._quiet:
                 self._heartbeat.maybe_print_heartbeat(force=True)
                 self._print_summary(time.monotonic() - start_time)
+
+            # ── Signal job completion to AluminatiAI backend ─────────────
+            if self._api_key and self._job_uuid:
+                signal_job_complete(
+                    endpoint=self._endpoint,
+                    api_key=self._api_key,
+                    job_uuid=self._job_uuid,
+                    end_time=datetime.now(timezone.utc).isoformat(),
+                )
 
         return 0
 
@@ -692,6 +759,24 @@ examples:
         action="store_true",
         help="Suppress periodic heartbeat output (summary still printed on exit).",
     )
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="AluminatiAI API key (alum_...). When set, signals job completion on exit.",
+    )
+    parser.add_argument(
+        "--endpoint",
+        type=str,
+        default="https://aluminatiai-landing.vercel.app",
+        help="AluminatiAI API base URL (default: production).",
+    )
+    parser.add_argument(
+        "--job-uuid",
+        type=str,
+        default=None,
+        help="UUID of the gpu_jobs row in the database. Required for completion signal.",
+    )
 
     args = parser.parse_args()
 
@@ -719,6 +804,9 @@ examples:
         duration_s=args.duration,
         heartbeat_s=args.heartbeat,
         quiet=args.quiet,
+        api_key=args.api_key,
+        endpoint=args.endpoint,
+        job_uuid=args.job_uuid,
     )
 
     return agent.run()
