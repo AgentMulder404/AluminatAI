@@ -90,7 +90,8 @@ class EnergyAgent:
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGTERM, self._signal_handler)
+        if hasattr(signal, 'SIGTERM'):  # not available on Windows
+            signal.signal(signal.SIGTERM, self._signal_handler)
 
         # Rich console for pretty output
         if RICH_AVAILABLE and not quiet:
