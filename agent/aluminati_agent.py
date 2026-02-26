@@ -538,7 +538,7 @@ class AgentCore:
         heartbeat_s: float = 30.0,
         quiet: bool = False,
         api_key: Optional[str] = None,
-        endpoint: str = "https://aluminatiai-landing.vercel.app",
+        endpoint: str = "https://aluminatiai.com",
         job_uuid: Optional[str] = None,
     ):
         self._job_id = job_id
@@ -768,7 +768,7 @@ examples:
     parser.add_argument(
         "--endpoint",
         type=str,
-        default="https://aluminatiai-landing.vercel.app",
+        default="https://aluminatiai.com",
         help="AluminatiAI API base URL (default: production).",
     )
     parser.add_argument(

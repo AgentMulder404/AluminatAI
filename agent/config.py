@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 # API Configuration
-API_ENDPOINT = os.getenv('ALUMINATAI_API_ENDPOINT', 'https://aluminatiai-landing.vercel.app/api/metrics/ingest')
+API_ENDPOINT = os.getenv('ALUMINATAI_API_ENDPOINT', 'https://aluminatiai.com/api/metrics/ingest')
 API_KEY = os.getenv('ALUMINATAI_API_KEY', '')
 
 # Upload Configuration
