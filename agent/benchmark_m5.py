@@ -57,7 +57,7 @@ GPU_UUID = "apple-m5-integrated-gpu"
 GPU_NAME = "Apple M5 GPU"
 GPU_INDEX = 0
 POWER_LIMIT_W = 45.0  # Approximate M5 Pro GPU power envelope
-DEFAULT_API_ENDPOINT = "https://aluminatai.com/api/metrics/ingest"
+DEFAULT_API_ENDPOINT = "https://aluminatiai-landing.vercel.app/api/metrics/ingest"
 
 # ---------------------------------------------------------------------------
 # Job Definitions

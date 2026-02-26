@@ -87,7 +87,7 @@ sudo python3 -m pip install -r requirements.txt --quiet
 echo
 echo -e "${GREEN}🔑 API Key Setup${NC}"
 echo "   Find your API key in your AluminatAI dashboard:"
-echo "   https://aluminatai.com/dashboard/setup"
+echo "   https://aluminatiai-landing.vercel.app/dashboard/setup"
 echo
 read -p "   Enter API Key: " API_KEY
 
@@ -107,7 +107,7 @@ echo "⚙️  Creating configuration..."
 sudo tee "$INSTALL_DIR/.env" > /dev/null <<EOF
 # AluminatAI Agent Configuration
 ALUMINATAI_API_KEY=$API_KEY
-ALUMINATAI_API_ENDPOINT=https://aluminatai.com/api/metrics/ingest
+ALUMINATAI_API_ENDPOINT=https://aluminatiai-landing.vercel.app/api/metrics/ingest
 SAMPLE_INTERVAL=5.0
 UPLOAD_INTERVAL=60
 LOG_LEVEL=INFO
@@ -171,7 +171,7 @@ if sudo systemctl is-active --quiet aluminatai-agent; then
     echo "  Stop:     sudo systemctl stop aluminatai-agent"
     echo "  Restart:  sudo systemctl restart aluminatai-agent"
     echo
-    echo "Dashboard: https://aluminatai.com/dashboard"
+    echo "Dashboard: https://aluminatiai-landing.vercel.app/dashboard"
     echo
     echo "Metrics will appear in your dashboard within 60 seconds."
 else
