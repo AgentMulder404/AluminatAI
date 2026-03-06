@@ -1,13 +1,15 @@
-# GPU Energy Agent - Python Dependencies
+# GPU Energy Agent — pinned Python dependencies
+# Keep in sync with pyproject.toml [project.dependencies]
+# Update procedure: pip install --upgrade <pkg>, test, then bump the pin here.
 
 # NVML Python bindings for GPU metrics
-pynvml>=11.5.0
+pynvml==11.5.0
 
 # HTTP requests for API communication
-requests>=2.31.0
+requests==2.32.3
 
 # Environment variable management
-python-dotenv>=1.0.0
+python-dotenv==1.0.1
 
-# Rich console formatting (optional but recommended)
-rich>=13.0.0
+# Rich console formatting
+rich==13.9.4
