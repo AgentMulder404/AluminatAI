@@ -52,10 +52,14 @@ class GPUMetrics:
     model_tag: Optional[str] = None
     scheduler_source: Optional[str] = None
 
+    # Process-level data for attribution engine (not serialised to API)
+    processes: Optional[list] = None
+
     def to_dict(self) -> Dict:
-        """Convert to dictionary for serialization, omitting None attribution fields."""
+        """Convert to dictionary for serialization, omitting None/internal fields."""
         d = asdict(self)
-        # Drop None values so the payload stays backward-compatible
+        # Drop None values and internal-only fields not sent to API
+        d.pop("processes", None)
         return {k: v for k, v in d.items() if v is not None}
 
     def to_csv_row(self) -> List:
@@ -240,6 +244,17 @@ class GPUCollector:
             except pynvml.NVMLError:
                 pass
 
+        # Compute processes (for attribution engine; <0.1ms overhead)
+        processes = []
+        try:
+            nvml_procs = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
+            processes = [
+                {"pid": p.pid, "used_gpu_memory": p.usedGpuMemory or 0}
+                for p in nvml_procs
+            ]
+        except pynvml.NVMLError:
+            pass
+
         return GPUMetrics(
             timestamp=timestamp,
             gpu_index=gpu_index,
@@ -256,6 +271,7 @@ class GPUCollector:
             memory_clock_mhz=mem_clock,
             memory_used_mb=mem_used,
             memory_total_mb=mem_total,
+            processes=processes,
         )
 
     def get_gpu_count(self) -> int:

@@ -1,0 +1,41 @@
+[Unit]
+Description=AluminatAI GPU Energy Monitoring Agent
+Documentation=https://aluminatiai.com/docs/agent
+After=network-online.target nvidia-persistenced.service
+Wants=network-online.target
+# Restart if NVML driver is temporarily unavailable (e.g. driver reload)
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=aluminatai
+Group=aluminatai
+WorkingDirectory=/opt/aluminatai-agent
+
+# Load all env vars from file (one KEY=VALUE per line)
+EnvironmentFile=/etc/aluminatai/agent.env
+
+# Use the installed entry point (pip install -e . creates this)
+ExecStart=aluminatai-agent --quiet --output /var/log/aluminatai/manifest.csv
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=always
+RestartSec=10
+
+# Give the agent time to flush on SIGTERM before SIGKILL
+TimeoutStopSec=30
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=aluminatai-agent
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/aluminatai /opt/aluminatai-agent/data
+
+[Install]
+WantedBy=multi-user.target

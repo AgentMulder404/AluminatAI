@@ -204,6 +204,17 @@ class RunaiAdapter(SchedulerAdapter):
         # Fallback: sequential
         return list(range(gpu_count))
 
+    def resolve_job(self, job_name: str) -> Optional[JobMetadata]:
+        """
+        Back-lookup a Run:ai job by its name for PidResolver attribution.
+
+        Checks the gpu_job_map cache (keyed by job name from API response).
+        """
+        for cached in self._gpu_job_map.values():
+            if cached.job_name == job_name or cached.job_id == job_name:
+                return cached
+        return None
+
     @property
     def name(self) -> str:
         if self._inside_job:

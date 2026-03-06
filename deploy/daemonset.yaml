@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aluminatai-agent
+  namespace: aluminatai
+  labels:
+    app: aluminatai-agent
+    version: "0.2.0"
+spec:
+  selector:
+    matchLabels:
+      app: aluminatai-agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: aluminatai-agent
+        version: "0.2.0"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: aluminatai-agent
+      # Required to read /proc/<pid>/environ for process attribution
+      hostPID: true
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      nodeSelector:
+        nvidia.com/gpu: "present"
+      initContainers:
+        - name: wait-for-nvml
+          image: ubuntu:22.04
+          command: ["sh", "-c", "until nvidia-smi; do sleep 5; done"]
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+      containers:
+        - name: aluminatai-agent
+          image: aluminatai/agent:0.2.0
+          imagePullPolicy: Always
+          command: ["aluminatai-agent", "--quiet"]
+          env:
+            - name: ALUMINATAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aluminatai-agent-secret
+                  key: api-key
+            - name: ALUMINATAI_API_ENDPOINT
+              value: "https://aluminatiai.com/api/metrics/ingest"
+            - name: SAMPLE_INTERVAL
+              value: "5.0"
+            - name: UPLOAD_INTERVAL
+              value: "60"
+            - name: METRICS_PORT
+              value: "9100"
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+              nvidia.com/gpu: 0  # agent does not consume GPU compute
+          ports:
+            - name: metrics
+              containerPort: 9100
+              protocol: TCP
+          volumeMounts:
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+            - name: agent-data
+              mountPath: /data
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: 9100
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: agent-data
+          emptyDir: {}
+      terminationGracePeriodSeconds: 30

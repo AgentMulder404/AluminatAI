@@ -1,185 +1,137 @@
 #!/bin/bash
-set -e
+# AluminatAI GPU Agent Installer v0.2.0
+set -euo pipefail
 
-echo "🚀 AluminatAI GPU Agent Installer"
-echo "=================================="
+echo "🚀 AluminatAI GPU Agent Installer v0.2.0"
+echo "========================================="
 echo
 
-# Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Check for NVIDIA GPU
-if ! command -v nvidia-smi &> /dev/null; then
-    echo -e "${RED}❌ Error: nvidia-smi not found.${NC}"
-    echo "Please install NVIDIA drivers first:"
-    echo "  https://www.nvidia.com/download/index.aspx"
+# ── Preflight checks ──────────────────────────────────────────────────────────
+
+if ! command -v nvidia-smi &>/dev/null; then
+    echo -e "${RED}❌ nvidia-smi not found. Install NVIDIA drivers first.${NC}"
     exit 1
 fi
-
 echo -e "${GREEN}✅ NVIDIA drivers detected${NC}"
-GPU_INFO=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
-echo "   GPU: $GPU_INFO"
+echo "   GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
 
-# Check Python version
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Error: Python 3 not found.${NC}"
-    echo "Please install Python 3.8 or higher:"
-    echo "  https://www.python.org/downloads/"
-    exit 1
+if ! command -v python3 &>/dev/null; then
+    echo -e "${RED}❌ Python 3 not found.${NC}"; exit 1
 fi
 
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-echo -e "${GREEN}✅ Python $PYTHON_VERSION detected${NC}"
-
-# Check Python version is 3.8+
-PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info[0])')
 PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info[1])')
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
-    echo -e "${RED}❌ Error: Python 3.8+ required (found $PYTHON_VERSION)${NC}"
-    exit 1
+PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info[0])')
+if [ "$PYTHON_MAJOR" -lt 3 ] || [ "$PYTHON_MINOR" -lt 9 ]; then
+    echo -e "${RED}❌ Python 3.9+ required (found $PYTHON_VERSION)${NC}"; exit 1
 fi
+echo -e "${GREEN}✅ Python $PYTHON_VERSION${NC}"
 
-# Install directory
-INSTALL_DIR="/opt/aluminatai-agent"
+# ── Install directory ─────────────────────────────────────────────────────────
+
+INSTALL_DIR="${INSTALL_DIR:-/opt/aluminatai-agent}"
 echo
 echo "📁 Install directory: $INSTALL_DIR"
 
-# Check if already installed
 if [ -d "$INSTALL_DIR" ]; then
     echo -e "${YELLOW}⚠️  Previous installation found${NC}"
-    read -p "   Remove and reinstall? (y/n) " -n 1 -r
+    read -rp "   Remove and reinstall? (y/n) " REPLY
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "   Removing old installation..."
+    if [[ "$REPLY" =~ ^[Yy]$ ]]; then
         sudo systemctl stop aluminatai-agent 2>/dev/null || true
         sudo systemctl disable aluminatai-agent 2>/dev/null || true
         sudo rm -rf "$INSTALL_DIR"
     else
-        echo "Installation cancelled."
-        exit 0
+        echo "Installation cancelled."; exit 0
     fi
 fi
 
-# Create install directory
-echo "📦 Installing agent..."
-sudo mkdir -p "$INSTALL_DIR"
+# ── Copy source and install via pip ───────────────────────────────────────────
 
-# Copy agent files
-if [ -f "main.py" ]; then
-    # Installing from source directory
-    sudo cp -r main.py collector.py uploader.py config.py "$INSTALL_DIR/"
-    sudo cp requirements.txt "$INSTALL_DIR/" 2>/dev/null || true
-else
-    echo -e "${RED}❌ Error: Agent files not found${NC}"
-    echo "Please run this script from the agent directory."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Check we are in the agent/ source directory (contains pyproject.toml one level up)
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ ! -f "$REPO_ROOT/pyproject.toml" ]; then
+    echo -e "${RED}❌ pyproject.toml not found in $REPO_ROOT${NC}"
+    echo "Please run this script from the agent/ directory of the cloned repo."
     exit 1
 fi
 
-# Install Python dependencies
-echo "📦 Installing Python dependencies..."
-cd "$INSTALL_DIR"
-sudo python3 -m pip install -r requirements.txt --quiet
+echo "📦 Installing agent package…"
+sudo mkdir -p "$INSTALL_DIR"
+sudo cp -r "$REPO_ROOT"/. "$INSTALL_DIR/"
 
-# Prompt for API key
+# Install package + dependencies (editable install)
+sudo python3 -m pip install -e "$INSTALL_DIR" --quiet
+echo -e "${GREEN}✅ aluminatai-agent installed${NC}"
+
+# ── User and directories ──────────────────────────────────────────────────────
+
+if ! id -u aluminatai &>/dev/null; then
+    sudo useradd --system --no-create-home --shell /usr/sbin/nologin aluminatai
+fi
+sudo mkdir -p /etc/aluminatai /var/log/aluminatai "$INSTALL_DIR/data"
+sudo chown aluminatai:aluminatai /var/log/aluminatai "$INSTALL_DIR/data"
+
+# ── API key setup ─────────────────────────────────────────────────────────────
+
 echo
 echo -e "${GREEN}🔑 API Key Setup${NC}"
-echo "   Find your API key in your AluminatAI dashboard:"
-echo "   https://aluminatiai.com/dashboard/setup"
+echo "   Find your key at: https://aluminatiai.com/dashboard/setup"
 echo
-read -p "   Enter API Key: " API_KEY
+read -rp "   Enter API Key: " API_KEY
 
-# Validate API key format
-if [[ ! $API_KEY =~ ^alum_ ]]; then
-    echo -e "${YELLOW}⚠️  Warning: API key should start with 'alum_'${NC}"
-    read -p "   Continue anyway? (y/n) " -n 1 -r
+if [[ ! "$API_KEY" =~ ^alum_ ]]; then
+    echo -e "${YELLOW}⚠️  Key should start with 'alum_'${NC}"
+    read -rp "   Continue? (y/n) " REPLY
     echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        echo "Installation cancelled."
-        exit 0
-    fi
+    [[ "$REPLY" =~ ^[Yy]$ ]] || { echo "Cancelled."; exit 0; }
 fi
 
-# Create environment configuration
-echo "⚙️  Creating configuration..."
-sudo tee "$INSTALL_DIR/.env" > /dev/null <<EOF
-# AluminatAI Agent Configuration
+# ── Environment file ──────────────────────────────────────────────────────────
+
+echo "⚙️  Writing /etc/aluminatai/agent.env…"
+sudo tee /etc/aluminatai/agent.env > /dev/null <<EOF
+# AluminatAI Agent Configuration — generated by install.sh
 ALUMINATAI_API_KEY=$API_KEY
 ALUMINATAI_API_ENDPOINT=https://aluminatiai.com/api/metrics/ingest
 SAMPLE_INTERVAL=5.0
 UPLOAD_INTERVAL=60
+METRICS_PORT=9100
 LOG_LEVEL=INFO
-ENABLE_LOCAL_BACKUP=true
 EOF
+sudo chmod 600 /etc/aluminatai/agent.env
 
-sudo chmod 600 "$INSTALL_DIR/.env"
+# ── Systemd service ───────────────────────────────────────────────────────────
 
-# Create log directory
-sudo mkdir -p /var/log/aluminatai
-sudo chmod 755 /var/log/aluminatai
-
-# Create systemd service
-echo "🔧 Creating systemd service..."
-sudo tee /etc/systemd/system/aluminatai-agent.service > /dev/null <<EOF
-[Unit]
-Description=AluminatAI GPU Energy Monitoring Agent
-After=network.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=$INSTALL_DIR
-EnvironmentFile=$INSTALL_DIR/.env
-ExecStart=/usr/bin/python3 $INSTALL_DIR/main.py --quiet --output /var/log/aluminatai/metrics.csv
-Restart=always
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Reload systemd
+echo "🔧 Installing systemd service…"
+sudo cp "$INSTALL_DIR/deploy/aluminatai-agent.service" /etc/systemd/system/aluminatai-agent.service
 sudo systemctl daemon-reload
-
-# Enable service
-echo "▶️  Enabling service..."
 sudo systemctl enable aluminatai-agent
-
-# Start service
-echo "▶️  Starting service..."
 sudo systemctl start aluminatai-agent
 
-# Wait and check status
 sleep 3
 
 if sudo systemctl is-active --quiet aluminatai-agent; then
     echo
-    echo -e "${GREEN}✅ Installation complete!${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}✅ AluminatAI Agent is running!${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${GREEN}🎉 Agent is running and sending metrics to AluminatAI${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo
-    echo "Useful commands:"
+    echo "Commands:"
     echo "  Status:   sudo systemctl status aluminatai-agent"
     echo "  Logs:     sudo journalctl -u aluminatai-agent -f"
-    echo "  Stop:     sudo systemctl stop aluminatai-agent"
-    echo "  Restart:  sudo systemctl restart aluminatai-agent"
+    echo "  Metrics:  curl localhost:9100/metrics"
     echo
     echo "Dashboard: https://aluminatiai.com/dashboard"
-    echo
-    echo "Metrics will appear in your dashboard within 60 seconds."
 else
-    echo
     echo -e "${RED}❌ Service failed to start${NC}"
-    echo
-    echo "Check logs for errors:"
-    echo "  sudo journalctl -u aluminatai-agent -n 50"
-    echo
+    echo "Logs: sudo journalctl -u aluminatai-agent -n 50"
     exit 1
 fi

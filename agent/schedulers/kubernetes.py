@@ -192,6 +192,49 @@ class KubernetesAdapter(SchedulerAdapter):
         logger.debug(f"Detected node name from hostname: {hostname}")
         return hostname
 
+    def resolve_pod_by_uid(self, pod_uid: str) -> Optional[JobMetadata]:
+        """
+        Look up a pod by its UID for PidResolver K8s cgroup attribution.
+
+        Checks existing gpu_job_map cache (populated by discover_jobs) first,
+        then falls back to a direct API list with a UID field selector.
+        """
+        # Cache hit: scan current map
+        for job in self._gpu_job_map.values():
+            if job.job_id == pod_uid:
+                return job
+
+        # Not in cache — query API
+        try:
+            pods = self._v1.list_pod_for_all_namespaces(
+                field_selector=f"metadata.uid={pod_uid},status.phase=Running",
+            )
+        except Exception as e:
+            logger.debug(f"resolve_pod_by_uid({pod_uid}) API error: {e}")
+            return None
+
+        for pod in pods.items:
+            gpu_count = self._get_gpu_request(pod)
+            if gpu_count == 0:
+                continue
+            gpu_indices = self._resolve_gpu_indices(pod, gpu_count)
+            labels = pod.metadata.labels or {}
+            annotations = pod.metadata.annotations or {}
+            start_time = ""
+            if pod.status and pod.status.start_time:
+                start_time = pod.status.start_time.isoformat()
+            return JobMetadata(
+                job_id=self._derive_job_id(pod),
+                job_name=pod.metadata.name,
+                team_id=self._extract_team(pod),
+                model_tag=labels.get(MODEL_LABEL, "untagged"),
+                scheduler_source="kubernetes",
+                gpu_indices=gpu_indices,
+                user_email=annotations.get(USER_ANNOTATION, "unknown"),
+                start_time=start_time,
+            )
+        return None
+
     @property
     def name(self) -> str:
         return f"kubernetes (node={self._node_name})"

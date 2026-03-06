@@ -1,181 +1,248 @@
 """
-Metrics uploader for AluminatAI API
-Handles uploading GPU metrics with retry logic and local backup
-"""
-import requests
-import json
-import time
-from typing import List, Dict
-from pathlib import Path
-import logging
+Metrics uploader for AluminatAI API — v0.2.0
 
-from config import API_ENDPOINT, API_KEY, UPLOAD_BATCH_SIZE, DATA_DIR, ENABLE_LOCAL_BACKUP
+Features:
+  - Exponential backoff with jitter (1s → 2s → 4s → 8s → 16s, capped 60s)
+  - Respects Retry-After on 429
+  - Permanent failure on 401/403 → writes to WAL immediately
+  - WAL-based local buffer (append-only newline-delimited JSON)
+  - TLS / mTLS / proxy support from config
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import random
+import time
+from typing import Dict, List
+
+import requests
+
+from config import (
+    API_ENDPOINT, API_KEY, UPLOAD_BATCH_SIZE,
+    WAL_DIR, WAL_MAX_AGE_HOURS, WAL_MAX_MB,
+    UPLOAD_MAX_RETRIES, UPLOAD_MAX_RETRY_DELAY,
+    HTTPS_PROXY, CA_BUNDLE, CLIENT_CERT, CLIENT_KEY,
+)
 
 logger = logging.getLogger(__name__)
 
+# ── WAL helpers ───────────────────────────────────────────────────────────────
+
+WAL_FILE = WAL_DIR / "metrics.wal"
+
+
+def _wal_append(batch: List[Dict]) -> None:
+    """Append a batch to the WAL as newline-delimited JSON entries."""
+    WAL_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(WAL_FILE, "a") as f:
+            for row in batch:
+                entry = {"ts": time.time(), "row": row}
+                f.write(json.dumps(entry) + "\n")
+        logger.info("WAL: appended %d rows → %s", len(batch), WAL_FILE)
+    except OSError as exc:
+        logger.error("WAL write failed: %s", exc)
+
+
+def _wal_read_valid() -> List[Dict]:
+    """Read WAL, filter by TTL, enforce size cap, return metric dicts."""
+    if not WAL_FILE.exists():
+        return []
+
+    cutoff = time.time() - WAL_MAX_AGE_HOURS * 3600
+    rows: list[dict] = []
+    raw_lines: list[str] = []
+
+    try:
+        with open(WAL_FILE) as f:
+            raw_lines = f.readlines()
+    except OSError:
+        return []
+
+    for line in raw_lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+            if entry.get("ts", 0) >= cutoff:
+                rows.append(entry["row"])
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Size cap: drop oldest if WAL is too large
+    wal_mb = WAL_FILE.stat().st_size / (1024 * 1024) if WAL_FILE.exists() else 0
+    if wal_mb > WAL_MAX_MB:
+        drop = max(0, len(rows) - len(rows) // 2)
+        rows = rows[drop:]
+        logger.warning("WAL exceeded %dMB — dropped %d oldest rows", WAL_MAX_MB, drop)
+
+    return rows
+
+
+def _wal_clear() -> None:
+    """Delete the WAL after a successful full replay."""
+    try:
+        WAL_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+# ── Session factory ───────────────────────────────────────────────────────────
+
+
+def _build_session(api_key: str) -> requests.Session:
+    session = requests.Session()
+    session.headers.update({
+        "Content-Type": "application/json",
+        "X-API-Key": api_key,
+    })
+    if HTTPS_PROXY:
+        session.proxies = {"https": HTTPS_PROXY, "http": HTTPS_PROXY}
+    if CA_BUNDLE:
+        session.verify = CA_BUNDLE
+    if CLIENT_CERT and CLIENT_KEY:
+        session.cert = (CLIENT_CERT, CLIENT_KEY)
+    return session
+
+
+# ── Uploader ──────────────────────────────────────────────────────────────────
+
 
 class MetricsUploader:
-    """Handles uploading metrics to AluminatAI API"""
+    """Upload GPU metrics to the AluminatAI API with backoff + WAL durability."""
 
     def __init__(self, api_endpoint: str = API_ENDPOINT, api_key: str = API_KEY):
         self.api_endpoint = api_endpoint
         self.api_key = api_key
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json',
-            'X-API-Key': api_key,
-        })
-
-        # Metrics buffer
+        self.session = _build_session(api_key)
         self.buffer: List[Dict] = []
-        self.failed_uploads_dir = DATA_DIR / 'failed_uploads'
+        self._upload_success = 0
+        self._upload_failure = 0
+        logger.info("Uploader initialised → %s", api_endpoint)
 
-        if ENABLE_LOCAL_BACKUP:
-            self.failed_uploads_dir.mkdir(parents=True, exist_ok=True)
-
-        logger.info(f"📤 Uploader initialized: {api_endpoint}")
-
-    def add_metrics(self, metrics: List[Dict]):
-        """Add metrics to upload buffer"""
+    def add_metrics(self, metrics: List[Dict]) -> None:
         self.buffer.extend(metrics)
-        logger.debug(f"Added {len(metrics)} metrics to buffer (total: {len(self.buffer)})")
 
     def upload_batch(self, metrics: List[Dict]) -> bool:
-        """Upload a batch of metrics to API"""
-        try:
-            response = self.session.post(
-                self.api_endpoint,
-                json=metrics,
-                timeout=30
-            )
+        """
+        Upload one batch with exponential backoff.
 
-            if response.status_code == 200:
-                data = response.json()
-                logger.info(f"✅ Uploaded {len(metrics)} metrics successfully")
+        Returns True on success.  Writes to WAL on permanent failure.
+        """
+        delay = 1.0
+        for attempt in range(1, UPLOAD_MAX_RETRIES + 1):
+            try:
+                resp = self.session.post(self.api_endpoint, json=metrics, timeout=30)
+            except requests.Timeout:
+                logger.warning("Upload timeout (attempt %d/%d)", attempt, UPLOAD_MAX_RETRIES)
+                self._sleep_with_jitter(delay)
+                delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
+                continue
+            except requests.ConnectionError as exc:
+                logger.warning("Connection error (attempt %d/%d): %s", attempt, UPLOAD_MAX_RETRIES, exc)
+                self._sleep_with_jitter(delay)
+                delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
+                continue
+            except requests.RequestException as exc:
+                logger.error("Unrecoverable request error: %s", exc)
+                _wal_append(metrics)
+                self._upload_failure += 1
+                return False
+
+            if resp.status_code == 200:
+                self._upload_success += len(metrics)
                 return True
-            elif response.status_code == 401:
-                logger.error("❌ API key invalid or expired")
-                return False
-            elif response.status_code == 429:
-                logger.warning("⚠️  Rate limit exceeded, will retry later")
-                return False
-            else:
-                logger.warning(f"⚠️  Upload failed: HTTP {response.status_code}")
-                try:
-                    error_data = response.json()
-                    logger.warning(f"   Error: {error_data.get('error', 'Unknown error')}")
-                except:
-                    pass
+
+            if resp.status_code in (401, 403):
+                logger.error("Permanent auth failure (%d) — check API key", resp.status_code)
+                _wal_append(metrics)
+                self._upload_failure += 1
                 return False
 
-        except requests.Timeout:
-            logger.error("❌ Upload timeout (30s)")
-            return False
-        except requests.ConnectionError as e:
-            logger.error(f"❌ Connection error: {e}")
-            return False
-        except requests.RequestException as e:
-            logger.error(f"❌ Upload error: {e}")
-            return False
+            if resp.status_code == 429:
+                retry_after = float(resp.headers.get("Retry-After", delay))
+                logger.warning("Rate-limited — waiting %.0fs", retry_after)
+                time.sleep(retry_after + random.uniform(0, 1))
+                delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
+                continue
+
+            # 5xx or other transient error
+            logger.warning("HTTP %d (attempt %d/%d)", resp.status_code, attempt, UPLOAD_MAX_RETRIES)
+            self._sleep_with_jitter(delay)
+            delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
+
+        # Exhausted retries
+        logger.error("Upload failed after %d attempts — writing to WAL", UPLOAD_MAX_RETRIES)
+        _wal_append(metrics)
+        self._upload_failure += 1
+        return False
+
+    @staticmethod
+    def _sleep_with_jitter(base_delay: float) -> None:
+        jitter = random.uniform(-0.2 * base_delay, 0.2 * base_delay)
+        time.sleep(max(0, base_delay + jitter))
 
     def flush(self) -> int:
-        """Upload all buffered metrics"""
+        """Upload all buffered metrics. Returns number successfully uploaded."""
         if not self.buffer:
             return 0
 
         uploaded = 0
-        failed_batches = []
+        remaining: list[dict] = []
 
-        # Split into batches
         for i in range(0, len(self.buffer), UPLOAD_BATCH_SIZE):
             batch = self.buffer[i:i + UPLOAD_BATCH_SIZE]
-
             if self.upload_batch(batch):
                 uploaded += len(batch)
             else:
-                failed_batches.append(batch)
+                remaining.extend(batch)
 
-        # Save failed uploads locally
-        if failed_batches and ENABLE_LOCAL_BACKUP:
-            self._save_failed_uploads(failed_batches)
-
-        # Clear buffer
-        total_metrics = len(self.buffer)
-        self.buffer = []
-
-        if uploaded > 0:
-            logger.info(f"📊 Upload summary: {uploaded}/{total_metrics} succeeded")
-
+        self.buffer = remaining
+        if uploaded:
+            logger.info("Flushed %d metrics", uploaded)
         return uploaded
 
-    def _save_failed_uploads(self, batches: List[List[Dict]]):
-        """Save failed uploads to disk for retry"""
-        timestamp = int(time.time())
-        filepath = self.failed_uploads_dir / f"failed_{timestamp}.json"
-
-        try:
-            with open(filepath, 'w') as f:
-                json.dump({
-                    'timestamp': timestamp,
-                    'batches': batches,
-                }, f)
-            logger.info(f"💾 Saved {sum(len(b) for b in batches)} failed metrics to {filepath}")
-        except Exception as e:
-            logger.error(f"Failed to save failed uploads: {e}")
-
     def retry_failed_uploads(self) -> int:
-        """Retry uploading previously failed batches"""
-        if not ENABLE_LOCAL_BACKUP:
+        """
+        Replay the WAL at startup.  Returns number of metrics successfully re-uploaded.
+        Clears the WAL if all entries are replayed.
+        """
+        rows = _wal_read_valid()
+        if not rows:
             return 0
 
+        logger.info("WAL replay: %d rows pending", len(rows))
         uploaded = 0
-        failed_files = list(self.failed_uploads_dir.glob('failed_*.json'))
+        failed: list[dict] = []
 
-        if not failed_files:
-            return 0
+        for i in range(0, len(rows), UPLOAD_BATCH_SIZE):
+            batch = rows[i:i + UPLOAD_BATCH_SIZE]
+            if self.upload_batch(batch):
+                uploaded += len(batch)
+            else:
+                failed.extend(batch)
 
-        logger.info(f"🔄 Retrying {len(failed_files)} failed upload batch(es)")
-
-        for filepath in failed_files:
-            try:
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-
-                all_succeeded = True
-                for batch in data['batches']:
-                    if self.upload_batch(batch):
-                        uploaded += len(batch)
-                    else:
-                        all_succeeded = False
-                        break
-
-                # Delete file if all batches succeeded
-                if all_succeeded:
-                    filepath.unlink()
-                    logger.info(f"✅ Retried and cleared {filepath.name}")
-
-            except Exception as e:
-                logger.error(f"Failed to retry {filepath}: {e}")
+        if not failed:
+            _wal_clear()
+            logger.info("WAL replay complete — all %d rows uploaded", uploaded)
+        else:
+            # Rewrite WAL with only the failed rows
+            _wal_clear()
+            _wal_append(failed)
+            logger.warning("WAL replay partial: %d uploaded, %d remain", uploaded, len(failed))
 
         return uploaded
 
     def get_status(self) -> Dict:
-        """Get uploader status"""
-        failed_count = 0
-        if ENABLE_LOCAL_BACKUP:
-            failed_files = list(self.failed_uploads_dir.glob('failed_*.json'))
-            for filepath in failed_files:
-                try:
-                    with open(filepath, 'r') as f:
-                        data = json.load(f)
-                        for batch in data['batches']:
-                            failed_count += len(batch)
-                except:
-                    pass
-
+        wal_size = WAL_FILE.stat().st_size if WAL_FILE.exists() else 0
         return {
-            'buffer_size': len(self.buffer),
-            'failed_metrics_count': failed_count,
-            'api_endpoint': self.api_endpoint,
-            'has_api_key': bool(self.api_key),
+            "buffer_size": len(self.buffer),
+            "wal_bytes": wal_size,
+            "upload_success_total": self._upload_success,
+            "upload_failure_total": self._upload_failure,
+            "api_endpoint": self.api_endpoint,
+            "has_api_key": bool(self.api_key),
         }

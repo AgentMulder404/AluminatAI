@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# DEPRECATED: use agent/agent.py (aluminatai-agent CLI) instead.
+# This file is kept for reference and will be deleted in v0.3.0.
 """
 AluminatAI Background Monitoring Agent v0.1
 

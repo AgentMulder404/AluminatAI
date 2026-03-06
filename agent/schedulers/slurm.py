@@ -297,6 +297,55 @@ class SlurmAdapter(SchedulerAdapter):
             pass
         return ""
 
+    def resolve_job(self, job_id: str) -> Optional[JobMetadata]:
+        """
+        Back-lookup a Slurm job by its numeric job ID.
+
+        Checks the local gpu_job_map cache first (populated by discover_jobs),
+        then falls back to scontrol for jobs discovered via PID environ.
+        """
+        # Cache hit: strip "slurm-" prefix used internally
+        for cached in self._gpu_job_map.values():
+            if cached.job_id == f"slurm-{job_id}" or cached.job_id == job_id:
+                return cached
+
+        # Not in cache — query scontrol directly
+        try:
+            result = subprocess.run(
+                ["scontrol", "show", "job", job_id],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode != 0:
+                return None
+            output = result.stdout
+
+            name_match = re.search(r"JobName=(\S+)", output)
+            account_match = re.search(r"Account=(\S+)", output)
+            user_match = re.search(r"UserId=(\w+)", output)
+            start_match = re.search(r"StartTime=(\S+)", output)
+
+            name = name_match.group(1) if name_match else "unknown"
+            account = account_match.group(1) if account_match else "default"
+            user = user_match.group(1) if user_match else "unknown"
+            start = start_match.group(1) if start_match else ""
+            model_tag = self._fetch_model_from_scontrol(job_id)
+            gpu_indices = self._resolve_job_gpus(job_id)
+
+            return JobMetadata(
+                job_id=f"slurm-{job_id}",
+                job_name=name,
+                team_id=account,
+                model_tag=model_tag,
+                scheduler_source="slurm",
+                gpu_indices=gpu_indices,
+                user_email=f"{user}@cluster",
+                start_time=start,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+
     @property
     def name(self) -> str:
         if self._inside_job:

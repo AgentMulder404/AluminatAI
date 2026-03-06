@@ -1,3 +1,5 @@
+# DEPRECATED: use agent/agent.py (aluminatai-agent CLI) instead.
+# This file is kept for reference and will be deleted in v0.3.0.
 """
 GPU Energy Agent - Main Entry Point
 
@@ -37,6 +39,14 @@ try:
     SCHEDULER_AVAILABLE = True
 except ImportError:
     SCHEDULER_AVAILABLE = False
+
+try:
+    from attribution import AttributionEngine
+    from attribution.process_probe import ProcessProbe
+    from attribution.pid_resolver import PidResolver
+    ATTRIBUTION_AVAILABLE = True
+except ImportError:
+    ATTRIBUTION_AVAILABLE = False
 
 
 class EnergyAgent:
@@ -87,6 +97,15 @@ class EnergyAgent:
                 print(f"🔗 Scheduler: {self.scheduler.name}")
         elif not quiet:
             print("⚠️  Scheduler integration unavailable")
+
+        # Initialize attribution engine (process-level GPU attribution)
+        self.attribution_engine = None
+        if ATTRIBUTION_AVAILABLE and self.scheduler:
+            probe = ProcessProbe()
+            resolver = PidResolver(self.scheduler)
+            self.attribution_engine = AttributionEngine(probe, resolver, self.scheduler)
+            if not quiet:
+                print("🔬 Attribution: process-level GPU attribution enabled")
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -160,8 +179,47 @@ class EnergyAgent:
                 metrics = self.collector.collect()
                 self.sample_count += 1
 
-                # Enrich metrics with job attribution
-                if self.scheduler:
+                # Enrich metrics with job attribution and upload
+                if self.uploader:
+                    attributed_dicts: list[dict] = []
+                    for m in metrics:
+                        handle = self.collector.gpu_handles[m.gpu_index]
+                        if self.attribution_engine:
+                            attributions = self.attribution_engine.resolve(
+                                handle=handle,
+                                gpu_index=m.gpu_index,
+                                total_power_w=m.power_draw_w,
+                                energy_delta_j=m.energy_delta_j,
+                            )
+                            if attributions:
+                                for attr in attributions:
+                                    d = m.to_dict()
+                                    d.update(
+                                        team_id=attr.team_id,
+                                        model_tag=attr.model_tag,
+                                        job_id=attr.job_id,
+                                        scheduler_source=attr.scheduler_source,
+                                        power_draw_w=attr.power_w,
+                                        energy_delta_j=attr.energy_delta_j,
+                                        gpu_fraction=attr.gpu_fraction,
+                                        attribution_confidence=attr.confidence,
+                                    )
+                                    attributed_dicts.append(d)
+                            else:
+                                attributed_dicts.append(m.to_dict())
+                        elif self.scheduler:
+                            # Old fallback: winner-takes-all scheduler poll
+                            job = self.scheduler.gpu_to_job(m.gpu_index)
+                            if job:
+                                m.job_id = job.job_id
+                                m.team_id = job.team_id
+                                m.model_tag = job.model_tag
+                                m.scheduler_source = job.scheduler_source
+                            attributed_dicts.append(m.to_dict())
+                        else:
+                            attributed_dicts.append(m.to_dict())
+                    self.uploader.add_metrics(attributed_dicts)
+                elif self.scheduler and not self.attribution_engine:
                     for m in metrics:
                         job = self.scheduler.gpu_to_job(m.gpu_index)
                         if job:
@@ -174,11 +232,6 @@ class EnergyAgent:
                 for m in metrics:
                     if m.energy_delta_j:
                         self.total_energy[m.gpu_index] += m.energy_delta_j / 3_600_000  # J -> kWh
-
-                # Add metrics to uploader buffer
-                if self.uploader:
-                    metric_dicts = [m.to_dict() for m in metrics]
-                    self.uploader.add_metrics(metric_dicts)
 
                     # Flush buffer periodically
                     if time.time() - self.last_upload_time >= UPLOAD_INTERVAL:

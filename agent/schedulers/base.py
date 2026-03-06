@@ -55,6 +55,24 @@ class SchedulerAdapter(ABC):
         """
         ...
 
+    def resolve_job(self, job_id: str) -> Optional["JobMetadata"]:
+        """
+        Back-lookup a specific job by ID or name (for PidResolver).
+
+        Called when a process's environ contains a scheduler-specific
+        job identifier. Override in adapters that support it.
+        Default returns None (unsupported).
+        """
+        return None
+
+    def resolve_pod_by_uid(self, pod_uid: str) -> Optional["JobMetadata"]:
+        """
+        Back-lookup a Kubernetes pod by its UID (for PidResolver).
+
+        Override in KubernetesAdapter. Default returns None.
+        """
+        return None
+
     @property
     def name(self) -> str:
         """Human-readable adapter name."""
