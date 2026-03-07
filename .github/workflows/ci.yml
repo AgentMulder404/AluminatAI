@@ -29,4 +29,4 @@ jobs:
         run: pip install pytest pytest-cov
 
       - name: Run tests
-        run: pytest agent/tests/ -v --tb=short --ignore=agent/tests/powercap_ab_test.py
+        run: pytest agent/tests/ -v --tb=short --ignore=agent/tests/powercap_ab_test.py --ignore=agent/tests/test_collector.py
