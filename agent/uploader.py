@@ -101,8 +101,10 @@ def _build_session(api_key: str) -> requests.Session:
     })
     if HTTPS_PROXY:
         session.proxies = {"https": HTTPS_PROXY, "http": HTTPS_PROXY}
-    if CA_BUNDLE:
-        session.verify = CA_BUNDLE
+    # TLS verification: always enabled. Never set verify=False — self-signed certs
+    # are rejected by default. CA_BUNDLE overrides the system CA store (e.g. for
+    # corporate proxy MITM certs); omit it to use the bundled Mozilla CA store.
+    session.verify = CA_BUNDLE if CA_BUNDLE else True
     if CLIENT_CERT and CLIENT_KEY:
         session.cert = (CLIENT_CERT, CLIENT_KEY)
     return session
