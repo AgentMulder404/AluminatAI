@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "GPU energy monitoring agent with per-job attribution"
 requires-python = ">=3.9"
 dependencies = [
-    "nvidia-ml-py3>=11.0",   # same API as pynvml; requirements.txt pins pynvml==11.5.0
+    "pynvml>=11.0",
     "requests>=2.32",
     "python-dotenv>=1.0",
     "rich>=13.9",
