@@ -20,6 +20,9 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
+      - name: Upgrade pip and setuptools
+        run: pip install --upgrade pip "setuptools>=68"
+
       - name: Install agent with optional extras
         # nvidia-ml-py3 installs fine without a GPU — NVML is loaded lazily at runtime.
         # Tests mock pynvml so they run correctly without hardware.
