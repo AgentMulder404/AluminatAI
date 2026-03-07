@@ -17,13 +17,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Checkout private submodule
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          git config --global url."https://${GH_PAT}@github.com/".insteadOf "https://github.com/"
-          git submodule update --init --recursive
+        with:
+          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
