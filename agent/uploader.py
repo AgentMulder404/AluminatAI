@@ -28,9 +28,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import random
 import time
 from typing import Dict, List
+
+try:
+    import fcntl  # POSIX only — not available on Windows
+    _HAS_FCNTL = True
+except ImportError:
+    _HAS_FCNTL = False
 
 import requests
 
@@ -49,14 +56,24 @@ WAL_FILE = WAL_DIR / "metrics.wal"
 
 
 def _wal_append(batch: List[Dict]) -> None:
-    """Append a batch to the WAL as newline-delimited JSON entries."""
+    """Append a batch to the WAL as newline-delimited JSON entries.
+
+    Uses an exclusive flock on POSIX to prevent concurrent writers (e.g. two
+    agent processes during a K8s rolling update) from interleaving partial
+    writes and corrupting the WAL.
+    """
     WAL_DIR.mkdir(parents=True, exist_ok=True)
     try:
         with open(WAL_FILE, "a") as f:
-            for row in batch:
-                entry = {"ts": time.time(), "row": row}
-                f.write(json.dumps(entry) + "
-")
+            if _HAS_FCNTL:
+                fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                for row in batch:
+                    entry = {"ts": time.time(), "row": row}
+                    f.write(json.dumps(entry) + "\n")
+            finally:
+                if _HAS_FCNTL:
+                    fcntl.flock(f, fcntl.LOCK_UN)
         logger.info("WAL: appended %d rows → %s", len(batch), WAL_FILE)
     except OSError as exc:
         logger.error("WAL write failed: %s", exc)
@@ -104,6 +121,38 @@ def _wal_clear() -> None:
         WAL_FILE.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def _wal_rewrite(rows: List[Dict]) -> None:
+    """Atomically replace the WAL with only the given rows.
+
+    Writes to a .tmp sibling file first, then renames over the WAL so that a
+    crash between _wal_clear() and _wal_append() can never lose data — the
+    old WAL remains intact until the rename succeeds.
+    """
+    WAL_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = WAL_FILE.with_suffix(".tmp")
+    try:
+        with open(tmp, "w") as f:
+            if _HAS_FCNTL:
+                fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                for row in rows:
+                    entry = {"ts": time.time(), "row": row}
+                    f.write(json.dumps(entry) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+            finally:
+                if _HAS_FCNTL:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        tmp.replace(WAL_FILE)  # atomic on POSIX
+        logger.info("WAL: rewrote %d rows → %s", len(rows), WAL_FILE)
+    except OSError as exc:
+        logger.error("WAL rewrite failed: %s", exc)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 # ── Session factory ───────────────────────────────────────────────────────────
@@ -247,9 +296,10 @@ class MetricsUploader:
             _wal_clear()
             logger.info("WAL replay complete — all %d rows uploaded", uploaded)
         else:
-            # Rewrite WAL with only the failed rows
-            _wal_clear()
-            _wal_append(failed)
+            # Atomically rewrite WAL with only the rows that still need upload.
+            # _wal_rewrite() writes to a .tmp file then renames, so a crash
+            # between these two steps cannot silently drop metrics.
+            _wal_rewrite(failed)
             logger.warning("WAL replay partial: %d uploaded, %d remain", uploaded, len(failed))
 
         return uploaded
