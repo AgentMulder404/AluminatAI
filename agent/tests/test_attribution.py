@@ -14,23 +14,29 @@
 #
 # AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 """
-Attribution engine unit tests (Phase 3 — DDP grouping).
+Attribution engine unit tests.
 
 Tests:
-  1. DDP: 8 PIDs with same SLURM_JOB_ID → 1 result, gpu_fraction=1.0
-  2. Multi-tenant: 2 PIDs from different jobs (60/40 mem split) → 2 results summing to 1.0
-  3. No-PID scheduler fallback → confidence="scheduler_poll", gpu_fraction=1.0
-  4. No-PID, no scheduler, ALUMINATAI_IDLE_TEAM set → confidence="idle"
+  1.  DDP: 8 PIDs with same SLURM_JOB_ID → 1 result, gpu_fraction=1.0, confidence="scheduler"
+  2.  Multi-tenant: 2 PIDs from different jobs (60/40 mem split) → 2 results summing to 1.0
+  3.  No-PID scheduler fallback → confidence="scheduler_poll", gpu_fraction=1.0
+  4.  No-PID, no scheduler, ALUMINATAI_IDLE_TEAM set → confidence="idle"
+  5.  Heuristic match: jupyter cmdline → confidence="heuristic", scheduler_source="heuristic"
+  6.  Parent PID walk: ancestor environ with ALUMINATAI_TEAM → tag inherited
+  7.  Rules file match: custom JSON rules file → correct team/model assigned
+  8.  Spoofing guard: untrusted UID with ALUMINATAI_TEAM → manual tag ignored
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sys
+import tempfile
 import unittest
 from dataclasses import dataclass, field
 from typing import List, Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, patch as mock_patch
 
 # Allow running from repo root or agent/ directory
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -38,6 +44,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from attribution.engine import AttributionEngine, AttributionResult
 from attribution.process_probe import ProcessInfo, ProcessProbe
 from attribution.pid_resolver import PidResolver
+from attribution.rules import AttributionRules
 from schedulers.base import JobMetadata, NullAdapter, SchedulerAdapter
 
 
@@ -55,11 +62,13 @@ def make_job(job_id: str, team: str = "team-a", model: str = "gpt") -> JobMetada
     )
 
 
-def make_proc(pid: int, gpu_mem: int, slurm_job_id: str = "") -> ProcessInfo:
+def make_proc(pid: int, gpu_mem: int, slurm_job_id: str = "",
+              cmdline: str = "", owner_uid: int = -1) -> ProcessInfo:
     environ = {}
     if slurm_job_id:
         environ["SLURM_JOB_ID"] = slurm_job_id
-    return ProcessInfo(pid=pid, gpu_memory_bytes=gpu_mem, environ=environ)
+    return ProcessInfo(pid=pid, gpu_memory_bytes=gpu_mem, environ=environ,
+                       cmdline=cmdline, owner_uid=owner_uid)
 
 
 class MockScheduler(SchedulerAdapter):
@@ -93,7 +102,7 @@ def build_engine(procs: List[ProcessInfo], scheduler: SchedulerAdapter) -> Attri
     return AttributionEngine(probe, resolver, scheduler)
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
+# ── Tests: existing behaviour ─────────────────────────────────────────────────
 
 
 class TestDDPGrouping(unittest.TestCase):
@@ -116,7 +125,7 @@ class TestDDPGrouping(unittest.TestCase):
         self.assertEqual(r.team_id, "ml-team")
         self.assertAlmostEqual(r.gpu_fraction, 1.0, places=3)
         self.assertAlmostEqual(r.power_w, 300.0, places=1)
-        self.assertEqual(r.confidence, "process")
+        self.assertEqual(r.confidence, "scheduler")
 
 
 class TestMultiTenantSplit(unittest.TestCase):
@@ -149,14 +158,13 @@ class TestMultiTenantSplit(unittest.TestCase):
         self.assertAlmostEqual(total_energy, 2000.0, places=2)
 
         for r in results:
-            self.assertEqual(r.confidence, "process")
+            self.assertEqual(r.confidence, "scheduler")
 
 
 class TestSchedulerFallback(unittest.TestCase):
     """Case 3: No running processes → fall back to scheduler.gpu_to_job()."""
 
     def test_no_procs_uses_scheduler_poll(self):
-        job = make_job("JOB_SCHED", team="ops-team")
         job = JobMetadata(
             job_id="JOB_SCHED",
             job_name="training",
@@ -203,6 +211,218 @@ class TestIdleFallback(unittest.TestCase):
             results = engine.resolve(handle=None, gpu_index=0, total_power_w=50.0, energy_delta_j=250.0)
 
         self.assertEqual(results, [], "No attribution config → empty list (backward compat)")
+
+
+# ── Tests: new Phase 2–3 behaviour ────────────────────────────────────────────
+
+
+class TestHeuristicResolution(unittest.TestCase):
+    """Case 5: Untagged process with recognisable cmdline → heuristic attribution."""
+
+    def test_jupyter_cmdline_heuristic(self):
+        proc = make_proc(pid=9999, gpu_mem=2 * 1024**3,
+                         cmdline="jupyter notebook --no-browser --port=8888")
+        scheduler = NullAdapter()
+        engine = build_engine([proc], scheduler)
+
+        results = engine.resolve(handle=None, gpu_index=0, total_power_w=80.0, energy_delta_j=400.0)
+
+        self.assertEqual(len(results), 1)
+        r = results[0]
+        self.assertEqual(r.confidence, "heuristic")
+        self.assertEqual(r.scheduler_source, "heuristic")
+        self.assertEqual(r.team_id, "jupyter")
+        self.assertEqual(r.model_tag, "notebook")
+
+    def test_vllm_cmdline_heuristic(self):
+        proc = make_proc(pid=8888, gpu_mem=10 * 1024**3,
+                         cmdline="python -m vllm.entrypoints.openai.api_server --model llama3")
+        scheduler = NullAdapter()
+        engine = build_engine([proc], scheduler)
+
+        results = engine.resolve(handle=None, gpu_index=0, total_power_w=200.0, energy_delta_j=None)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].confidence, "heuristic")
+        self.assertEqual(results[0].model_tag, "vllm-serve")
+
+    def test_empty_cmdline_no_heuristic(self):
+        """Processes with no cmdline should not match heuristics → memory_split."""
+        proc = make_proc(pid=7777, gpu_mem=1 * 1024**3, cmdline="")
+        scheduler = NullAdapter()
+        engine = build_engine([proc], scheduler)
+
+        env_without_idle = {k: v for k, v in os.environ.items() if k != "ALUMINATAI_IDLE_TEAM"}
+        with patch.dict(os.environ, env_without_idle, clear=True):
+            results = engine.resolve(handle=None, gpu_index=0, total_power_w=50.0, energy_delta_j=None)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].confidence, "memory_split")
+
+
+class TestParentPidWalk(unittest.TestCase):
+    """Case 6: Ancestor process has ALUMINATAI_TEAM in its environ."""
+
+    def test_inherits_team_from_parent(self):
+        probe = ProcessProbe()
+        child_pid, parent_pid = 5000, 4000
+
+        with patch.object(probe, "_read_ppid", side_effect=lambda p: parent_pid if p == child_pid else None), \
+             patch.object(probe, "_read_environ", side_effect=lambda p: {"ALUMINATAI_TEAM": "nlp-team"} if p == parent_pid else {}):
+            result = probe._walk_parent_environ(child_pid)
+
+        self.assertEqual(result.get("ALUMINATAI_TEAM"), "nlp-team")
+
+    def test_no_match_returns_empty(self):
+        probe = ProcessProbe()
+
+        with patch.object(probe, "_read_ppid", return_value=None):
+            result = probe._walk_parent_environ(1234)
+
+        self.assertEqual(result, {})
+
+    def test_stops_at_init_pid(self):
+        probe = ProcessProbe()
+
+        # Parent is PID 1 (init) → should stop immediately without reading its environ
+        with patch.object(probe, "_read_ppid", return_value=1), \
+             patch.object(probe, "_read_environ") as mock_environ:
+            result = probe._walk_parent_environ(5000)
+
+        mock_environ.assert_not_called()
+        self.assertEqual(result, {})
+
+
+class TestAttributionRulesFile(unittest.TestCase):
+    """Case 7: Custom rules JSON file assigns correct team/model."""
+
+    def _write_rules(self, rules_data: dict) -> str:
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        json.dump(rules_data, tmp)
+        tmp.close()
+        return tmp.name
+
+    def test_rules_file_match(self):
+        path = self._write_rules({
+            "rules": [
+                {"pattern": "python.*gpt4_train", "team": "llm-infra", "model": "gpt4", "priority": 10},
+                {"pattern": "jupyter",            "team": "research",  "model": "notebook", "priority": 1},
+            ]
+        })
+        try:
+            with patch.dict(os.environ, {"ALUMINATAI_ATTRIBUTION_CONFIG": path}):
+                rules = AttributionRules()
+                rules.load()
+
+            match = rules.match("python gpt4_train.py --lr 0.001")
+            self.assertIsNotNone(match)
+            self.assertEqual(match.team, "llm-infra")
+            self.assertEqual(match.model, "gpt4")
+        finally:
+            os.unlink(path)
+
+    def test_priority_ordering(self):
+        path = self._write_rules({
+            "rules": [
+                {"pattern": "python", "team": "low-prio",  "priority": 1},
+                {"pattern": "python", "team": "high-prio", "priority": 99},
+            ]
+        })
+        try:
+            with patch.dict(os.environ, {"ALUMINATAI_ATTRIBUTION_CONFIG": path}):
+                rules = AttributionRules()
+                rules.load()
+
+            match = rules.match("python train.py")
+            self.assertEqual(match.team, "high-prio")
+        finally:
+            os.unlink(path)
+
+    def test_no_rules_file_is_noop(self):
+        """Missing config file → load() silently no-ops, match() returns None."""
+        with patch.dict(os.environ, {"ALUMINATAI_ATTRIBUTION_CONFIG": "/nonexistent/path.json"}):
+            rules = AttributionRules()
+            rules.load()
+
+        self.assertIsNone(rules.match("python anything.py"))
+
+    def test_rules_file_end_to_end(self):
+        """Rules match flows through PidResolver → AttributionEngine → confidence='rules'."""
+        path = self._write_rules({
+            "rules": [{"pattern": "special_workload", "team": "ops-team", "model": "custom"}]
+        })
+        try:
+            proc = make_proc(pid=3333, gpu_mem=4 * 1024**3,
+                             cmdline="python special_workload.py")
+            scheduler = NullAdapter()
+
+            with patch.dict(os.environ, {"ALUMINATAI_ATTRIBUTION_CONFIG": path}):
+                engine = build_engine([proc], scheduler)
+                results = engine.resolve(handle=None, gpu_index=0, total_power_w=100.0, energy_delta_j=None)
+
+            self.assertEqual(len(results), 1)
+            r = results[0]
+            self.assertEqual(r.confidence, "rules")
+            self.assertEqual(r.team_id, "ops-team")
+            self.assertEqual(r.model_tag, "custom")
+        finally:
+            os.unlink(path)
+
+
+class TestSpoofingGuard(unittest.TestCase):
+    """Case 8: Untrusted UID with ALUMINATAI_TEAM → manual tag ignored."""
+
+    def test_untrusted_uid_skips_manual_tag(self):
+        """Process from UID 1001 claiming ALUMINATAI_TEAM when only UID 0 is trusted."""
+        proc = ProcessInfo(
+            pid=1234,
+            gpu_memory_bytes=1 * 1024**3,
+            environ={"ALUMINATAI_TEAM": "malicious-team"},
+            owner_uid=1001,
+        )
+        scheduler = NullAdapter()
+
+        with patch("attribution.pid_resolver._TRUSTED_UIDS", {0}):
+            resolver = PidResolver(scheduler)
+            job = resolver.resolve(proc)
+
+        # Manual tag ignored, no heuristic match → unresolved
+        self.assertIsNone(job)
+
+    def test_trusted_uid_allows_manual_tag(self):
+        """Root process (UID 0) setting ALUMINATAI_TEAM should be honoured."""
+        proc = ProcessInfo(
+            pid=1235,
+            gpu_memory_bytes=1 * 1024**3,
+            environ={"ALUMINATAI_TEAM": "trusted-team"},
+            owner_uid=0,
+        )
+        scheduler = NullAdapter()
+
+        with patch("attribution.pid_resolver._TRUSTED_UIDS", {0}):
+            resolver = PidResolver(scheduler)
+            job = resolver.resolve(proc)
+
+        self.assertIsNotNone(job)
+        self.assertEqual(job.team_id, "trusted-team")
+        self.assertEqual(job.scheduler_source, "manual")
+
+    def test_empty_trusted_uids_allows_all(self):
+        """When TRUSTED_UIDS is empty (default), all UIDs are accepted."""
+        proc = ProcessInfo(
+            pid=1236,
+            gpu_memory_bytes=1 * 1024**3,
+            environ={"ALUMINATAI_TEAM": "any-team"},
+            owner_uid=9999,
+        )
+        scheduler = NullAdapter()
+
+        with patch("attribution.pid_resolver._TRUSTED_UIDS", set()):
+            resolver = PidResolver(scheduler)
+            job = resolver.resolve(proc)
+
+        self.assertIsNotNone(job)
+        self.assertEqual(job.team_id, "any-team")
 
 
 if __name__ == "__main__":

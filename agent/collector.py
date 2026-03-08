@@ -339,8 +339,7 @@ if __name__ == '__main__':
             for info in collector.get_gpu_info():
                 print(f"  GPU {info['index']}: {info['name']} ({info['uuid']})")
 
-            print("
-Collecting 3 samples (2s intervals)...")
+            print("\nCollecting 3 samples (2s intervals)...")
             for i in range(3):
                 metrics = collector.collect()
                 for m in metrics:
@@ -352,8 +351,7 @@ Collecting 3 samples (2s intervals)...")
                 if i < 2:  # Don't sleep after last sample
                     time.sleep(2)
 
-            print("
-✅ Collector test passed!")
+            print("\n  Collector test passed!")
 
     except Exception as e:
         print(f"❌ Error: {e}")

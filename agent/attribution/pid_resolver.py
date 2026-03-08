@@ -20,8 +20,10 @@ Resolution priority (first match wins):
   1. SLURM_JOB_ID in environ  → SlurmAdapter.resolve_job()
   2. RUNAI_JOB_NAME in environ → RunaiAdapter.resolve_job()
   3. KUBERNETES_SERVICE_HOST   → read cgroup for pod UID → KubernetesAdapter.resolve_pod_by_uid()
-  4. ALUMINATAI_TEAM + ALUMINATAI_MODEL env vars (manual override)
-  5. None (unresolved — power is still tracked under "pid:<pid>")
+  4. ALUMINATAI_TEAM + ALUMINATAI_MODEL env vars (manual override, anti-spoof checked)
+  5. Custom attribution rules file (ALUMINATAI_ATTRIBUTION_CONFIG)
+  6. Built-in cmdline heuristics (jupyter, vllm, torchserve, …)
+  7. None (unresolved — power is still tracked under "pid:<pid>")
 """
 
 import logging
@@ -38,10 +40,31 @@ logger = logging.getLogger(__name__)
 
 _IS_LINUX = sys.platform.startswith("linux")
 
+# Load TRUSTED_UIDS from config (guarded so tests can run without config on path)
+try:
+    from config import TRUSTED_UIDS as _TRUSTED_UIDS
+except ImportError:
+    _TRUSTED_UIDS: set[int] = set()
+
+# Built-in cmdline heuristics: (compiled_regex, team_id, model_tag)
+# Checked in order; first match wins. Confidence → "heuristic".
+_BUILTIN_HEURISTICS: list[tuple[re.Pattern, str, str]] = [
+    (re.compile(r"jupyter",           re.IGNORECASE), "jupyter",   "notebook"),
+    (re.compile(r"python.*train",     re.IGNORECASE), "unknown",   "training"),
+    (re.compile(r"python.*inference", re.IGNORECASE), "unknown",   "inference"),
+    (re.compile(r"vllm",              re.IGNORECASE), "unknown",   "vllm-serve"),
+    (re.compile(r"torchserve",        re.IGNORECASE), "unknown",   "torchserve"),
+    (re.compile(r"tritonserver",      re.IGNORECASE), "unknown",   "triton"),
+]
+
 
 class PidResolver:
     def __init__(self, scheduler: "SchedulerAdapter"):
         self._scheduler = scheduler
+        # Load custom attribution rules (silently skipped if no config file found)
+        from .rules import AttributionRules
+        self._rules = AttributionRules()
+        self._rules.load()
 
     def resolve(self, proc: ProcessInfo) -> "Optional[JobMetadata]":
         env = proc.environ
@@ -68,20 +91,60 @@ class PidResolver:
                 if job:
                     return job
 
-        # 4. Manual ALUMINATAI env vars
+        # 4. Manual ALUMINATAI env vars (with optional anti-spoofing)
         team = env.get("ALUMINATAI_TEAM")
         model = env.get("ALUMINATAI_MODEL", "untagged")
         if team:
+            if _TRUSTED_UIDS and proc.owner_uid not in _TRUSTED_UIDS:
+                logger.warning(
+                    "PID %d claims ALUMINATAI_TEAM=%r but UID %d is not in TRUSTED_UIDS"
+                    " — skipping manual tag",
+                    proc.pid, team, proc.owner_uid,
+                )
+                # Fall through to rules / heuristic
+            else:
+                from schedulers.base import JobMetadata
+                return JobMetadata(
+                    job_id=f"manual-pid-{proc.pid}",
+                    job_name=f"pid-{proc.pid}",
+                    team_id=team,
+                    model_tag=model,
+                    scheduler_source="manual",
+                    gpu_indices=[],
+                )
+
+        # 5. Custom attribution rules
+        rule = self._rules.match(proc.cmdline)
+        if rule:
             from schedulers.base import JobMetadata
             return JobMetadata(
-                job_id=f"manual-pid-{proc.pid}",
+                job_id=f"rules-pid-{proc.pid}",
                 job_name=f"pid-{proc.pid}",
-                team_id=team,
-                model_tag=model,
-                scheduler_source="manual",
+                team_id=rule.team,
+                model_tag=rule.model,
+                scheduler_source="rules",
                 gpu_indices=[],
             )
 
+        # 6. Built-in heuristics
+        return self._resolve_heuristic(proc)
+
+    def _resolve_heuristic(self, proc: ProcessInfo) -> "Optional[JobMetadata]":
+        """Match cmdline against built-in heuristic patterns."""
+        cmdline = proc.cmdline
+        if not cmdline:
+            return None
+        for pattern, team, model in _BUILTIN_HEURISTICS:
+            if pattern.search(cmdline):
+                from schedulers.base import JobMetadata
+                return JobMetadata(
+                    job_id=f"heuristic-pid-{proc.pid}",
+                    job_name=f"pid-{proc.pid}",
+                    team_id=team,
+                    model_tag=model,
+                    scheduler_source="heuristic",
+                    gpu_indices=[],
+                )
         return None
 
     def _read_pod_uid_from_cgroup(self, pid: int) -> Optional[str]:

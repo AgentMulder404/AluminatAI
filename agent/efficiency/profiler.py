@@ -205,8 +205,7 @@ class ProfileResult:
             lines.append("")
 
         lines.append("=" * 72)
-        return "
-".join(lines)
+        return "\n".join(lines)
 
 
 # ═══════════════════════════════════════════════════════════════════════

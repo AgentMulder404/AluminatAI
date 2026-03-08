@@ -46,13 +46,45 @@ from config import (
     WAL_DIR, WAL_MAX_AGE_HOURS, WAL_MAX_MB,
     UPLOAD_MAX_RETRIES, UPLOAD_MAX_RETRY_DELAY,
     HTTPS_PROXY, CA_BUNDLE, CLIENT_CERT, CLIENT_KEY,
+    OFFLINE_MODE, DRY_RUN,
 )
 
 logger = logging.getLogger(__name__)
 
+# ── WAL encryption (optional — requires cryptography package) ─────────────────
+
+
+def _init_fernet():
+    """Return a Fernet instance derived from the API key, or None.
+
+    Key derivation: SHA-256(API_KEY) → 32 raw bytes → URL-safe base64 → Fernet key.
+    Activated automatically when ALUMINATAI_API_KEY is set AND cryptography is installed.
+    Falls back gracefully to plaintext WAL with a one-time WARNING if the package is absent.
+    """
+    if not API_KEY:
+        return None
+    try:
+        from cryptography.fernet import Fernet
+        import hashlib
+        import base64
+        raw = hashlib.sha256(API_KEY.encode()).digest()
+        return Fernet(base64.urlsafe_b64encode(raw))
+    except ImportError:
+        logger.warning(
+            "WAL encryption unavailable — install aluminatai[secure] for encrypted WAL"
+        )
+        return None
+
+
+_FERNET = _init_fernet()
+
 # ── WAL helpers ───────────────────────────────────────────────────────────────
 
 WAL_FILE = WAL_DIR / "metrics.wal"
+
+# Approximate count of pending WAL rows, maintained by append/clear/rewrite.
+# This is an in-process estimate — it resets to 0 on restart.
+_WAL_PENDING: int = 0
 
 
 def _wal_append(batch: List[Dict]) -> None:
@@ -62,6 +94,7 @@ def _wal_append(batch: List[Dict]) -> None:
     agent processes during a K8s rolling update) from interleaving partial
     writes and corrupting the WAL.
     """
+    global _WAL_PENDING
     WAL_DIR.mkdir(parents=True, exist_ok=True)
     try:
         with open(WAL_FILE, "a") as f:
@@ -70,13 +103,19 @@ def _wal_append(batch: List[Dict]) -> None:
             try:
                 for row in batch:
                     entry = {"ts": time.time(), "row": row}
-                    f.write(json.dumps(entry) + "\n")
+                    line_bytes = json.dumps(entry).encode()
+                    if _FERNET:
+                        f.write(_FERNET.encrypt(line_bytes).decode() + "\n")
+                    else:
+                        f.write(line_bytes.decode() + "\n")
             finally:
                 if _HAS_FCNTL:
                     fcntl.flock(f, fcntl.LOCK_UN)
+        _WAL_PENDING += len(batch)
         logger.info("WAL: appended %d rows → %s", len(batch), WAL_FILE)
     except OSError as exc:
-        logger.error("WAL write failed: %s", exc)
+        logger.error("WAL write failed: %s", exc,
+                     extra={"event": "wal_write_failed", "path": str(WAL_FILE), "error": str(exc)})
 
 
 def _wal_read_valid() -> List[Dict]:
@@ -94,16 +133,34 @@ def _wal_read_valid() -> List[Dict]:
     except OSError:
         return []
 
+    skipped_decrypt = 0
     for line in raw_lines:
         line = line.strip()
         if not line:
             continue
-        try:
-            entry = json.loads(line)
-            if entry.get("ts", 0) >= cutoff:
+        entry = None
+        if _FERNET:
+            try:
+                entry = json.loads(_FERNET.decrypt(line.encode()))
+            except Exception:
+                # Wrong key or plaintext line — try raw JSON as fallback
+                try:
+                    entry = json.loads(line)
+                except (json.JSONDecodeError, KeyError):
+                    skipped_decrypt += 1
+                    continue
+        else:
+            try:
+                entry = json.loads(line)
+            except (json.JSONDecodeError, KeyError):
+                continue
+        if entry and entry.get("ts", 0) >= cutoff:
+            try:
                 rows.append(entry["row"])
-        except (json.JSONDecodeError, KeyError):
-            pass
+            except KeyError:
+                pass
+    if skipped_decrypt:
+        logger.warning("WAL: skipped %d lines (decrypt failed — key mismatch?)", skipped_decrypt)
 
     # Size cap: drop oldest if WAL is too large
     wal_mb = WAL_FILE.stat().st_size / (1024 * 1024) if WAL_FILE.exists() else 0
@@ -117,8 +174,10 @@ def _wal_read_valid() -> List[Dict]:
 
 def _wal_clear() -> None:
     """Delete the WAL after a successful full replay."""
+    global _WAL_PENDING
     try:
         WAL_FILE.unlink(missing_ok=True)
+        _WAL_PENDING = 0
     except OSError:
         pass
 
@@ -139,16 +198,23 @@ def _wal_rewrite(rows: List[Dict]) -> None:
             try:
                 for row in rows:
                     entry = {"ts": time.time(), "row": row}
-                    f.write(json.dumps(entry) + "\n")
+                    line_bytes = json.dumps(entry).encode()
+                    if _FERNET:
+                        f.write(_FERNET.encrypt(line_bytes).decode() + "\n")
+                    else:
+                        f.write(line_bytes.decode() + "\n")
                 f.flush()
                 os.fsync(f.fileno())
             finally:
                 if _HAS_FCNTL:
                     fcntl.flock(f, fcntl.LOCK_UN)
         tmp.replace(WAL_FILE)  # atomic on POSIX
+        global _WAL_PENDING
+        _WAL_PENDING = len(rows)
         logger.info("WAL: rewrote %d rows → %s", len(rows), WAL_FILE)
     except OSError as exc:
-        logger.error("WAL rewrite failed: %s", exc)
+        logger.error("WAL rewrite failed: %s", exc,
+                     extra={"event": "wal_rewrite_failed", "path": str(WAL_FILE), "error": str(exc)})
         try:
             tmp.unlink(missing_ok=True)
         except OSError:
@@ -188,7 +254,12 @@ class MetricsUploader:
         self.buffer: List[Dict] = []
         self._upload_success = 0
         self._upload_failure = 0
-        logger.info("Uploader initialised → %s", api_endpoint)
+        self._wal_replay_uploaded = 0
+        self._wal_replay_failed = 0
+        if OFFLINE_MODE:
+            logger.info("OFFLINE_MODE=1 — all metrics written to WAL; no HTTP uploads")
+        else:
+            logger.info("Uploader initialised → %s", api_endpoint)
 
     def add_metrics(self, metrics: List[Dict]) -> None:
         self.buffer.extend(metrics)
@@ -198,23 +269,46 @@ class MetricsUploader:
         Upload one batch with exponential backoff.
 
         Returns True on success.  Writes to WAL on permanent failure.
+        In OFFLINE_MODE, writes to WAL immediately and returns False (no HTTP).
         """
+        if DRY_RUN:
+            logger.info(
+                "DRY RUN — would upload %d metrics to %s (skipped)",
+                len(metrics), self.api_endpoint,
+            )
+            return True  # treat as success so WAL doesn't accumulate
+        if OFFLINE_MODE:
+            _wal_append(metrics)
+            return False
         delay = 1.0
         for attempt in range(1, UPLOAD_MAX_RETRIES + 1):
             try:
                 resp = self.session.post(self.api_endpoint, json=metrics, timeout=30)
             except requests.Timeout:
-                logger.warning("Upload timeout (attempt %d/%d)", attempt, UPLOAD_MAX_RETRIES)
+                logger.warning(
+                    "Upload timeout (attempt %d/%d)", attempt, UPLOAD_MAX_RETRIES,
+                    extra={"event": "upload_timeout", "attempt": attempt,
+                           "max_retries": UPLOAD_MAX_RETRIES, "next_delay_s": round(delay, 1)},
+                )
                 self._sleep_with_jitter(delay)
                 delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
                 continue
             except requests.ConnectionError as exc:
-                logger.warning("Connection error (attempt %d/%d): %s", attempt, UPLOAD_MAX_RETRIES, exc)
+                logger.warning(
+                    "Connection error (attempt %d/%d): %s", attempt, UPLOAD_MAX_RETRIES, exc,
+                    extra={"event": "upload_connection_error", "attempt": attempt,
+                           "max_retries": UPLOAD_MAX_RETRIES, "error": str(exc),
+                           "next_delay_s": round(delay, 1)},
+                )
                 self._sleep_with_jitter(delay)
                 delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
                 continue
             except requests.RequestException as exc:
-                logger.error("Unrecoverable request error: %s", exc)
+                logger.error(
+                    "Unrecoverable request error: %s", exc,
+                    extra={"event": "upload_unrecoverable", "error": str(exc),
+                           "batch_size": len(metrics)},
+                )
                 _wal_append(metrics)
                 self._upload_failure += 1
                 return False
@@ -224,25 +318,42 @@ class MetricsUploader:
                 return True
 
             if resp.status_code in (401, 403):
-                logger.error("Permanent auth failure (%d) — check API key", resp.status_code)
+                logger.error(
+                    "Permanent auth failure (%d) — check API key", resp.status_code,
+                    extra={"event": "upload_auth_failed", "status_code": resp.status_code,
+                           "batch_size": len(metrics)},
+                )
                 _wal_append(metrics)
                 self._upload_failure += 1
                 return False
 
             if resp.status_code == 429:
                 retry_after = float(resp.headers.get("Retry-After", delay))
-                logger.warning("Rate-limited — waiting %.0fs", retry_after)
+                logger.warning(
+                    "Rate-limited — waiting %.0fs", retry_after,
+                    extra={"event": "upload_rate_limited", "retry_after_s": round(retry_after, 1),
+                           "attempt": attempt},
+                )
                 time.sleep(retry_after + random.uniform(0, 1))
                 delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
                 continue
 
             # 5xx or other transient error
-            logger.warning("HTTP %d (attempt %d/%d)", resp.status_code, attempt, UPLOAD_MAX_RETRIES)
+            logger.warning(
+                "HTTP %d (attempt %d/%d)", resp.status_code, attempt, UPLOAD_MAX_RETRIES,
+                extra={"event": "upload_http_error", "status_code": resp.status_code,
+                       "attempt": attempt, "max_retries": UPLOAD_MAX_RETRIES,
+                       "next_delay_s": round(delay, 1)},
+            )
             self._sleep_with_jitter(delay)
             delay = min(delay * 2, UPLOAD_MAX_RETRY_DELAY)
 
         # Exhausted retries
-        logger.error("Upload failed after %d attempts — writing to WAL", UPLOAD_MAX_RETRIES)
+        logger.error(
+            "Upload failed after %d attempts — writing to WAL", UPLOAD_MAX_RETRIES,
+            extra={"event": "upload_exhausted", "max_retries": UPLOAD_MAX_RETRIES,
+                   "batch_size": len(metrics)},
+        )
         _wal_append(metrics)
         self._upload_failure += 1
         return False
@@ -276,12 +387,18 @@ class MetricsUploader:
         """
         Replay the WAL at startup.  Returns number of metrics successfully re-uploaded.
         Clears the WAL if all entries are replayed.
+        In OFFLINE_MODE, skips replay (WAL is the intended storage).
         """
+        if DRY_RUN or OFFLINE_MODE:
+            return 0
         rows = _wal_read_valid()
         if not rows:
             return 0
 
-        logger.info("WAL replay: %d rows pending", len(rows))
+        logger.info(
+            "WAL replay: %d rows pending", len(rows),
+            extra={"event": "wal_replay_start", "pending_rows": len(rows)},
+        )
         uploaded = 0
         failed: list[dict] = []
 
@@ -292,15 +409,25 @@ class MetricsUploader:
             else:
                 failed.extend(batch)
 
+        self._wal_replay_uploaded += uploaded
+        self._wal_replay_failed += len(failed)
+
         if not failed:
             _wal_clear()
-            logger.info("WAL replay complete — all %d rows uploaded", uploaded)
+            logger.info(
+                "WAL replay complete — all %d rows uploaded", uploaded,
+                extra={"event": "wal_replay_complete", "uploaded": uploaded, "failed": 0},
+            )
         else:
             # Atomically rewrite WAL with only the rows that still need upload.
             # _wal_rewrite() writes to a .tmp file then renames, so a crash
             # between these two steps cannot silently drop metrics.
             _wal_rewrite(failed)
-            logger.warning("WAL replay partial: %d uploaded, %d remain", uploaded, len(failed))
+            logger.warning(
+                "WAL replay partial: %d uploaded, %d remain", uploaded, len(failed),
+                extra={"event": "wal_replay_partial", "uploaded": uploaded,
+                       "failed": len(failed), "reason": "upload_errors"},
+            )
 
         return uploaded
 
@@ -309,8 +436,11 @@ class MetricsUploader:
         return {
             "buffer_size": len(self.buffer),
             "wal_bytes": wal_size,
+            "wal_entries_pending": _WAL_PENDING,
             "upload_success_total": self._upload_success,
             "upload_failure_total": self._upload_failure,
+            "wal_replay_uploaded_total": self._wal_replay_uploaded,
+            "wal_replay_failed_total": self._wal_replay_failed,
             "api_endpoint": self.api_endpoint,
             "has_api_key": bool(self.api_key),
         }

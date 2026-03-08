@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aluminatiai"
-version = "0.2.1"
+version = "0.2.2"
 description = "GPU energy monitoring agent — per-job cost attribution for AI teams"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -29,7 +29,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-prometheus = ["prometheus-client>=0.19"]
+prometheus    = ["prometheus-client>=0.19"]
+secure        = ["cryptography>=42.0"]
+observability = ["PyYAML>=6.0"]
+all           = ["prometheus-client>=0.19", "cryptography>=42.0", "PyYAML>=6.0"]
 
 [project.scripts]
 aluminatiai = "aluminatiai.cli:main"

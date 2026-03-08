@@ -20,9 +20,12 @@ For each GPU handle + power reading, returns one or more AttributionResult
 objects representing each job's fractional share of the GPU power.
 
 Attribution confidence levels:
-  "process"        — resolved via nvmlDeviceGetComputeRunningProcesses + PID env
-  "scheduler_poll" — resolved via scheduler.gpu_to_job() (old behaviour)
-  "inferred"       — heuristic / partial resolution
+  "tagged"         — ALUMINATAI_TEAM/MODEL env var explicitly set by the user
+  "scheduler"      — resolved via SLURM_JOB_ID / RUNAI_JOB_NAME / K8s pod UID
+  "scheduler_poll" — resolved via scheduler.gpu_to_job() (legacy poll path)
+  "rules"          — matched by a custom attribution rules file
+  "heuristic"      — matched by a built-in cmdline heuristic
+  "memory_split"   — unresolved; power split proportionally by GPU memory usage
   "idle"           — GPU is idle; billed to ALUMINATAI_IDLE_TEAM
 """
 
@@ -49,7 +52,7 @@ class AttributionResult:
     power_w: float
     gpu_fraction: float                   # 0.0–1.0
     energy_delta_j: Optional[float]
-    confidence: str                       # "process" | "scheduler_poll" | "inferred" | "idle"
+    confidence: str   # "tagged"|"scheduler"|"scheduler_poll"|"rules"|"heuristic"|"memory_split"|"idle"
 
 
 class AttributionEngine:
@@ -82,6 +85,16 @@ class AttributionEngine:
         """
         processes = self._probe.query(handle, gpu_index)
 
+        # Maps scheduler_source → confidence string
+        _SOURCE_CONFIDENCE = {
+            "manual":     "tagged",
+            "slurm":      "scheduler",
+            "runai":      "scheduler",
+            "kubernetes": "scheduler",
+            "rules":      "rules",
+            "heuristic":  "heuristic",
+        }
+
         if processes:
             # Group by resolved job key, accumulate GPU memory bytes
             by_key: dict[str, tuple[Optional["JobMetadata"], int]] = {}
@@ -101,12 +114,14 @@ class AttributionEngine:
                     model_tag = job.model_tag
                     job_id = job.job_id
                     scheduler_source = job.scheduler_source
+                    confidence = _SOURCE_CONFIDENCE.get(scheduler_source, "scheduler")
                 else:
-                    # Unresolved process — emit under sentinel values
+                    # Unresolved process — power split proportionally by GPU memory
                     team_id = os.getenv("ALUMINATAI_IDLE_TEAM", "unresolved")
                     model_tag = "untagged"
                     job_id = key
-                    scheduler_source = "manual"
+                    scheduler_source = "unresolved"
+                    confidence = "memory_split"
 
                 results.append(AttributionResult(
                     team_id=team_id,
@@ -116,7 +131,7 @@ class AttributionEngine:
                     power_w=round(total_power_w * frac, 3),
                     gpu_fraction=round(frac, 4),
                     energy_delta_j=round(energy_delta_j * frac, 4) if energy_delta_j is not None else None,
-                    confidence="process",
+                    confidence=confidence,
                 ))
 
             return results

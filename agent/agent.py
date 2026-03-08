@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
+import shutil
 import io
 import json
 import logging
@@ -49,8 +51,101 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+# ── Logging helpers ────────────────────────────────────────────────────────────
 
+# Standard LogRecord attributes that should not be treated as user "extra" fields.
+_STANDARD_LOG_ATTRS: frozenset = frozenset({
+    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+    "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+    "created", "msecs", "relativeCreated", "thread", "threadName",
+    "process", "processName", "taskName", "message", "asctime",
+})
+
+
+class _JsonFormatter(logging.Formatter):
+    """
+    Emit each log record as a single-line JSON object for ELK / Grafana Loki.
+
+    Standard fields: ts, level, logger, msg.
+    Extra fields passed via logger.xxx(..., extra={...}) are merged in at the
+    top level, enabling structured events like:
+      {"ts":"…","level":"WARNING","event":"upload_timeout","attempt":2, …}
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict = {
+            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        # Merge any extra={} fields the caller attached
+        for key, val in record.__dict__.items():
+            if key not in _STANDARD_LOG_ATTRS and not key.startswith("_"):
+                payload[key] = val
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        if record.stack_info:
+            payload["stack"] = self.formatStack(record.stack_info)
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def _setup_logging(level: str = "INFO", fmt: str = "text") -> None:
+    """
+    Configure the root logger with the requested level and format.
+
+    Args:
+        level: Standard logging level name ("DEBUG", "INFO", "WARNING", …).
+        fmt:   "text" (human-readable) or "json" (newline-delimited JSON).
+    """
+    root = logging.getLogger()
+    root.setLevel(getattr(logging, level.upper(), logging.INFO))
+    root.handlers.clear()
+    handler = logging.StreamHandler(sys.stderr)
+    if fmt == "json":
+        handler.setFormatter(_JsonFormatter())
+    else:
+        handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        ))
+    root.addHandler(handler)
+
+
+# ── Config hash ───────────────────────────────────────────────────────────────
+
+
+def _compute_config_hash() -> str:
+    """
+    Return an 8-char hex digest that changes when key agent config values drift.
+
+    Useful for fleet-wide drift detection: if two agent nodes report the same
+    version but different config_hash values in their heartbeats, their configs
+    have diverged (e.g., one has a stale SAMPLE_INTERVAL).
+    """
+    try:
+        from config import (
+            API_ENDPOINT, SAMPLE_INTERVAL, UPLOAD_INTERVAL, UPLOAD_BATCH_SIZE,
+            METRICS_PORT, WAL_MAX_MB, LOG_LEVEL, DRY_RUN, PROMETHEUS_ONLY, OFFLINE_MODE,
+        )
+    except ImportError:
+        return "00000000"
+    canonical = json.dumps({
+        "api_endpoint":    API_ENDPOINT,
+        "sample_interval": SAMPLE_INTERVAL,
+        "upload_interval": UPLOAD_INTERVAL,
+        "batch_size":      UPLOAD_BATCH_SIZE,
+        "metrics_port":    METRICS_PORT,
+        "wal_max_mb":      WAL_MAX_MB,
+        "log_level":       LOG_LEVEL,
+        "dry_run":         DRY_RUN,
+        "prometheus_only": PROMETHEUS_ONLY,
+        "offline_mode":    OFFLINE_MODE,
+    }, sort_keys=True).encode()
+    return hashlib.sha256(canonical).hexdigest()[:8]
+
+
+# Minimal early setup so import-time warnings are visible; overridden in main().
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -73,9 +168,9 @@ except ImportError:
 try:
     from collector import GPUCollector, CSV_HEADER
     _COLLECTOR = True
-except ImportError:
+except (ImportError, SyntaxError) as _e:
     _COLLECTOR = False
-    log.warning("collector.py not found — NVML collection disabled")
+    log.warning("collector.py unavailable (%s) — NVML collection disabled", type(_e).__name__)
 
 try:
     from uploader import MetricsUploader
@@ -83,6 +178,7 @@ try:
         UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY, API_ENDPOINT,
         SCHEDULER_POLL_INTERVAL, SAMPLE_INTERVAL,
         AGENT_VERSION, HEARTBEAT_INTERVAL,
+        DRY_RUN, PROMETHEUS_ONLY, LOG_LEVEL, LOG_FORMAT,
     )
     _UPLOADER = True
 except ImportError:
@@ -93,8 +189,12 @@ except ImportError:
     UPLOAD_INTERVAL = 60
     SCHEDULER_POLL_INTERVAL = 30
     SAMPLE_INTERVAL = 5.0
-    AGENT_VERSION = "0.2.0"
+    AGENT_VERSION = "0.2.2"
     HEARTBEAT_INTERVAL = 300
+    DRY_RUN = False
+    PROMETHEUS_ONLY = False
+    LOG_LEVEL = "INFO"
+    LOG_FORMAT = "text"
 
 try:
     from schedulers import detect_scheduler
@@ -195,8 +295,15 @@ def signal_job_complete(endpoint: str, api_key: str, job_uuid: str,
 # ── Heartbeat sender ──────────────────────────────────────────────────────────
 
 
-def send_heartbeat(endpoint: str, api_key: str, gpu_count: int,
-                   gpu_uuids: List[str], scheduler_name: str) -> None:
+def send_heartbeat(
+    endpoint: str,
+    api_key: str,
+    gpu_count: int,
+    gpu_uuids: List[str],
+    scheduler_name: str,
+    uptime_sec: float = 0.0,
+    config_hash: str = "",
+) -> None:
     url = endpoint.rstrip("/") + "/api/agent/heartbeat"
     payload = {
         "agent_version": AGENT_VERSION,
@@ -204,6 +311,8 @@ def send_heartbeat(endpoint: str, api_key: str, gpu_count: int,
         "gpu_count": gpu_count,
         "gpu_uuids": gpu_uuids,
         "scheduler": scheduler_name,
+        "uptime_sec": round(uptime_sec, 1),
+        "config_hash": config_hash,
     }
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
@@ -242,21 +351,34 @@ class Agent:
         duration: Optional[float] = None,
         quiet: bool = False,
         job_uuid: Optional[str] = None,
+        dry_run: bool = DRY_RUN,
+        prometheus_only: bool = PROMETHEUS_ONLY,
     ):
         self.interval = interval
         self.output_csv = output_csv
         self.duration = duration
         self.quiet = quiet
         self.job_uuid = job_uuid or os.getenv("ALUMINATAI_JOB_UUID")
+        self.dry_run = dry_run
+        self.prometheus_only = prometheus_only
 
         self.running = False
         self.sample_count = 0
         self.total_energy: dict[int, float] = {}
+        self._start_time = time.monotonic()
+        self._config_hash = _compute_config_hash()
 
-        # Upload
+        if self.dry_run:
+            log.warning("DRY RUN — collecting and attributing, but no data will be uploaded or written to WAL")
+        if self.prometheus_only:
+            log.warning("PROMETHEUS ONLY — cloud uploads disabled; Prometheus metrics served locally")
+
+        # Upload — disabled in prometheus_only mode (dry_run still creates uploader for logging)
         self.uploader: Optional[MetricsUploader] = None
         self.last_upload_time = 0.0
-        if _UPLOADER and UPLOAD_ENABLED and API_KEY:
+        if self.prometheus_only:
+            pass  # no uploader; Prometheus is the only sink
+        elif _UPLOADER and UPLOAD_ENABLED and API_KEY:
             self.uploader = MetricsUploader()
             log.info("API upload enabled → %s", API_ENDPOINT)
         elif not quiet:
@@ -327,6 +449,15 @@ class Agent:
             retried = self.uploader.retry_failed_uploads()
             if retried > 0:
                 log.info("WAL replay: %d metrics re-uploaded", retried)
+            # Push initial WAL stats to Prometheus
+            if self.metrics_server:
+                status = self.uploader.get_status()
+                self.metrics_server.update_wal_stats(
+                    wal_size_bytes=status["wal_bytes"],
+                    wal_entries_pending=status["wal_entries_pending"],
+                    replay_uploaded_delta=self.uploader._wal_replay_uploaded,
+                    replay_failed_delta=self.uploader._wal_replay_failed,
+                )
 
         # CSV manifest
         manifest: Optional[ManifestWriter] = None
@@ -341,10 +472,18 @@ class Agent:
         start_time = time.monotonic()
         self.last_upload_time = time.time()
 
-        # Initial heartbeat
-        if self.uploader and API_KEY:
-            send_heartbeat(API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name)
+        # Initial heartbeat (skipped in dry-run / prometheus-only modes)
+        if self.uploader and API_KEY and not self.dry_run and not self.prometheus_only:
+            send_heartbeat(
+                API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name,
+                uptime_sec=0.0,
+                config_hash=self._config_hash,
+            )
             self.last_heartbeat = time.time()
+
+        # Determine run mode label for Prometheus agent_info
+        _mode = "dry_run" if self.dry_run else ("prometheus_only" if self.prometheus_only else "normal")
+        _hostname = socket.gethostname()
 
         try:
             while self.running:
@@ -416,6 +555,8 @@ class Agent:
                                     d.get("temperature_c"), d.get("memory_used_mb"),
                                     None, None, None, None,
                                 ])
+                            if self.metrics_server:
+                                self.metrics_server.record_attribution_unresolved()
                     else:
                         if self.scheduler:
                             job = self.scheduler.gpu_to_job(m.gpu_index)
@@ -439,9 +580,16 @@ class Agent:
                 if self.uploader and attributed_rows:
                     self.uploader.add_metrics(attributed_rows)
 
-                # Prometheus metrics update
+                # Prometheus metrics update (GPU + attribution)
                 if self.metrics_server:
                     self.metrics_server.update(metrics, attributed_rows)
+                    # Agent uptime and info — updated every collection cycle
+                    self.metrics_server.update_agent_stats(
+                        uptime_sec=time.monotonic() - self._start_time,
+                        version=AGENT_VERSION,
+                        hostname=_hostname,
+                        mode=_mode,
+                    )
 
                 # Energy accumulation
                 for m in metrics:
@@ -454,10 +602,28 @@ class Agent:
                     self.last_upload_time = time.time()
                     if n and not self.quiet:
                         log.info("Uploaded %d metrics", n)
+                    # Update WAL + upload stats in Prometheus after every flush
+                    if self.metrics_server:
+                        status = self.uploader.get_status()
+                        self.metrics_server.update_upload_stats(
+                            success_delta=0,   # counters cumulative — delta tracked by uploader
+                            failure_delta=0,
+                            buffer_size=status["buffer_size"],
+                        )
+                        self.metrics_server.update_wal_stats(
+                            wal_size_bytes=status["wal_bytes"],
+                            wal_entries_pending=status["wal_entries_pending"],
+                        )
 
-                # Periodic heartbeat
-                if self.uploader and API_KEY and (time.time() - self.last_heartbeat >= HEARTBEAT_INTERVAL):
-                    send_heartbeat(API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name)
+                # Periodic heartbeat (skipped in dry-run / prometheus-only modes)
+                if (self.uploader and API_KEY
+                        and not self.dry_run and not self.prometheus_only
+                        and time.time() - self.last_heartbeat >= HEARTBEAT_INTERVAL):
+                    send_heartbeat(
+                        API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name,
+                        uptime_sec=time.monotonic() - self._start_time,
+                        config_hash=self._config_hash,
+                    )
                     self.last_heartbeat = time.time()
 
                 # Console display
@@ -501,8 +667,8 @@ class Agent:
             if self.metrics_server:
                 self.metrics_server.stop()
 
-            # Signal job completion
-            if API_KEY and self.job_uuid:
+            # Signal job completion (skipped in dry-run / prometheus-only modes)
+            if API_KEY and self.job_uuid and not self.dry_run and not self.prometheus_only:
                 signal_job_complete(
                     endpoint=API_ENDPOINT,
                     api_key=API_KEY,
@@ -525,7 +691,12 @@ class Agent:
         log.info("  Interval    : %.2fs", self.interval)
         log.info("  Scheduler   : %s", scheduler)
         log.info("  Attribution : %s", "process-level" if self.attribution_engine else "scheduler-poll")
-        log.info("  Upload      : %s", "enabled" if self.uploader else "disabled")
+        if self.dry_run:
+            log.info("  Mode        : DRY RUN (no uploads, no WAL)")
+        elif self.prometheus_only:
+            log.info("  Mode        : PROMETHEUS ONLY (no cloud uploads)")
+        else:
+            log.info("  Upload      : %s", "enabled" if self.uploader else "disabled")
         if self.duration:
             log.info("  Duration    : %.0fs", self.duration)
         if self.output_csv:
@@ -567,30 +738,234 @@ class Agent:
         log.info("=" * 60)
 
 
+# ── Replay subcommand ─────────────────────────────────────────────────────────
+
+
+_SERVICE_UNIT = """\
+[Unit]
+Description=AluminatAI GPU Energy Monitoring Agent
+Documentation=https://aluminatiai.com/docs/agent
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=aluminatai
+Group=aluminatai
+EnvironmentFile=/etc/aluminatai/agent.env
+Environment=DATA_DIR=/var/lib/aluminatai
+Environment=LOG_DIR=/var/log/aluminatai
+ExecStart={bin_path}
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/aluminatai /var/log/aluminatai
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+MemoryMax=256M
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+_ENV_TEMPLATE = """\
+# AluminatAI Agent Configuration
+# Edit this file, then restart: sudo systemctl restart aluminatai-agent
+# Full reference: https://aluminatiai.com/docs/agent#configuration
+
+ALUMINATAI_API_KEY={api_key}
+ALUMINATAI_API_ENDPOINT=https://aluminatiai.com/api/metrics/ingest
+SAMPLE_INTERVAL=5.0
+UPLOAD_INTERVAL=60
+METRICS_PORT=9100
+LOG_LEVEL=INFO
+"""
+
+_UNIT_PATH = Path("/etc/systemd/system/aluminatai-agent.service")
+_ENV_PATH  = Path("/etc/aluminatai/agent.env")
+
+
+def _cmd_service(args) -> int:
+    """service install | uninstall | status."""
+    action = args.service_action
+
+    if action == "status":
+        ret = os.system("systemctl status aluminatai-agent")
+        return 0 if ret == 0 else 1
+
+    if action == "uninstall":
+        if os.geteuid() != 0:
+            print("error: 'service uninstall' must be run as root (try: sudo aluminatiai service uninstall)")
+            return 1
+        os.system("systemctl stop aluminatai-agent 2>/dev/null")
+        os.system("systemctl disable aluminatai-agent 2>/dev/null")
+        for path in [_UNIT_PATH]:
+            if path.exists():
+                path.unlink()
+                print(f"Removed {path}")
+        os.system("systemctl daemon-reload")
+        print("Service uninstalled.  Config and data directories were NOT removed.")
+        print(f"  Config: {_ENV_PATH}  (remove manually if desired)")
+        return 0
+
+    # install
+    if os.geteuid() != 0:
+        print("error: 'service install' must be run as root (try: sudo aluminatiai service install)")
+        return 1
+
+    if not hasattr(args, "api_key") or not args.api_key:
+        existing_key = ""
+        if _ENV_PATH.exists():
+            for line in _ENV_PATH.read_text().splitlines():
+                if line.startswith("ALUMINATAI_API_KEY="):
+                    existing_key = line.split("=", 1)[1].strip()
+                    break
+        if existing_key:
+            print(f"Found existing API key in {_ENV_PATH}")
+            api_key = existing_key
+        else:
+            print("Get your API key at: https://aluminatiai.com/dashboard/setup")
+            try:
+                api_key = input("Enter API Key: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\nCancelled.")
+                return 1
+            if not api_key:
+                print("error: API key cannot be empty")
+                return 1
+
+    else:
+        api_key = args.api_key
+
+    # Find the installed binary
+    bin_path = sys.executable.replace("python", "aluminatiai").replace("python3", "aluminatiai")
+    bin_path = shutil.which("aluminatiai") or bin_path
+
+    # Create user if missing
+    if os.system("id aluminatai &>/dev/null") != 0:
+        os.system("useradd --system --no-create-home --shell /usr/sbin/nologin "
+                  "--comment 'AluminatAI GPU agent' aluminatai")
+        print("Created system user 'aluminatai'")
+
+    # Directories
+    for d, mode in [
+        (Path("/var/lib/aluminatai"), 0o700),
+        (Path("/var/log/aluminatai"), 0o755),
+        (Path("/etc/aluminatai"),     0o750),
+    ]:
+        d.mkdir(parents=True, exist_ok=True, mode=mode)
+
+    # Env file (write only if not present or explicitly updating)
+    if not _ENV_PATH.exists() or getattr(args, "update_env", False):
+        _ENV_PATH.write_text(_ENV_TEMPLATE.format(api_key=api_key))
+        _ENV_PATH.chmod(0o600)
+        print(f"Wrote {_ENV_PATH}")
+    else:
+        print(f"Keeping existing {_ENV_PATH} (pass --update-env to overwrite)")
+
+    # Unit file
+    _UNIT_PATH.write_text(_SERVICE_UNIT.format(bin_path=bin_path))
+    _UNIT_PATH.chmod(0o644)
+    print(f"Wrote {_UNIT_PATH}")
+
+    os.system("systemctl daemon-reload")
+    os.system("systemctl enable aluminatai-agent")
+    os.system("systemctl restart aluminatai-agent")
+
+    import time as _t
+    _t.sleep(3)
+
+    active = os.system("systemctl is-active --quiet aluminatai-agent") == 0
+    if active:
+        print("\nAluminatAI Agent is running!")
+        print("  Status:    sudo systemctl status aluminatai-agent")
+        print("  Logs:      sudo journalctl -u aluminatai-agent -f")
+        print("  Metrics:   curl -s localhost:9100/metrics | head -20")
+        print("  Dashboard: https://aluminatiai.com/dashboard")
+        return 0
+    else:
+        print("\nService failed to start.")
+        print("  Logs: sudo journalctl -u aluminatai-agent -n 50")
+        return 1
+
+
+def _cmd_replay(args) -> int:
+    """Export WAL contents to a CSV file, optionally clearing the WAL."""
+    try:
+        from uploader import _wal_read_valid, _wal_clear
+    except ImportError:
+        log.error("uploader.py not available — cannot replay WAL")
+        return 1
+
+    rows = _wal_read_valid()
+    if not rows:
+        print("WAL is empty.")
+        return 0
+
+    out = Path(args.output)
+    with open(out, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"Exported {len(rows)} rows → {out}")
+
+    if args.clear:
+        _wal_clear()
+        print("WAL cleared.")
+
+    return 0
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="aluminatai-agent",
-        description="AluminatAI GPU Energy Agent v0.2.0",
+        description="AluminatAI GPU Energy Agent v0.2.2",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Environment variables (override CLI defaults):
+Environment variables and config file (lowest to highest priority):
+  Config file  (--config path.json or ALUMINATAI_CONFIG env var)
   ALUMINATAI_API_KEY        API key (alum_...)
   ALUMINATAI_API_ENDPOINT   Ingest URL
   ALUMINATAI_JOB_UUID       DB job UUID for completion signal
-  SAMPLE_INTERVAL           Sampling interval in seconds
-  UPLOAD_INTERVAL           Upload flush interval in seconds
+  SAMPLE_INTERVAL           Sampling interval in seconds (default: 5.0)
+  UPLOAD_INTERVAL           Upload flush interval in seconds (default: 60)
+  LOG_LEVEL                 DEBUG / INFO / WARNING / ERROR (default: INFO)
+  LOG_FORMAT                text | json  (default: text)
+  DRY_RUN                   1 — collect/attribute but do not upload
+  PROMETHEUS_ONLY           1 — disable cloud uploads; serve Prometheus only
+  OFFLINE_MODE              1 — write WAL only, no HTTP uploads
+
+Config file keys (JSON/YAML): sample_interval, upload_interval,
+  metrics_port, wal_max_mb, log_level, log_format, dry_run,
+  prometheus_only, offline_mode, … (see docs)
 
 Examples:
-  aluminatai-agent
-  aluminatai-agent --interval 2 --duration 3600
-  aluminatai-agent --output /data/manifests/run.csv --quiet
+  aluminatiai
+  aluminatiai --interval 1 --duration 3600
+  aluminatiai --dry-run --log-format json
+  aluminatiai --prometheus-only --interval 2
+  aluminatiai --config /etc/aluminatai.json
+  aluminatiai replay --output /data/metrics.csv --clear
+  aluminatiai service install
+  aluminatiai service status
+  aluminatiai service uninstall
         """,
     )
+    parser.add_argument("--config", "-c", type=str, default=None,
+                        help="JSON or YAML config file path (also: ALUMINATAI_CONFIG env var)")
     parser.add_argument("--interval", "-i", type=float, default=None,
-                        help="Sampling interval in seconds (default: SAMPLE_INTERVAL env or 5.0)")
+                        help="Sampling interval in seconds (default: SAMPLE_INTERVAL or 5.0)")
     parser.add_argument("--output", "-o", type=str, default=None,
                         help="Output CSV manifest path")
     parser.add_argument("--duration", "-d", type=float, default=None,
@@ -599,9 +974,71 @@ Examples:
                         help="Suppress console output")
     parser.add_argument("--job-uuid", type=str, default=None,
                         help="DB job UUID — signals completion on exit")
+    parser.add_argument("--dry-run", action="store_true", default=DRY_RUN,
+                        help="Collect and attribute but skip all uploads/WAL writes")
+    parser.add_argument("--prometheus-only", action="store_true", default=PROMETHEUS_ONLY,
+                        help="Disable cloud uploads; serve Prometheus metrics only")
+    parser.add_argument("--log-format", choices=["text", "json"], default=LOG_FORMAT,
+                        help="Log output format: 'text' (default) or 'json' for ELK/Loki")
+    parser.add_argument("--log-level", default=None,
+                        help="Logging verbosity: DEBUG, INFO, WARNING, ERROR (default: LOG_LEVEL or INFO)")
     parser.add_argument("--version", action="version", version=f"aluminatai-agent {AGENT_VERSION}")
 
+    subparsers = parser.add_subparsers(dest="command")
+
+    # replay subcommand: export WAL → CSV
+    replay_parser = subparsers.add_parser(
+        "replay",
+        help="Export WAL contents to CSV (for offline/air-gapped clusters)",
+    )
+    replay_parser.add_argument(
+        "--output", "-o", default="metrics.csv",
+        help="Output CSV file path (default: metrics.csv)",
+    )
+    replay_parser.add_argument(
+        "--clear", action="store_true",
+        help="Clear the WAL after successful export",
+    )
+
+    # service subcommand: install / uninstall / status for systemd
+    service_parser = subparsers.add_parser(
+        "service",
+        help="Manage the aluminatai-agent systemd service (requires root for install/uninstall)",
+    )
+    service_sub = service_parser.add_subparsers(dest="service_action")
+    service_sub.required = True
+
+    svc_install = service_sub.add_parser("install", help="Install and start the systemd service")
+    svc_install.add_argument(
+        "--api-key", dest="api_key", default=os.environ.get("ALUMINATAI_API_KEY", ""),
+        help="API key (default: ALUMINATAI_API_KEY env var)",
+    )
+    svc_install.add_argument(
+        "--update-env", action="store_true",
+        help="Overwrite existing /etc/aluminatai/agent.env",
+    )
+
+    service_sub.add_parser("uninstall", help="Stop, disable, and remove the systemd service")
+    service_sub.add_parser("status", help="Show systemd service status")
+
     args = parser.parse_args()
+
+    # Apply --config if provided (already applied in cli.py for installed entry-point;
+    # this handles the case where agent.py is run directly with python agent.py).
+    if args.command not in ("replay", "service") and getattr(args, "config", None):
+        if not os.environ.get("ALUMINATAI_CONFIG"):
+            os.environ["ALUMINATAI_CONFIG"] = args.config
+
+    if args.command == "replay":
+        return _cmd_replay(args)
+
+    if args.command == "service":
+        return _cmd_service(args)
+
+    # Re-configure logging now that we have the final level + format
+    effective_level = args.log_level or LOG_LEVEL
+    effective_fmt = args.log_format
+    _setup_logging(level=effective_level, fmt=effective_fmt)
 
     interval = args.interval if args.interval is not None else SAMPLE_INTERVAL
     if interval < 0.1:
@@ -614,6 +1051,8 @@ Examples:
         duration=args.duration,
         quiet=args.quiet,
         job_uuid=args.job_uuid,
+        dry_run=args.dry_run,
+        prometheus_only=args.prometheus_only,
     )
     return agent.run()
 

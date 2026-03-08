@@ -11,17 +11,15 @@ StartLimitBurst=5
 Type=simple
 User=aluminatai
 Group=aluminatai
-WorkingDirectory=/opt/aluminatai-agent
-
-# Load all env vars from file (one KEY=VALUE per line)
 EnvironmentFile=/etc/aluminatai/agent.env
+Environment=DATA_DIR=/var/lib/aluminatai
+Environment=LOG_DIR=/var/log/aluminatai
 
-# Use the installed entry point (pip install -e . creates this)
-ExecStart=aluminatai-agent --quiet --output /var/log/aluminatai/manifest.csv
+ExecStart=/usr/local/bin/aluminatiai
 ExecReload=/bin/kill -HUP $MAINPID
 
-Restart=always
-RestartSec=10
+Restart=on-failure
+RestartSec=10s
 
 # Give the agent time to flush on SIGTERM before SIGKILL
 TimeoutStopSec=30

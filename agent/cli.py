@@ -20,7 +20,12 @@ When installed via `pip install aluminatiai`, the `aluminatiai` command
 runs this module.  sys.path is patched first so the bare-import modules
 (collector, config, uploader, etc.) resolve against the installed package
 directory regardless of the working directory.
+
+The --config/-c flag is pre-parsed here (before any other imports) so that
+config.py's _load_config_file() sees the ALUMINATAI_CONFIG env var when it
+runs at import time.
 """
+import argparse
 import os
 import sys
 
@@ -33,7 +38,18 @@ def main() -> None:
     if here not in sys.path:
         sys.path.insert(0, here)
 
-    # Delegate to agent.main() — it owns argparse + the run loop.
+    # ── Pre-parse --config before any module imports ───────────────────────
+    # config.py runs _load_config_file() at import time; by setting
+    # ALUMINATAI_CONFIG here first, the file is loaded before any constant
+    # in config.py is evaluated — including those imported by agent.py.
+    _pre = argparse.ArgumentParser(add_help=False)
+    _pre.add_argument("--config", "-c", default=None,
+                      help="Path to JSON/YAML config file")
+    _known, _ = _pre.parse_known_args()
+    if _known.config:
+        os.environ["ALUMINATAI_CONFIG"] = _known.config
+
+    # Delegate to agent.main() — it owns the full argparse + run loop.
     from agent import main as _main  # noqa: PLC0415
     sys.exit(_main())
 

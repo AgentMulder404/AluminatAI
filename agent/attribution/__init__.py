@@ -21,5 +21,6 @@ proportionally by GPU memory fraction when multiple processes share a device.
 """
 
 from .engine import AttributionEngine, AttributionResult
+from .rules import AttributionRules, AttributionRule
 
-__all__ = ["AttributionEngine", "AttributionResult"]
+__all__ = ["AttributionEngine", "AttributionResult", "AttributionRules", "AttributionRule"]
