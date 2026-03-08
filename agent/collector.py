@@ -1,3 +1,18 @@
+# Copyright 2026 Kevin (AluminatiAI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 """
 GPU Metrics Collector using NVIDIA Management Library (NVML)
 
@@ -324,7 +339,8 @@ if __name__ == '__main__':
             for info in collector.get_gpu_info():
                 print(f"  GPU {info['index']}: {info['name']} ({info['uuid']})")
 
-            print("\nCollecting 3 samples (2s intervals)...")
+            print("
+Collecting 3 samples (2s intervals)...")
             for i in range(3):
                 metrics = collector.collect()
                 for m in metrics:
@@ -336,7 +352,8 @@ if __name__ == '__main__':
                 if i < 2:  # Don't sleep after last sample
                     time.sleep(2)
 
-            print("\n✅ Collector test passed!")
+            print("
+✅ Collector test passed!")
 
     except Exception as e:
         print(f"❌ Error: {e}")

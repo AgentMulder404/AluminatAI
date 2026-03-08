@@ -1,3 +1,18 @@
+# Copyright 2026 Kevin (AluminatiAI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 """
 Benchmark CPU and Memory Overhead of GPU Energy Agent
 
@@ -61,7 +76,8 @@ class OverheadBenchmark:
 
     def measure_agent_overhead(self, interval: float = 5.0):
         """Measure overhead with agent running"""
-        print(f"\n📊 Measuring agent overhead (interval={interval}s)...")
+        print(f"
+📊 Measuring agent overhead (interval={interval}s)...")
 
         def run_agent():
             """Agent process"""
@@ -115,7 +131,8 @@ class OverheadBenchmark:
 
     def measure_collection_latency(self, num_samples: int = 100):
         """Measure time to collect metrics"""
-        print(f"\n📊 Measuring collection latency ({num_samples} samples)...")
+        print(f"
+📊 Measuring collection latency ({num_samples} samples)...")
 
         try:
             with GPUCollector() as collector:
@@ -150,7 +167,8 @@ class OverheadBenchmark:
 
     def print_summary(self):
         """Print comprehensive summary"""
-        print("\n" + "="*70)
+        print("
+" + "="*70)
         print(" OVERHEAD BENCHMARK SUMMARY")
         print("="*70)
 
@@ -161,7 +179,8 @@ class OverheadBenchmark:
             cpu_overhead = agent['cpu_avg'] - baseline['cpu_avg']
             mem_overhead = agent['mem_avg'] - baseline['mem_avg']
 
-            print(f"\n{'Metric':<30} {'Baseline':>15} {'With Agent':>15} {'Overhead':>15}")
+            print(f"
+{'Metric':<30} {'Baseline':>15} {'With Agent':>15} {'Overhead':>15}")
             print("-"*70)
             print(f"{'CPU Usage (avg)':30} {baseline['cpu_avg']:>14.3f}% {agent['cpu_avg']:>14.3f}% {cpu_overhead:>+14.3f}%")
             print(f"{'CPU Usage (max)':30} {baseline['cpu_max']:>14.3f}% {agent['cpu_max']:>14.3f}%")
@@ -170,7 +189,8 @@ class OverheadBenchmark:
 
         if 'latency' in self.results:
             lat = self.results['latency']
-            print(f"\n{'Collection Latency':<30}")
+            print(f"
+{'Collection Latency':<30}")
             print("-"*70)
             print(f"{'Mean latency':30} {lat['mean_ms']:>14.3f} ms")
             print(f"{'P95 latency':30} {lat['p95_ms']:>14.3f} ms")
@@ -184,7 +204,8 @@ class OverheadBenchmark:
                 print(f"{'Max sampling rate':30} {max_hz:>14.1f} Hz")
 
         # Pass/Fail criteria
-        print("\n" + "-"*70)
+        print("
+" + "-"*70)
         print("PASS/FAIL CRITERIA")
         print("-"*70)
 
@@ -202,16 +223,19 @@ class OverheadBenchmark:
 
             print(f"{'P95 latency < 5.0 ms':40} {'✅ PASS' if latency_pass else '❌ FAIL':>10}")
 
-        print("="*70 + "\n")
+        print("="*70 + "
+")
 
 
 def main():
     """Run complete overhead benchmark"""
-    print("\n🚀 GPU Energy Agent - Overhead Benchmark")
+    print("
+🚀 GPU Energy Agent - Overhead Benchmark")
     print("="*70)
     print("This benchmark measures CPU, memory, and latency overhead.")
     print(f"Benchmark duration: 30 seconds per test")
-    print("="*70 + "\n")
+    print("="*70 + "
+")
 
     benchmark = OverheadBenchmark(duration=30)
 
@@ -225,10 +249,13 @@ def main():
         benchmark.print_summary()
 
     except KeyboardInterrupt:
-        print("\n\n⚠️  Benchmark interrupted by user")
+        print("
+
+⚠️  Benchmark interrupted by user")
         return 1
     except Exception as e:
-        print(f"\n❌ Benchmark failed: {e}")
+        print(f"
+❌ Benchmark failed: {e}")
         import traceback
         traceback.print_exc()
         return 1

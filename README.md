@@ -1,365 +1,303 @@
-# AluminatAI - GPU Energy Intelligence Platform
+<div align="center">
 
-**Know exactly what your GPUs cost. Every watt, every dollar, every job.**
+# ⚡ AluminatiAI
 
-AluminatAI is an open-source GPU energy monitoring platform that gives AI teams real-time visibility into power consumption, energy costs, and utilization across their GPU fleet. A lightweight Python agent runs on your GPU machines and streams metrics to a cloud dashboard where you can track spending, compare jobs, and optimize workloads.
+**nvidia-smi shows you watts. AluminatiAI shows you dollars.**
 
-**Live:** [https://www.aluminatiai.com/](https://aluminatiai-landing.vercel.app)
+Per-job GPU energy monitoring, cost attribution, and waste detection for AI teams.
+
+[![PyPI version](https://badge.fury.io/py/aluminatiai.svg)](https://badge.fury.io/py/aluminatiai)
+[![PyPI Downloads](https://static.pepy.tech/badge/aluminatiai)](https://pepy.tech/project/aluminatiai)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/pypi/pyversions/aluminatiai)](https://pypi.org/project/aluminatiai)
+[![GitHub Stars](https://img.shields.io/github/stars/AgentMulder404/AluminatAI?style=social)](https://github.com/AgentMulder404/AluminatAI/stargazers)
+
+[Website](https://aluminatiai.com) · [Docs](https://aluminatiai.com/docs/agent) · [Dashboard](https://aluminatiai.com/dashboard) · [Report a Bug](https://github.com/AgentMulder404/AluminatAI/issues)
+
+</div>
 
 ---
 
-## How It Works
+## The Problem
 
-```
-┌──────────────────┐     HTTPS/JSON      ┌──────────────────────────┐
-│   GPU Machine     │ ─────────────────► │   AluminatAI Platform     │
-│                    │   every 60s        │                            │
-│  ┌──────────────┐ │                     │  ┌──────────┐             │
-│  │  Python Agent │ │                     │  │ Next.js  │  Vercel     │
-│  │  (pynvml)    │ │                     │  │ API      │             │
-│  └──────────────┘ │                     │  └────┬─────┘             │
-│                    │                     │       │                    │
-│  NVIDIA A100/H100  │                     │  ┌────▼─────┐             │
-│  RTX 3090/4090     │                     │  │ Supabase │  PostgreSQL │
-│  Any NVIDIA GPU    │                     │  │ Database │  + RLS      │
-└──────────────────┘                     │  └────┬─────┘             │
-                                          │       │                    │
-                                          │  ┌────▼─────┐             │
-                                          │  │Dashboard │  React      │
-                                          │  │ UI       │  + Recharts │
-                                          │  └──────────┘             │
-                                          └──────────────────────────┘
-```
+Your A100 burns **$40/hour**. Do you know which of your training jobs was worth it?
+
+Most ML teams can't answer that. `nvidia-smi` shows real-time watts. Cloud providers show a monthly bill. **Neither tells you which specific job was your $800 run.**
+
+The hidden cost of GPU waste compounds fast:
+- Training jobs left running overnight when convergence stalled hours ago
+- Idle GPUs sitting at 3% utilization, eating full power draw
+- No per-team attribution → no accountability → no improvement
+- Finance asks "can we cut GPU spend?" and nobody has data to answer with
+
+AluminatiAI closes that gap. A lightweight Python agent runs on your GPU machines, attributes energy to individual jobs in real time, and streams dollar costs to a dashboard — so you know what everything costs before the cloud bill arrives.
+
+---
 
 ## Features
 
-- **Real-Time GPU Monitoring** - Power draw, utilization, temperature, memory, and clock speeds sampled every 5 seconds
-- **Energy Cost Tracking** - Calculates energy consumption in kWh and converts to dollar costs at your electricity rate
-- **Job Attribution** - Track which training jobs consumed how much energy and what they cost
-- **Dashboard** - Three views: Today's Cost, Jobs Table, and Utilization vs Power chart
-- **Free Trial** - 30-day free trial with auto-generated API keys on signup
-- **Lightweight Agent** - <1% CPU, ~50MB RAM overhead on GPU machines
-- **Secure** - Row-Level Security, API key auth with `pgcrypto`, rate limiting, server-side validation
-- **Minimax Scheduler** - Bonus hackathon project: AI-powered job scheduling that balances speed vs. energy cost
-
----
-
-## Project Structure
-
-```
-AluminatAI/
-├── aluminatai-landing/          # Next.js web platform (deployed to Vercel)
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── metrics/ingest/  # GPU metrics ingestion endpoint
-│   │   │   ├── dashboard/       # today-cost, jobs, utilization-chart
-│   │   │   ├── user/profile/    # User profile + API key rotation
-│   │   │   └── cron/            # Materialized view refresh
-│   │   ├── dashboard/           # Protected dashboard UI
-│   │   ├── login/               # Auth pages
-│   │   └── page.tsx             # Landing page
-│   ├── components/              # React components
-│   ├── lib/                     # Auth, rate limiting, Supabase clients
-│   └── database/migrations/     # SQL migrations (001-005)
-│
-├── agent/                       # Python GPU monitoring agent
-│   ├── main.py                  # Agent entry point
-│   ├── collector.py             # NVML-based GPU metrics collector
-│   ├── uploader.py              # API upload with retry + local backup
-│   ├── config.py                # Environment-based configuration
-│   ├── install.sh               # One-line install script
-│   └── tests/                   # Test suite + Colab notebook
-│
-├── minimax-scheduler/           # Hackathon: Minimax GPU job scheduler
-│   └── backend/                 # FastAPI + minimax algorithm
-│
-├── backend/                     # Legacy FastAPI backend (reference)
-├── frontend/                    # Legacy React frontend (reference)
-├── docker/                      # Docker configs for agent + backend
-├── docs/                        # Architecture docs, metrics schema
-└── assets/                      # Logo and diagrams
-```
+- **Per-job cost attribution** — tracks energy ($) per training run, not just per machine
+- **Real-time power monitoring** — samples NVML every 5 seconds via `nvidia-ml-py`
+- **Team chargeback** — tag workloads with `ALUMINATAI_TEAM` to split costs by team
+- **Utilization & efficiency metrics** — throughput-per-watt, idle detection, utilization trends
+- **Budget alerts** — get notified before costs spike, not after
+- **WAL-backed reliability** — metrics buffer locally during API outages, replay on reconnect
+- **Multi-scheduler support** — Kubernetes, Slurm, Run:ai, and manual tagging
+- **MLflow & W&B callbacks** — tag experiment runs with energy cost automatically
+- **Prometheus endpoint** — expose metrics to your existing Grafana stack (`METRICS_PORT=9100`)
+- **Zero infra overhead** — ~0% CPU, ~50 MB RAM, single pip install
 
 ---
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 18+ and npm
-- Python 3.8+
-- A Supabase account ([supabase.com](https://supabase.com))
-- An NVIDIA GPU (for the agent) or Google Colab with GPU runtime
-
-### 1. Clone the Repository
+### Install
 
 ```bash
-git clone https://github.com/AgentMulder404/aluminatai-landing.git
-cd aluminatai-landing
+pip install aluminatiai
 ```
 
-### 2. Set Up the Database (Supabase)
-
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** and run the migrations in order:
+### Run
 
 ```bash
-# Run these SQL files in the Supabase SQL Editor:
-database/migrations/002_gpu_monitoring_schema_postgres.sql
-database/migrations/003_fix_materialized_view.sql
-database/migrations/004_fix_trigger_permissions.sql
-database/migrations/005_secure_api_keys_and_constraints.sql
+export ALUMINATAI_API_KEY=alum_your_key_here
+aluminatiai
 ```
 
-This creates:
-- `users` table with auto-generated API keys (using `pgcrypto`)
-- `gpu_metrics` time-series table with CHECK constraints
-- `gpu_jobs` table for job tracking
-- `gpu_metrics_hourly` materialized view for fast dashboard queries
-- Row-Level Security policies on all tables
-- Triggers for user profile auto-creation on signup
+That's it. The agent starts streaming GPU metrics to your dashboard immediately.
 
-### 3. Set Up the Web Platform
+Get your API key at [aluminatiai.com/dashboard](https://aluminatiai.com/dashboard) — free during beta.
+
+### Docker
 
 ```bash
-cd aluminatai-landing
-npm install
-```
-
-Create a `.env.local` file:
-
-```bash
-# Supabase (from your project settings > API)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Cron secret (generate with: openssl rand -base64 32)
-CRON_SECRET=your-cron-secret
-```
-
-Run the development server:
-
-```bash
-npm run dev
-```
-
-Visit `http://localhost:3000` - you should see the landing page.
-
-### 4. Create an Account
-
-1. Click **"Start Free Trial"** on the landing page
-2. Enter your name, email, and password
-3. You'll be redirected to the dashboard setup page
-4. Copy your API key (starts with `alum_`)
-
-### 5. Install the GPU Agent
-
-On your GPU machine (or Google Colab):
-
-```bash
-# Install dependencies
-pip install pynvml requests python-dotenv rich
-
-# Set environment variables
-export ALUMINATAI_API_KEY="alum_your_key_here"
-export ALUMINATAI_API_ENDPOINT="http://localhost:3000/api/metrics/ingest"
-
-# Run the agent
-python agent/main.py
-```
-
-Options:
-
-```bash
-# Custom sampling interval (1 second)
-python agent/main.py --interval 1
-
-# Save to CSV + upload
-python agent/main.py --output data/metrics.csv
-
-# Run for 5 minutes
-python agent/main.py --duration 300
-
-# Quiet mode (no console output)
-python agent/main.py --quiet --output data/metrics.csv
-```
-
-For production, use the systemd service:
-
-```bash
-cd agent
-chmod +x install.sh
-sudo ./install.sh
-```
-
-### 6. Test on Google Colab (A100)
-
-Upload `agent/tests/AluminatAI_A100_Test.ipynb` to Google Colab:
-
-1. Go to [colab.research.google.com](https://colab.research.google.com)
-2. **File > Upload notebook** and select the `.ipynb` file
-3. **Runtime > Change runtime type** > select **A100 GPU**
-4. Paste your API key in Cell 2
-5. **Runtime > Run all**
-
-The notebook runs 7 test suites:
-- NVML hardware access
-- Collector class + energy calculation
-- API authentication validation
-- End-to-end collect + upload
-- Stress test under GPU load (8192x8192 matmul)
-- API key security audit
-- 60-second continuous monitoring demo
-
----
-
-## API Reference
-
-### Metrics Ingestion
-
-```
-POST /api/metrics/ingest
-Header: X-API-Key: alum_your_key_here
-```
-
-**Request body** (single metric or array):
-
-```json
-[
-  {
-    "timestamp": "2026-02-06T12:00:00Z",
-    "gpu_index": 0,
-    "gpu_uuid": "GPU-abc123",
-    "gpu_name": "NVIDIA A100-SXM4-40GB",
-    "power_draw_w": 285.5,
-    "power_limit_w": 400.0,
-    "energy_delta_j": 571.0,
-    "utilization_gpu_pct": 95,
-    "utilization_memory_pct": 60,
-    "temperature_c": 72,
-    "memory_used_mb": 32000,
-    "memory_total_mb": 40960
-  }
-]
-```
-
-**Validation rules:**
-- `power_draw_w`: 0-1500W
-- `temperature_c`: 0-120C
-- `utilization_*_pct`: 0-100
-- `timestamp`: valid ISO 8601, not more than 5 minutes in the future
-- Max 1000 metrics per request
-
-**Rate limit:** 100 requests/minute per user
-
-### Dashboard APIs
-
-| Endpoint | Method | Auth | Rate Limit | Description |
-|---|---|---|---|---|
-| `/api/dashboard/today-cost` | GET | Session | 60/min | Today's energy cost |
-| `/api/dashboard/jobs` | GET | Session | 60/min | Job history with pagination |
-| `/api/dashboard/utilization-chart` | GET | Session | 60/min | Time-series chart data |
-| `/api/user/profile` | GET | Session | - | User profile + API key |
-| `/api/user/profile` | PATCH | Session | - | Update profile settings |
-| `/api/user/profile` | POST | Session | 5/hr | Rotate API key |
-
-### API Key Rotation
-
-```bash
-curl -X POST https://aluminatiai-landing.vercel.app/api/user/profile \
-  -H "Content-Type: application/json" \
-  -H "Cookie: your-session-cookie" \
-  -d '{"action": "rotate_api_key"}'
+docker run --rm --runtime=nvidia --pid=host \
+  -e ALUMINATAI_API_KEY=alum_your_key_here \
+  ghcr.io/agentmulder404/aluminatai-agent:latest
 ```
 
 ---
 
-## Security
+## Configuration
 
-- **API Keys**: Generated with `pgcrypto gen_random_bytes()` - 340 bits of entropy
-- **Row-Level Security**: Users can only access their own data
-- **Rate Limiting**: Per-user limits on all endpoints
-- **Input Validation**: Server-side + database CHECK constraints
-- **HTTPS**: Enforced by Vercel
-- **No ambiguous characters**: API keys exclude `0, O, I, l, 1` to prevent copy errors
+All settings are environment variables — no config files required.
+
+| Variable | Default | Description |
+|---|---|---|
+| `ALUMINATAI_API_KEY` | *(required)* | Your API key from the dashboard |
+| `ALUMINATAI_API_ENDPOINT` | `https://aluminatiai.com/v1/metrics/ingest` | Ingest endpoint |
+| `SAMPLE_INTERVAL` | `5.0` | Seconds between NVML samples |
+| `UPLOAD_INTERVAL` | `60` | Seconds between metric flushes |
+| `ALUMINATAI_TEAM` | *(none)* | Team tag for chargeback attribution |
+| `ALUMINATAI_MODEL` | *(none)* | Model tag for per-experiment tracking |
+| `LOG_LEVEL` | `INFO` | Logging verbosity |
+| `METRICS_PORT` | `9100` | Prometheus scrape port (`0` = disabled) |
+
+---
+
+## Job Attribution
+
+Tag your workloads at launch for per-job cost breakdown:
+
+```bash
+ALUMINATAI_TEAM=nlp-team \
+ALUMINATAI_MODEL=llama3-finetune \
+ALUMINATAI_API_KEY=alum_... \
+python train.py
+```
+
+Or use the MLflow callback:
+
+```python
+from aluminatiai.integrations.mlflow_callback import AluminatiMLflowCallback
+
+with mlflow.start_run():
+    cb = AluminatiMLflowCallback()
+    trainer.add_callback(cb)
+```
+
+Or W&B:
+
+```python
+from aluminatiai.integrations.wandb_callback import AluminatiWandbCallback
+
+wandb.init(project="my-project")
+trainer.add_callback(AluminatiWandbCallback())
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   GPU Machine                           │
+│                                                         │
+│  ┌──────────────┐     ┌──────────────┐                 │
+│  │  NVML/NVIDIA │────▶│   Sampler    │  5s interval    │
+│  │  Driver      │     │  (nvidia-    │                 │
+│  └──────────────┘     │   ml-py)     │                 │
+│                       └──────┬───────┘                 │
+│                              │                          │
+│                       ┌──────▼───────┐                 │
+│                       │  Attributor  │ job_id / team   │
+│                       │  (process +  │ tagging         │
+│                       │  scheduler)  │                 │
+│                       └──────┬───────┘                 │
+│                              │                          │
+│                       ┌──────▼───────┐                 │
+│                       │  WAL Buffer  │ survives         │
+│                       │  (local)     │ outages          │
+│                       └──────┬───────┘                 │
+└──────────────────────────────┼──────────────────────────┘
+                               │ HTTPS
+                               ▼
+                    ┌─────────────────────┐
+                    │  aluminatiai.com    │
+                    │  /v1/metrics/ingest │
+                    └─────────┬───────────┘
+                              │
+                    ┌─────────▼───────────┐
+                    │  Dashboard          │
+                    │  watts → $ per job  │
+                    │  team attribution   │
+                    │  chargeback reports │
+                    └─────────────────────┘
+```
 
 ---
 
 ## Deployment
 
-### Vercel (Web Platform)
+### systemd (recommended for production)
 
-```bash
-# Install Vercel CLI
-npm i -g vercel
+```ini
+# /etc/systemd/system/aluminatiai.service
+[Unit]
+Description=AluminatiAI GPU Agent
+After=network.target
 
-# Deploy
-cd aluminatai-landing
-vercel
+[Service]
+ExecStart=/usr/local/bin/aluminatiai
+Restart=on-failure
+RestartSec=10
+EnvironmentFile=/etc/aluminatiai.env
 
-# Set environment variables in Vercel dashboard
+[Install]
+WantedBy=multi-user.target
 ```
 
-### Cron Job (Materialized View Refresh)
+```bash
+sudo systemctl enable --now aluminatiai
+```
 
-Set up a cron job to refresh the hourly metrics view:
+### Kubernetes DaemonSet
 
-- **URL**: `https://your-app.vercel.app/api/cron/refresh-metrics`
-- **Method**: POST
-- **Header**: `Authorization: Bearer your-cron-secret`
-- **Schedule**: Every hour (`0 * * * *`)
+```bash
+kubectl apply -f https://raw.githubusercontent.com/AgentMulder404/AluminatAI/main/deploy/k8s/daemonset.yaml
+```
 
-You can use [cron-job.org](https://cron-job.org) (free) or Vercel Cron.
+### Slurm (Prolog/Epilog)
+
+```bash
+# /etc/slurm/prolog.d/aluminatiai.sh
+source /etc/aluminatiai.env
+aluminatiai &
+```
+
+Full deployment docs at [aluminatiai.com/docs/agent](https://aluminatiai.com/docs/agent).
 
 ---
 
-## Tech Stack
+## Why Open Source?
 
-| Component | Technology |
-|---|---|
-| Web Framework | Next.js 16 |
-| UI | React 19 + Tailwind CSS 4 |
-| Charts | Recharts |
-| Database | Supabase PostgreSQL |
-| Auth | Supabase Auth |
-| GPU Agent | Python + pynvml (NVML) |
-| Deployment | Vercel |
-| Scheduler | Minimax with alpha-beta pruning |
+GPU cost visibility should be a solved problem, not a proprietary feature gate.
+
+The GPU monitoring space is full of tools that show you _what's happening_ (`nvidia-smi`, Grafana) or _what happened_ (cloud billing dashboards). AluminatiAI is the missing link: **what each specific job cost, in real time, in dollars.**
+
+By open-sourcing the agent, anyone can:
+- Audit exactly what data is collected (it's just power draw and metadata you tag)
+- Run a fully self-hosted stack against your own endpoint
+- Contribute integrations for their scheduler, experiment tracker, or cloud provider
+- Build on the primitives for their own cost tooling
+
+The hosted dashboard at [aluminatiai.com](https://aluminatiai.com) is how the project is sustained. The agent that collects your data will always be free and open.
 
 ---
 
-## Minimax GPU Scheduler
+## Self-Hosting
 
-A bonus hackathon project in `minimax-scheduler/` that uses game theory to optimize GPU job scheduling:
-
-- **Speed Player (Maximizer)**: Wants to complete jobs ASAP
-- **Cost Player (Minimizer)**: Wants to minimize energy costs
-- **Alpha-Beta Pruning**: Efficiently explores the decision tree
-- **Result**: 15-30% cost savings vs. naive FIFO scheduling
+The agent is fully functional without the hosted dashboard. Point it at your own ingest endpoint:
 
 ```bash
-cd minimax-scheduler/backend
-pip install -r requirements.txt
-python demo.py
+ALUMINATAI_API_ENDPOINT=https://your-internal-api.com/v1/metrics/ingest \
+ALUMINATAI_API_KEY=your_key \
+aluminatiai
 ```
+
+The ingest API schema is documented at [aluminatiai.com/docs/api](https://aluminatiai.com/docs/api).
 
 ---
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes
-4. Push to the branch (`git push origin feature/my-feature`)
-5. Open a Pull Request
+Contributions are welcome. The project follows a standard fork → branch → PR workflow.
+
+**Good first issues:** scheduler integrations, new MLflow/W&B/OTEL hooks, packaging improvements, docs.
+
+1. Fork the repo
+2. Create a branch: `git checkout -b feat/your-feature`
+3. Make your changes with tests where applicable
+4. Open a PR against `main`
+
+By contributing, you agree your code will be licensed under Apache 2.0 and credited in the NOTICE file.
+
+**Code of conduct:** Be direct, be useful, don't be a jerk.
+
+---
+
+## Citation
+
+If you use AluminatiAI in research, please cite:
+
+```bibtex
+@software{aluminatiai2026,
+  author    = {Kevin},
+  title     = {AluminatiAI: Per-Job GPU Energy Monitoring and Cost Attribution},
+  year      = {2026},
+  url       = {https://github.com/AgentMulder404/AluminatAI},
+  version   = {0.2.1}
+}
+```
+
+See [CITATION.cff](CITATION.cff) for the machine-readable format.
+
+---
+
+## Authorship & Credit
+
+AluminatiAI was created and is maintained by **Kevin**.
+
+- X/Twitter: [@AluminatiAi_Dev](https://x.com/AluminatiAi_Dev)
+- Website: [aluminatiai.com](https://aluminatiai.com)
+- GitHub: [@AgentMulder404](https://github.com/AgentMulder404)
+
+Copyright © 2026 Kevin (AluminatiAI). All rights reserved.
+
+The name **"AluminatiAI"** is a trademark of the original author. Forks and derivative works are welcome under the Apache 2.0 license, but may not use the AluminatiAI name or logo to represent their products without written permission.
+
+If you build something with or on top of AluminatiAI, a mention or link back is appreciated — it helps others find the original project.
 
 ---
 
 ## License
 
-This project is open source. See [LICENSE](LICENSE) for details.
+Apache 2.0 — see [LICENSE](LICENSE) for full terms.
+
+In plain English: use it, fork it, build on it, sell products with it. Keep the copyright notice, don't call your fork "AluminatiAI", and don't claim you wrote it.
 
 ---
 
-Built by [@AgentMulder404](https://github.com/AgentMulder404)
+<div align="center">
+  <sub>Built with obsession by Kevin · Star ⭐ if this saves you money</sub>
+</div>

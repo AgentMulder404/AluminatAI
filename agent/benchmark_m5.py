@@ -1,3 +1,18 @@
+# Copyright 2026 Kevin (AluminatiAI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 
 #!/usr/bin/env python3
 """
@@ -291,7 +306,8 @@ def thermal_cooldown(monitor: PowerThermalMonitor, limit_c: float) -> None:
     """Block until SoC cools below (limit - hysteresis)."""
     temp = monitor.latest.die_temp_c
     target = limit_c - THERMAL_HYSTERESIS_C
-    print(f"\n  !! SoC die temperature is {temp:.0f} C (limit {limit_c:.0f} C)")
+    print(f"
+  !! SoC die temperature is {temp:.0f} C (limit {limit_c:.0f} C)")
     print(f"     Pausing until temperature drops below {target:.0f} C ...")
     while True:
         time.sleep(5)
@@ -398,7 +414,7 @@ def run_llama_inference(
 
     # Generation eval
     m = re.search(
-        r"(?<!\bprompt\s)eval time\s*=\s*([\d.]+)\s*ms\s*/\s*(\d+)\s*(?:tokens|runs)"
+        r"(?<!prompt\s)eval time\s*=\s*([\d.]+)\s*ms\s*/\s*(\d+)\s*(?:tokens|runs)"
         r".*?([\d.]+)\s*tokens per second",
         stderr,
     )
@@ -518,7 +534,8 @@ def run_job(
     start_time = datetime.now(timezone.utc)
     start_iso = start_time.isoformat()
 
-    print(f"\n{'=' * 70}")
+    print(f"
+{'=' * 70}")
     print(f"  JOB: {job_name}")
     print(f"  {job_cfg['description']}")
     print(f"  Tokens requested: {job_cfg['n_predict']}")
@@ -598,7 +615,8 @@ def run_job(
             print(f"  Uploaded {uploaded} metric samples to dashboard")
 
     # Print summary
-    print(f"\n  --- {job_name} Summary ---")
+    print(f"
+  --- {job_name} Summary ---")
     print(f"  Wall time:             {wall_elapsed:>8.1f} s")
     print(f"  Prompt tokens:         {result.prompt_tokens:>8}")
     print(f"  Tokens generated:      {result.tokens_generated:>8}")
@@ -732,8 +750,10 @@ Examples:
     print(f"  {'=' * 50}")
 
     # -- Start power/thermal monitor -----------------------------------------
-    print("\n  Starting power & thermal monitor ...")
-    print("  (If prompted, enter your sudo password for powermetrics)\n")
+    print("
+  Starting power & thermal monitor ...")
+    print("  (If prompted, enter your sudo password for powermetrics)
+")
     monitor = PowerThermalMonitor(interval_ms=SAMPLE_INTERVAL_MS)
     monitor.start()
 
@@ -748,7 +768,8 @@ Examples:
 
     # -- Warm-up phase -------------------------------------------------------
     if not args.skip_warmup:
-        print("\n  --- WARM-UP PHASE ---")
+        print("
+  --- WARM-UP PHASE ---")
         print("  Loading model into Metal GPU memory (excluded from job energy) ...")
         warmup = run_llama_inference(
             binary=binary,
@@ -785,11 +806,13 @@ Examples:
 
         # Inter-job cooldown (skip after last job)
         if i < len(args.jobs) - 1:
-            print("\n  Cooling pause between jobs (5s) ...")
+            print("
+  Cooling pause between jobs (5s) ...")
             time.sleep(5)
 
     # -- Final summary -------------------------------------------------------
-    print(f"\n{'=' * 70}")
+    print(f"
+{'=' * 70}")
     print(f"  BENCHMARK COMPLETE")
     print(f"{'=' * 70}")
     header = (

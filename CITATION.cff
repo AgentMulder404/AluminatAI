@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use AluminatiAI in your research, please cite it as below."
+type: software
+title: "AluminatiAI: Per-Job GPU Energy Monitoring and Cost Attribution"
+abstract: >
+  AluminatiAI is an open-source Python agent and dashboard for real-time
+  GPU energy monitoring, per-job cost attribution, team chargeback, and
+  waste detection in AI/ML infrastructure. It uses NVML (via nvidia-ml-py)
+  to sample power draw every 5 seconds and attributes energy costs to
+  individual training and inference jobs.
+authors:
+  - name: "Kevin"
+    alias: "AluminatiAi_Dev"
+    website: "https://aluminatiai.com"
+repository-code: "https://github.com/AgentMulder404/AluminatAI"
+url: "https://aluminatiai.com"
+license: Apache-2.0
+version: "0.2.1"
+date-released: "2026-03-07"
+keywords:
+  - GPU monitoring
+  - energy attribution
+  - cost tracking
+  - MLOps
+  - NVML
+  - nvidia-ml-py
+  - chargeback
+  - AI infrastructure

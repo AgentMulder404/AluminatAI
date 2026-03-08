@@ -1,3 +1,18 @@
+# Copyright 2026 Kevin (AluminatiAI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 """
 Energy Calculation Validation
 
@@ -40,17 +55,20 @@ class EnergyValidator:
         Args:
             interval: Sampling interval in seconds
         """
-        print(f"\n🔬 Energy Validation Test")
+        print(f"
+🔬 Energy Validation Test")
         print("="*70)
         print(f"Duration: {self.duration}s")
         print(f"Sampling interval: {interval}s")
         print(f"Expected samples: ~{int(self.duration / interval)}")
-        print("="*70 + "\n")
+        print("="*70 + "
+")
 
         try:
             with GPUCollector() as collector:
                 gpu_count = collector.get_gpu_count()
-                print(f"📊 Monitoring {gpu_count} GPUs...\n")
+                print(f"📊 Monitoring {gpu_count} GPUs...
+")
 
                 # Initialize tracking
                 for i in range(gpu_count):
@@ -104,13 +122,16 @@ class EnergyValidator:
                         time.sleep(sleep_time)
 
                 actual_duration = time.time() - start_time
-                print(f"\n✅ Collection complete. Actual duration: {actual_duration:.2f}s\n")
+                print(f"
+✅ Collection complete. Actual duration: {actual_duration:.2f}s
+")
 
                 # Validate results
                 self._validate_results(actual_duration)
 
         except Exception as e:
-            print(f"\n❌ Validation failed: {e}")
+            print(f"
+❌ Validation failed: {e}")
             import traceback
             traceback.print_exc()
             return 1
@@ -121,7 +142,8 @@ class EnergyValidator:
         """Analyze and validate collected data"""
         print("="*70)
         print(" VALIDATION RESULTS")
-        print("="*70 + "\n")
+        print("="*70 + "
+")
 
         all_pass = True
 
@@ -158,7 +180,8 @@ class EnergyValidator:
             print(f"{'Estimated cost ($0.12/kWh)':<35} ${energy_kwh * 0.12:>9.6f}")
 
             # Validation checks
-            print("\nValidation Checks:")
+            print("
+Validation Checks:")
 
             # Check 1: Error should be < 5%
             check1 = error_pct < 5.0
@@ -196,7 +219,8 @@ class EnergyValidator:
             print("✅ VALIDATION PASSED - Energy calculations are accurate")
         else:
             print("❌ VALIDATION FAILED - Review errors above")
-        print("="*70 + "\n")
+        print("="*70 + "
+")
 
         # Additional notes
         print("📝 Notes:")

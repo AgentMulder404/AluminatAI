@@ -1,3 +1,18 @@
+# Copyright 2026 Kevin (AluminatiAI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 # DEPRECATED: use agent/agent.py (aluminatai-agent CLI) instead.
 # This file is kept for reference and will be deleted in v0.3.0.
 """
@@ -120,7 +135,9 @@ class EnergyAgent:
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
-        print("\n\n🛑 Shutting down agent...")
+        print("
+
+🛑 Shutting down agent...")
         self.running = False
 
     def run(self):
@@ -250,7 +267,8 @@ class EnergyAgent:
 
                 # Check duration
                 if self.duration and (time.time() - start_time) >= self.duration:
-                    print(f"\n⏱️  Duration limit reached ({self.duration}s)")
+                    print(f"
+⏱️  Duration limit reached ({self.duration}s)")
                     break
 
                 # Sleep until next sample
@@ -260,13 +278,15 @@ class EnergyAgent:
                     time.sleep(sleep_time)
 
         except Exception as e:
-            print(f"\n❌ Error during collection: {e}")
+            print(f"
+❌ Error during collection: {e}")
             return 1
 
         finally:
             # Flush remaining metrics to API
             if self.uploader and len(self.uploader.buffer) > 0:
-                print(f"\n📤 Uploading {len(self.uploader.buffer)} remaining metrics...")
+                print(f"
+📤 Uploading {len(self.uploader.buffer)} remaining metrics...")
                 self.uploader.flush()
 
             # Cleanup
@@ -284,16 +304,19 @@ class EnergyAgent:
     def _print_header(self, gpu_count: int):
         """Print startup header"""
         if self.console:
-            self.console.print("\n[bold green]GPU Energy Agent v0.1.0[/bold green]")
+            self.console.print("
+[bold green]GPU Energy Agent v0.1.0[/bold green]")
             self.console.print(f"📊 Monitoring [cyan]{gpu_count}[/cyan] GPUs")
             self.console.print(f"⏱️  Sampling interval: [cyan]{self.interval}s[/cyan]")
             if self.duration:
                 self.console.print(f"⏱️  Duration: [cyan]{self.duration}s[/cyan]")
             self.console.print()
         else:
-            print(f"\nGPU Energy Agent v0.1.0")
+            print(f"
+GPU Energy Agent v0.1.0")
             print(f"Monitoring {gpu_count} GPUs")
-            print(f"Sampling interval: {self.interval}s\n")
+            print(f"Sampling interval: {self.interval}s
+")
 
     def _display_metrics(self, metrics):
         """Display current metrics to console"""
@@ -325,7 +348,8 @@ class EnergyAgent:
 
         else:
             # Simple text output
-            print(f"\n[Sample #{self.sample_count}] {datetime.now().strftime('%H:%M:%S')}")
+            print(f"
+[Sample #{self.sample_count}] {datetime.now().strftime('%H:%M:%S')}")
             for m in metrics:
                 energy_str = f"{m.energy_delta_j:.1f}J" if m.energy_delta_j else "N/A"
                 total_kwh = self.total_energy.get(m.gpu_index, 0)
@@ -338,7 +362,8 @@ class EnergyAgent:
 
     def _print_summary(self, runtime: float):
         """Print final summary"""
-        print("\n" + "="*60)
+        print("
+" + "="*60)
         print("SUMMARY")
         print("="*60)
         print(f"Runtime:        {runtime:.1f}s")
@@ -348,13 +373,15 @@ class EnergyAgent:
         # Uploader stats
         if self.uploader:
             status = self.uploader.get_status()
-            print(f"\nAPI Upload:")
+            print(f"
+API Upload:")
             print(f"  Status:         {'✅ Enabled' if status['has_api_key'] else '❌ Disabled'}")
             print(f"  Buffer:         {status['buffer_size']} metrics")
             if status['failed_metrics_count'] > 0:
                 print(f"  Failed:         {status['failed_metrics_count']} metrics (will retry next run)")
 
-        print(f"\nTotal Energy Consumed:")
+        print(f"
+Total Energy Consumed:")
 
         total_all = 0
         for gpu_idx, kwh in sorted(self.total_energy.items()):
@@ -362,7 +389,8 @@ class EnergyAgent:
             total_all += kwh
 
         print(f"  TOTAL:  {total_all:.6f} kWh (${total_all * 0.12:.4f} @ $0.12/kWh)")
-        print("="*60 + "\n")
+        print("="*60 + "
+")
 
 
 def main():

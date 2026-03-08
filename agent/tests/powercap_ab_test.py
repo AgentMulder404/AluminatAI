@@ -1,3 +1,18 @@
+# Copyright 2026 Kevin (AluminatiAI)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 #!/usr/bin/env python3
 """
 AluminatAI Scientific A/B Power-Cap Experiment
@@ -320,7 +335,8 @@ def run_training_phase(
       3. Run training loop for `duration_s` seconds
       4. Stop sampler, compute aggregates
     """
-    print(f"\n{'─' * 70}")
+    print(f"
+{'─' * 70}")
     print(f"  PHASE: {label}  |  Power Limit = {power_limit_w}W  |  Duration = {duration_s:.0f}s")
     print(f"{'─' * 70}")
 
@@ -361,11 +377,11 @@ def run_training_phase(
                 f"    [{elapsed:5.1f}s / {duration_s:.0f}s]  "
                 f"batches={batches}  images={images}  "
                 f"throughput={img_s:.0f} img/s  loss={loss.item():.4f}",
-                end="\r",
+                end="",
             )
 
     actual_duration = time.monotonic() - t_start
-    print()  # newline after \r progress
+    print()  # newline after  progress
 
     # Stop sampler and collect
     samples = sampler.stop()
@@ -429,7 +445,8 @@ def _compute_aggregates(r: PhaseResult):
 
 def _print_phase_summary(r: PhaseResult):
     """Print a concise phase summary."""
-    print(f"\n  {r.label} Results:")
+    print(f"
+  {r.label} Results:")
     print(f"    Duration           : {r.duration_s:.1f}s")
     print(f"    Batches            : {r.batches_completed}")
     print(f"    Images processed   : {r.images_processed:,}")
@@ -468,7 +485,8 @@ def run_burnin(
     purpose is to ensure the GPU junction temperature has plateaued
     before Test A begins.
     """
-    print(f"\n{'═' * 70}")
+    print(f"
+{'═' * 70}")
     print(f"  BURN-IN: {duration_s:.0f}s at {power_limit_w}W  (data discarded)")
     print(f"  Purpose: reach thermal steady-state before measurement phases")
     print(f"{'═' * 70}")
@@ -510,7 +528,7 @@ def run_burnin(
             print(
                 f"    [{elapsed:5.1f}s]  temp={temp}C  power={power:.0f}W  "
                 f"remaining={remaining:.0f}s",
-                end="\r",
+                end="",
             )
 
     # Final thermal reading
@@ -521,8 +539,10 @@ def run_burnin(
     except pynvml.NVMLError:
         final_temp = 0
 
-    print(f"\n  Burn-in complete.  Final GPU temperature: {final_temp}C")
-    print(f"  Thermal steady-state reached.  Proceeding to measurement.\n")
+    print(f"
+  Burn-in complete.  Final GPU temperature: {final_temp}C")
+    print(f"  Thermal steady-state reached.  Proceeding to measurement.
+")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -574,7 +594,8 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
 
     w = 70  # report width
 
-    print(f"\n{'━' * w}")
+    print(f"
+{'━' * w}")
     print(f"{'ALUMINATAI SCIENTIFIC A/B REPORT':^{w}}")
     print(f"{'Power-Cap Efficiency Experiment':^{w}}")
     print(f"{'━' * w}")
@@ -583,7 +604,8 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
     print(f"  CUDA: {torch.version.cuda}  |  PyTorch: {torch.__version__}")
 
     # ── Comparison Table ─────────────────────────────────────────────────
-    print(f"\n{'─' * w}")
+    print(f"
+{'─' * w}")
     print(f"  {'METRIC':<32} {'BASELINE':>15} {'OPTIMIZED':>15}")
     print(f"{'─' * w}")
 
@@ -641,7 +663,8 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
             print(f"  {label:<32} {b_val:>15} {o_val:>15}")
 
     # ── Key Findings ─────────────────────────────────────────────────────
-    print(f"\n{'─' * w}")
+    print(f"
+{'─' * w}")
     print(f"  KEY FINDINGS")
     print(f"{'─' * w}")
 
@@ -665,7 +688,8 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
         print(f"  you saved {aem:.1f}% in energy.")
 
     # ── Annualised Projection ────────────────────────────────────────────
-    print(f"\n{'─' * w}")
+    print(f"
+{'─' * w}")
     print(f"  ANNUALISED PROJECTION  (24/7 operation, 1 GPU)")
     print(f"{'─' * w}")
     print(f"  Baseline annual energy : {baseline_annual_kwh:,.0f} kWh")
@@ -675,7 +699,8 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
     print(f"  Annual CO2 reduction   : {annual_co2_saved_kg:,.0f} kg CO2")
 
     # ── Verdict ──────────────────────────────────────────────────────────
-    print(f"\n{'─' * w}")
+    print(f"
+{'─' * w}")
     print(f"  VERDICT")
     print(f"{'─' * w}")
 
@@ -700,9 +725,11 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
         print(f"  NOT RECOMMENDED")
         print(f"  Throughput loss ({throughput_loss_pct:.1f}%) is too severe.")
 
-    print(f"\n{'━' * w}")
+    print(f"
+{'━' * w}")
     print(f"{'END OF REPORT':^{w}}")
-    print(f"{'━' * w}\n")
+    print(f"{'━' * w}
+")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -778,7 +805,8 @@ examples:
         return 1
 
     # ── Banner ───────────────────────────────────────────────────────────
-    print(f"\n{'═' * 70}")
+    print(f"
+{'═' * 70}")
     print(f"  AluminatAI Scientific A/B Power-Cap Experiment")
     print(f"{'═' * 70}")
     print(f"  GPU             : {gpu_name}  (index {args.gpu})")
@@ -821,7 +849,9 @@ examples:
             device=device,
         )
     else:
-        print("\n  Burn-in skipped (--skip-burnin).  GPU may not be at steady-state.\n")
+        print("
+  Burn-in skipped (--skip-burnin).  GPU may not be at steady-state.
+")
 
     # ── Phase 1: Baseline (Test A) ───────────────────────────────────────
     baseline = run_training_phase(
@@ -837,7 +867,8 @@ examples:
     )
 
     # Brief cooldown between phases (5s) to let clocks settle
-    print("\n  Inter-phase cooldown (5s)...")
+    print("
+  Inter-phase cooldown (5s)...")
     time.sleep(5)
 
     # ── Phase 2: Optimized (Test B) ──────────────────────────────────────
@@ -854,7 +885,8 @@ examples:
     )
 
     # ── Restore default power limit ──────────────────────────────────────
-    print(f"\n  Restoring default power limit ({default_pl}W)...")
+    print(f"
+  Restoring default power limit ({default_pl}W)...")
     set_power_limit(args.gpu, default_pl)
 
     # ── Phase 3: Report ──────────────────────────────────────────────────
