@@ -1,34 +1,70 @@
+# Root pyproject.toml — delegates to agent/pyproject.toml
+# The installable Python package lives in agent/.
+# To install from source:
+#
+#   cd agent && pip install -e .
+#
+# To install the published package:
+#
+#   pip install aluminatiai
+#
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aluminatai-agent"
-version = "0.2.0"
-description = "GPU energy monitoring agent with per-job attribution"
-requires-python = ">=3.9"
+name = "aluminatiai"
+version = "0.2.1"
+description = "GPU energy monitoring agent — per-job cost attribution for AI teams"
+readme = "agent/README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.8"
+keywords = ["gpu", "monitoring", "energy", "mlops", "cost", "nvidia"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
-    "pynvml>=11.0",
-    "requests>=2.32",
+    "nvidia-ml-py>=12.0.0",
+    "requests>=2.28",
     "python-dotenv>=1.0",
-    "rich>=13.9",
+    "rich>=13.0",
 ]
 
 [project.optional-dependencies]
-kubernetes = ["kubernetes>=26"]
-prometheus = ["prometheus-client>=0.20"]
-otel = [
-    "opentelemetry-api>=1.20",
-    "opentelemetry-sdk>=1.20",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
-]
+prometheus = ["prometheus-client>=0.19"]
 
 [project.scripts]
-aluminatai-agent = "agent.agent:main"
+aluminatiai = "aluminatiai.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["agent*"]
+[project.urls]
+Homepage = "https://aluminatiai.com"
+Documentation = "https://aluminatiai.com/docs/agent"
+Repository = "https://github.com/AgentMulder404/AluminatAI"
+"Bug Tracker" = "https://github.com/AgentMulder404/AluminatAI/issues"
+
+[tool.setuptools]
+packages = [
+    "aluminatiai",
+    "aluminatiai.attribution",
+    "aluminatiai.integrations",
+    "aluminatiai.schedulers",
+    "aluminatiai.efficiency",
+]
+
+[tool.setuptools.package-dir]
+aluminatiai               = "agent"
+"aluminatiai.attribution"  = "agent/attribution"
+"aluminatiai.integrations" = "agent/integrations"
+"aluminatiai.schedulers"   = "agent/schedulers"
+"aluminatiai.efficiency"   = "agent/efficiency"
 
 [tool.setuptools.package-data]
-"agent" = ["py.typed"]
+"aluminatiai" = ["*.txt", "*.md"]

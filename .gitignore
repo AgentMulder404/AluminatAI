@@ -1,7 +1,11 @@
-# Dependencies
-node_modules/
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # Environment files
 .env
@@ -17,14 +21,13 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Next.js
-.next/
-out/
-
 # Agent runtime data
 agent/data/
 agent/logs/
+data/
+logs/
 
-# Package locks (root level only - subproject locks are kept)
-/package-lock.json
+# Node (root-level only — not used by agent)
+node_modules/
 /package.json
+/package-lock.json

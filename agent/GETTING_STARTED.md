@@ -1,284 +1,119 @@
-# Getting Started with GPU Energy Agent
+# Getting Started
 
 ## Prerequisites
 
-1. **NVIDIA GPU** with driver 450.80.02 or newer
-2. **Python 3.8+**
-3. **Linux OS** (Ubuntu, CentOS, etc.)
+- NVIDIA GPU with driver 450.80.02+
+- Python 3.8+
+- AluminatiAI API key — get one at [aluminatiai.com/dashboard](https://aluminatiai.com/dashboard)
 
-## Quick Start
-
-### 1. Install Dependencies
+## Install
 
 ```bash
-cd agent
-pip install -r requirements.txt
+pip install aluminatiai
 ```
 
-Expected output:
-```
-Successfully installed nvidia-ml-py3-7.352.0 psutil-5.9.6 rich-13.7.0 ...
-```
-
-### 2. Test GPU Detection
-
-Run a quick test to verify the collector can access your GPUs:
+## Start monitoring
 
 ```bash
-python collector.py
+export ALUMINATAI_API_KEY=alum_your_key_here
+aluminatiai
 ```
 
-Expected output:
-```
-Testing GPU Collector...
-Found 4 GPUs:
-  GPU 0: NVIDIA A100-SXM4-40GB (GPU-abc123...)
-  GPU 1: NVIDIA A100-SXM4-40GB (GPU-def456...)
-  ...
+You'll see real-time GPU metrics in the console and on your dashboard.
 
-Collecting 3 samples (2s intervals)...
-  GPU 0: 287.4W, 98% util, 76°C, 1437.0J
-  ...
-
-✅ Collector test passed!
-```
-
-### 3. Run the Agent
-
-Start monitoring all GPUs:
+## Tag workloads for per-job attribution
 
 ```bash
-python main.py
+ALUMINATAI_TEAM=nlp-team \
+ALUMINATAI_MODEL=llama3-finetune \
+ALUMINATAI_API_KEY=alum_your_key_here \
+python train.py
 ```
 
-You should see real-time metrics updating every 5 seconds:
+## MLflow / W&B integration
 
+```python
+# MLflow
+from aluminatiai.integrations.mlflow_callback import AluminatiMLflowCallback
+with mlflow.start_run():
+    trainer.add_callback(AluminatiMLflowCallback())
+
+# W&B
+from aluminatiai.integrations.wandb_callback import AluminatiWandbCallback
+wandb.init(project="my-project")
+trainer.add_callback(AluminatiWandbCallback())
 ```
-GPU Energy Agent v0.1.0
-📊 Monitoring 4 GPUs
-⏱️  Sampling interval: 5.0s
 
-┏━━━━━┳━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┓
-┃ GPU ┃  Power ┃ Util ┃ Temp ┃ Energy Δ┃ Total kWh┃
-┡━━━━━╇━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━━━━╇━━━━━━━━━━┩
-│ GPU 0│ 287.4W │  98% │  76°C│   1437J │  0.0012  │
-│ GPU 1│ 289.1W │  97% │  77°C│   1446J │  0.0012  │
-...
+## Production deployment
+
+### systemd
+
+```ini
+# /etc/systemd/system/aluminatiai.service
+[Unit]
+Description=AluminatiAI GPU Agent
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/aluminatiai
+Restart=on-failure
+RestartSec=10
+EnvironmentFile=/etc/aluminatiai.env
+
+[Install]
+WantedBy=multi-user.target
 ```
-
-Press `Ctrl+C` to stop.
-
-### 4. Export to CSV
-
-Run for 5 minutes and save metrics to CSV:
 
 ```bash
-python main.py --duration 300 --output data/test_run.csv
+sudo systemctl enable --now aluminatiai
 ```
 
-This creates `data/test_run.csv` with timestamped metrics for analysis.
-
-### 5. Run Tests
-
-#### Test 1: Unit Tests
+### Kubernetes DaemonSet
 
 ```bash
-python tests/test_collector.py
+kubectl apply -f https://raw.githubusercontent.com/AgentMulder404/AluminatAI/main/deploy/k8s/daemonset.yaml
 ```
 
-Expected: All tests pass ✅
-
-#### Test 2: Overhead Benchmark
-
-Measure agent CPU/memory impact:
+### Slurm
 
 ```bash
-python tests/benchmark_overhead.py
+# /etc/slurm/prolog.d/aluminatiai.sh
+source /etc/aluminatiai.env
+aluminatiai &
 ```
 
-Expected results:
-- CPU overhead: <0.1%
-- Memory overhead: <50 MB
-- Collection latency: <1ms per GPU
+## Prometheus
 
-#### Test 3: Energy Validation
-
-Validate energy calculations:
+The agent exposes a `/metrics` endpoint on port 9100 by default:
 
 ```bash
-python tests/validate_energy.py --duration 60
+# In your prometheus.yml:
+scrape_configs:
+  - job_name: aluminatiai
+    static_configs:
+      - targets: ['gpu-host:9100']
 ```
 
-Expected: Energy error <5% ✅
+Disable with `METRICS_PORT=0`.
 
-## Common Issues
+## Common issues
 
-### Issue: "No NVIDIA GPUs found"
-
-**Cause**: NVIDIA driver not installed or not working
-
-**Fix**:
-```bash
-# Check driver
-nvidia-smi
-
-# If not working, install driver:
-# Ubuntu:
-sudo apt install nvidia-driver-535
-
-# Then reboot
-sudo reboot
-```
-
-### Issue: "Failed to initialize NVML"
-
-**Cause**: Permission issue or driver mismatch
-
-**Fix**:
-```bash
-# Check driver version
-nvidia-smi
-
-# Ensure you're in the right groups
-groups
-
-# Add to video group if needed
-sudo usermod -a -G video $USER
-# Then log out and back in
-```
-
-### Issue: "Module 'pynvml' not found"
-
-**Cause**: Dependencies not installed
-
-**Fix**:
-```bash
-pip install -r requirements.txt
-```
-
-## Next Steps
-
-### Week 1-2: Current Focus
-
-- [x] Metrics collection working
-- [x] Energy calculations validated
-- [x] Overhead benchmarked
-- [ ] Run 24-hour stability test
-- [ ] Compare against external power meter
-
-### Week 3-4: Attribution
-
-- [ ] Add process tracking (PID → GPU mapping)
-- [ ] Parse command lines for model names
-- [ ] Implement job start/stop detection
-
-### Week 5-6: Backend Integration
-
-- [ ] Connect to FastAPI backend
-- [ ] Upload metrics to database
-- [ ] Real-time dashboard
-
-## Testing Checklist
-
-Use this checklist to verify your MVP agent:
-
-```
-□ GPU detection works (python collector.py)
-□ Agent runs without errors (python main.py)
-□ CPU overhead <0.1% (python tests/benchmark_overhead.py)
-□ Energy error <5% (python tests/validate_energy.py)
-□ CSV export works (python main.py --output data/test.csv)
-□ Can run for 1+ hours without crash
-□ Energy totals match expectations
-```
-
-## Getting Help
-
-If you encounter issues:
-
-1. Check `logs/` directory for error messages
-2. Run with verbose logging: `python main.py -v`
-3. Review [troubleshooting guide](README.md#troubleshooting)
-4. Open issue in main repository
-
-## Performance Tuning
-
-### Reduce Overhead
-
-If CPU usage is too high:
+### "No NVIDIA GPUs found"
 
 ```bash
-# Increase sampling interval
-python main.py --interval 10
-
-# Disable clock monitoring (edit collector.py):
-collector = GPUCollector(collect_clocks=False)
+nvidia-smi   # verify driver is working
 ```
 
-### Increase Accuracy
-
-For better energy accuracy:
+### "Failed to initialize NVML"
 
 ```bash
-# Use faster sampling (1s interval)
-python main.py --interval 1
-
-# Trade-off: Slightly higher overhead (~0.05% CPU)
+sudo usermod -a -G video $USER   # add to video group, then re-login
 ```
 
-## Example Workflows
+### Agent exits immediately
 
-### Workflow 1: Validate Against Power Meter
+Check `LOG_LEVEL=DEBUG` output and ensure `ALUMINATAI_API_KEY` is set correctly.
 
-```bash
-# 1. Start a GPU workload (e.g., training)
-python your_training_script.py &
+## More
 
-# 2. Run agent for 10 minutes
-python main.py --duration 600 --output data/validation.csv
-
-# 3. Compare total kWh with power meter reading
-# Note: Meter shows whole system, agent shows GPU only
-```
-
-### Workflow 2: Daily Monitoring
-
-```bash
-# Run as background service
-nohup python main.py --output data/daily_$(date +%Y%m%d).csv > logs/agent.log 2>&1 &
-
-# Check status
-tail -f logs/agent.log
-
-# Stop
-pkill -f "python main.py"
-```
-
-### Workflow 3: Job Energy Profiling
-
-```bash
-# Start agent
-python main.py --output data/job_profile.csv &
-AGENT_PID=$!
-
-# Run your ML job
-python train_resnet.py
-
-# Stop agent
-kill $AGENT_PID
-
-# Analyze CSV to see energy consumption during job
-```
-
-## Success Criteria (Week 1-2)
-
-Your MVP agent is ready when:
-
-- ✅ Runs with <0.1% CPU overhead
-- ✅ Collects accurate power metrics (validated against NVML)
-- ✅ Energy calculations within 5% of theoretical
-- ✅ Can run continuously for 24+ hours
-- ✅ CSV export works correctly
-- ✅ All unit tests pass
-
-Once these are met, move to Week 3-4 (attribution)!
+Full docs: [aluminatiai.com/docs/agent](https://aluminatiai.com/docs/agent)
