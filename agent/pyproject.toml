@@ -1,12 +1,12 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "aluminatiai"
 version = "0.2.0"
 description = "GPU energy monitoring agent — per-job cost attribution for AI teams"
-readme = "../README.md"
+readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.8"
 keywords = ["gpu", "monitoring", "energy", "mlops", "cost", "nvidia"]
