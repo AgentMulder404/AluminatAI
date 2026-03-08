@@ -3,7 +3,7 @@
 # Update procedure: pip install --upgrade <pkg>, test, then bump the pin here.
 
 # NVML Python bindings for GPU metrics
-pynvml==11.5.0
+nvidia-ml-py==13.590.48
 
 # HTTP requests for API communication
 requests==2.32.3
