@@ -1,0 +1,40 @@
+name: Publish aluminatiai to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"          # trigger on any git tag like v0.2.0, v1.0.0
+
+jobs:
+  build-and-publish:
+    name: Build wheel and publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+
+    permissions:
+      id-token: write   # required for OIDC trusted publishing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build wheel + sdist
+        working-directory: agent
+        run: python -m build
+
+      - name: Check distribution
+        working-directory: agent
+        run: twine check dist/*
+
+      - name: Publish to PyPI
+        working-directory: agent
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload dist/*
