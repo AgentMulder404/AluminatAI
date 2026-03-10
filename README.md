@@ -66,7 +66,7 @@ aluminatiai
 
 That's it. The agent starts streaming GPU metrics to your dashboard immediately.
 
-Get your API key at [aluminatiai.com/dashboard](https://aluminatiai.com/dashboard) — free during beta.
+Get your API key at [aluminatiai.com/dashboard](https://aluminatiai.com/dashboard) — 7-day free trial, no credit card required.
 
 ### Docker
 

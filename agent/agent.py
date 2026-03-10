@@ -1040,6 +1040,12 @@ Examples:
     effective_fmt = args.log_format
     _setup_logging(level=effective_level, fmt=effective_fmt)
 
+    if not UPLOAD_ENABLED and not args.dry_run and not args.prometheus_only:
+        log.warning(
+            "ALUMINATAI_API_KEY is not set — metrics will NOT be uploaded to the dashboard. "
+            "Get your API key at https://aluminatiai.com/dashboard"
+        )
+
     interval = args.interval if args.interval is not None else SAMPLE_INTERVAL
     if interval < 0.1:
         log.error("Interval must be >= 0.1s")
