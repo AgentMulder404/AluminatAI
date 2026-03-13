@@ -137,7 +137,7 @@ class AluminatAIWandbCallback:
         import urllib.request
         import json
 
-        base = self.api_endpoint.rstrip("/api/metrics/ingest").rstrip("/")
+        base = self.api_endpoint.removesuffix("/api/metrics/ingest").rstrip("/")
         url = f"{base}/api/metrics/cost-estimate"
         req = urllib.request.Request(
             url,

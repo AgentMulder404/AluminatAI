@@ -216,6 +216,12 @@ try:
 except ImportError:
     _METRICS_SERVER = False
 
+try:
+    from integrations.otel_exporter import AluminatAIOtelExporter
+    _OTEL = True
+except ImportError:
+    _OTEL = False
+
 # ── ManifestWriter — atomic-flush CSV output ──────────────────────────────────
 
 CSV_MANIFEST_COLUMNS = [
@@ -407,6 +413,13 @@ class Agent:
             self.metrics_server = MetricsServer()
             self.metrics_server.start()
 
+        # OpenTelemetry exporter (auto-enabled when OTEL_EXPORTER_OTLP_ENDPOINT is set)
+        self.otel_exporter = None
+        if _OTEL and os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+            self.otel_exporter = AluminatAIOtelExporter()
+            self.otel_exporter.start()
+            log.info("OTel exporter wired → %s", os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+
         # Rich console
         self.console = Console() if (_RICH and not quiet) else None
 
@@ -583,6 +596,10 @@ class Agent:
                 # Prometheus metrics update (GPU + attribution)
                 if self.metrics_server:
                     self.metrics_server.update(metrics, attributed_rows)
+
+                # OTel metrics export
+                if self.otel_exporter:
+                    self.otel_exporter.record(metrics, attributed_rows)
                     # Agent uptime and info — updated every collection cycle
                     self.metrics_server.update_agent_stats(
                         uptime_sec=time.monotonic() - self._start_time,
@@ -666,6 +683,10 @@ class Agent:
             # Stop Prometheus server
             if self.metrics_server:
                 self.metrics_server.stop()
+
+            # Shutdown OTel exporter (flushes remaining spans)
+            if self.otel_exporter:
+                self.otel_exporter.stop()
 
             # Signal job completion (skipped in dry-run / prometheus-only modes)
             if API_KEY and self.job_uuid and not self.dry_run and not self.prometheus_only:

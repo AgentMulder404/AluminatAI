@@ -150,7 +150,7 @@ class AluminatAIMLflowCallback:
         from datetime import datetime, timezone
 
         since_iso = datetime.fromtimestamp(since, tz=timezone.utc).isoformat()
-        base = self.api_endpoint.rstrip("/api/metrics/ingest").rstrip("/")
+        base = self.api_endpoint.removesuffix("/api/metrics/ingest").rstrip("/")
         url = f"{base}/api/metrics/cost-estimate"
 
         req = urllib.request.Request(
