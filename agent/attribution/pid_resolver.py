@@ -49,12 +49,38 @@ except ImportError:
 # Built-in cmdline heuristics: (compiled_regex, team_id, model_tag)
 # Checked in order; first match wins. Confidence → "heuristic".
 _BUILTIN_HEURISTICS: list[tuple[re.Pattern, str, str]] = [
-    (re.compile(r"jupyter",           re.IGNORECASE), "jupyter",   "notebook"),
-    (re.compile(r"python.*train",     re.IGNORECASE), "unknown",   "training"),
-    (re.compile(r"python.*inference", re.IGNORECASE), "unknown",   "inference"),
-    (re.compile(r"vllm",              re.IGNORECASE), "unknown",   "vllm-serve"),
-    (re.compile(r"torchserve",        re.IGNORECASE), "unknown",   "torchserve"),
-    (re.compile(r"tritonserver",      re.IGNORECASE), "unknown",   "triton"),
+    # Notebooks / IDEs
+    (re.compile(r"jupyter",                         re.IGNORECASE), "jupyter",      "notebook"),
+    (re.compile(r"ipykernel",                       re.IGNORECASE), "jupyter",      "notebook"),
+    (re.compile(r"code.*server|vscode.*server",     re.IGNORECASE), "vscode",       "ide"),
+    # Inference servers
+    (re.compile(r"vllm",                            re.IGNORECASE), "unknown",      "vllm-serve"),
+    (re.compile(r"torchserve",                      re.IGNORECASE), "unknown",      "torchserve"),
+    (re.compile(r"tritonserver",                    re.IGNORECASE), "unknown",      "triton"),
+    (re.compile(r"text.generation.inference|tgi",   re.IGNORECASE), "unknown",      "tgi-serve"),
+    (re.compile(r"ollama",                          re.IGNORECASE), "unknown",      "ollama-serve"),
+    (re.compile(r"llama.cpp|llama-server",          re.IGNORECASE), "unknown",      "llamacpp-serve"),
+    # Training frameworks
+    (re.compile(r"python.*train",                   re.IGNORECASE), "unknown",      "training"),
+    (re.compile(r"torchrun|torch\.distributed",     re.IGNORECASE), "unknown",      "distributed-training"),
+    (re.compile(r"deepspeed",                       re.IGNORECASE), "unknown",      "deepspeed-training"),
+    (re.compile(r"accelerate.*launch",              re.IGNORECASE), "unknown",      "hf-accelerate"),
+    (re.compile(r"transformers.*train|run_clm|run_mlm|run_glue", re.IGNORECASE), "unknown", "hf-transformers"),
+    (re.compile(r"lightning.*trainer|pl\.trainer",  re.IGNORECASE), "unknown",      "pytorch-lightning"),
+    (re.compile(r"ray.*train|ray\.tune",            re.IGNORECASE), "unknown",      "ray-train"),
+    (re.compile(r"mlflow.*run",                     re.IGNORECASE), "unknown",      "mlflow-run"),
+    (re.compile(r"wandb.*agent",                    re.IGNORECASE), "unknown",      "wandb-sweep"),
+    (re.compile(r"tensorflow|tf\.keras|tf2",        re.IGNORECASE), "unknown",      "tensorflow"),
+    (re.compile(r"jax.*train|flax.*train",          re.IGNORECASE), "unknown",      "jax-training"),
+    # Evaluation / batch jobs
+    (re.compile(r"python.*eval|lm.eval|lm_eval",   re.IGNORECASE), "unknown",      "eval"),
+    (re.compile(r"python.*inference",               re.IGNORECASE), "unknown",      "inference"),
+    (re.compile(r"python.*generate|python.*infer",  re.IGNORECASE), "unknown",      "batch-inference"),
+    # Data processing
+    (re.compile(r"spark.*submit|pyspark",           re.IGNORECASE), "unknown",      "spark"),
+    (re.compile(r"dask.*worker",                    re.IGNORECASE), "unknown",      "dask"),
+    # CUDA / GPU utilities (idle-like)
+    (re.compile(r"cuda.*memcpy|cudnn",              re.IGNORECASE), "unknown",      "cuda-utility"),
 ]
 
 
