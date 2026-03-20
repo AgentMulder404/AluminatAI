@@ -19,19 +19,31 @@ AttributionEngine: Resolve GPU power attribution per sample.
 For each GPU handle + power reading, returns one or more AttributionResult
 objects representing each job's fractional share of the GPU power.
 
-Attribution confidence levels:
-  "tagged"         — ALUMINATAI_TEAM/MODEL env var explicitly set by the user
-  "scheduler"      — resolved via SLURM_JOB_ID / RUNAI_JOB_NAME / K8s pod UID
-  "scheduler_poll" — resolved via scheduler.gpu_to_job() (legacy poll path)
-  "rules"          — matched by a custom attribution rules file
-  "heuristic"      — matched by a built-in cmdline heuristic
-  "memory_split"   — unresolved; power split proportionally by GPU memory usage
-  "idle"           — GPU is idle; billed to ALUMINATAI_IDLE_TEAM
+Attribution confidence levels (and numeric scores):
+  "tagged"         1.00 — ALUMINATAI_TEAM/MODEL env var explicitly set by the user
+  "api_tag"        0.95 — job registered via /api/v1/tag REST endpoint
+  "scheduler"      0.90 — resolved via SLURM_JOB_ID / RUNAI_JOB_NAME / K8s pod UID
+  "scheduler_poll" 0.75 — resolved via scheduler.gpu_to_job() (legacy poll path)
+  "rules"          0.60 — matched by a custom attribution rules file
+  "heuristic"      0.40 — matched by a built-in cmdline heuristic
+  "memory_split"   0.20 — unresolved; power split proportionally by GPU memory usage
+  "idle"           0.30 — GPU is idle; billed to ALUMINATAI_IDLE_TEAM
+
+Resolution priority (step 1 → 7):
+  1.   ALUMINATAI_TEAM/MODEL env var on the process                    → tagged (1.0)
+  1.5  /api/v1/tag REST registration (via TagClient)                   → api_tag (0.95)
+  2.   SLURM_JOB_ID / RUNAI_JOB_NAME / K8s pod UID on the process     → scheduler (0.9)
+  3.   scheduler.gpu_to_job() poll                                      → scheduler_poll (0.75)
+  4.   custom attribution rules file                                    → rules (0.6)
+  5.   built-in cmdline heuristics                                      → heuristic (0.4)
+  6.   GPU memory split (all unresolved processes)                      → memory_split (0.2)
+  7.   ALUMINATAI_IDLE_TEAM env var fallback                            → idle (0.3)
 """
 
 import os
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional, TYPE_CHECKING
 
 from .process_probe import ProcessProbe
@@ -39,8 +51,23 @@ from .pid_resolver import PidResolver
 
 if TYPE_CHECKING:
     from schedulers.base import SchedulerAdapter, JobMetadata
+    from tag_client import TagClient
+    from pid_smoother import PidSmoother
 
 logger = logging.getLogger(__name__)
+
+# Numeric confidence scores (0.0–1.0) for each attribution method.
+# Higher = more trustworthy attribution.
+CONFIDENCE_SCORES: dict[str, float] = {
+    "tagged":          1.00,   # explicit ALUMINATAI_TEAM env var on the process
+    "api_tag":         0.95,   # job registered via /api/v1/tag REST endpoint
+    "scheduler":       0.90,   # SLURM_JOB_ID / Run:ai / K8s pod UID on the process
+    "scheduler_poll":  0.75,   # scheduler.gpu_to_job() fallback poll
+    "rules":           0.60,   # custom attribution rules file regex match
+    "heuristic":       0.40,   # built-in cmdline heuristic (jupyter, vllm, …)
+    "memory_split":    0.20,   # unresolved; power split proportionally by GPU memory
+    "idle":            0.30,   # ALUMINATAI_IDLE_TEAM fallback
+}
 
 
 @dataclass
@@ -52,7 +79,8 @@ class AttributionResult:
     power_w: float
     gpu_fraction: float                   # 0.0–1.0
     energy_delta_j: Optional[float]
-    confidence: str   # "tagged"|"scheduler"|"scheduler_poll"|"rules"|"heuristic"|"memory_split"|"idle"
+    confidence: str        # "tagged"|"api_tag"|"scheduler"|"scheduler_poll"|"rules"|"heuristic"|"memory_split"|"idle"
+    confidence_score: float = field(default=0.0)  # numeric confidence in [0, 1]
 
 
 class AttributionEngine:
@@ -61,10 +89,14 @@ class AttributionEngine:
         probe: ProcessProbe,
         resolver: PidResolver,
         scheduler: "SchedulerAdapter",
+        tag_client: "Optional[TagClient]" = None,
+        smoother: "Optional[PidSmoother]" = None,
     ):
         self._probe = probe
         self._resolver = resolver
         self._scheduler = scheduler
+        self._tag_client = tag_client
+        self._smoother = smoother
 
     def resolve(
         self,
@@ -72,18 +104,40 @@ class AttributionEngine:
         gpu_index: int,
         total_power_w: float,
         energy_delta_j: Optional[float],
+        sample_time: Optional[datetime] = None,
     ) -> list[AttributionResult]:
         """
         Return attribution result(s) for one GPU at one sample time.
 
         Steps:
-          1. Query running compute processes via NVML
-          2. Resolve each process to a job, group by job, split power by memory fraction
-          3. Fallback: scheduler poll (single winner)
-          4. Fallback: idle attribution if ALUMINATAI_IDLE_TEAM is set
-          5. Return [] if no attribution configured (backward compat)
+          1.   Query running compute processes via NVML
+          1.5  For each resolved process, check TagClient for a REST-registered tag
+          2.   Resolve each process to a job via env vars / scheduler / heuristics
+          3.   Fallback: scheduler poll (single winner)
+          4.   Fallback: idle attribution if ALUMINATAI_IDLE_TEAM is set
+          5.   Return [] if no attribution configured (backward compat)
         """
+        if sample_time is None:
+            sample_time = datetime.now(timezone.utc)
+        elif sample_time.tzinfo is None:
+            sample_time = sample_time.replace(tzinfo=timezone.utc)
+
         processes = self._probe.query(handle, gpu_index)
+
+        # Temporal PID smoothing: filter out transient processes (DDP spawn
+        # workers still allocating, one-shot CUDA helpers) that appeared in
+        # fewer than `stable_threshold` fraction of the sliding window.
+        # Falls back to the raw NVML list when:
+        #   a) smoother is disabled, or
+        #   b) stable_pids() returns ∅ (cold start / no history yet), or
+        #   c) filtering would remove *all* current processes (new job)
+        if self._smoother and processes:
+            stable = self._smoother.stable_pids(gpu_index)
+            if stable:
+                filtered = [p for p in processes if p.pid in stable]
+                if filtered:
+                    processes = filtered
+                # else: all current PIDs are new → keep full raw list
 
         # Maps scheduler_source → confidence string
         _SOURCE_CONFIDENCE = {
@@ -97,18 +151,53 @@ class AttributionEngine:
 
         if processes:
             # Group by resolved job key, accumulate GPU memory bytes
-            by_key: dict[str, tuple[Optional["JobMetadata"], int]] = {}
+            by_key: dict[str, tuple[Optional["JobMetadata"], int, str]] = {}
             for proc in processes:
                 job = self._resolver.resolve(proc)
-                key = job.job_id if job else f"pid:{proc.pid}"
-                _, mem = by_key.get(key, (job, 0))
-                by_key[key] = (job, mem + proc.gpu_memory_bytes)
 
-            total_mem = sum(m for _, m in by_key.values()) or 1
+                # Step 1.5: check REST-registered tag for this (gpu_index, pid, time)
+                api_tag = None
+                if self._tag_client is not None:
+                    api_tag = self._tag_client.match(
+                        gpu_index=gpu_index,
+                        pid=proc.pid,
+                        ts=sample_time,
+                    )
+
+                if api_tag is not None:
+                    # API tag overrides resolver result (confidence 0.95)
+                    key = f"tag:{api_tag.id}"
+                    _, mem, _src = by_key.get(key, (None, 0, "api_tag"))
+                    # Store a synthetic job-like tuple: (tag_record, mem_bytes, confidence)
+                    by_key[key] = (api_tag, mem + proc.gpu_memory_bytes, "api_tag")  # type: ignore[assignment]
+                else:
+                    key = job.job_id if job else f"pid:{proc.pid}"
+                    _, mem, _src = by_key.get(key, (job, 0, ""))
+                    by_key[key] = (job, mem + proc.gpu_memory_bytes, "")  # type: ignore[assignment]
+
+            total_mem = sum(m for _, m, _ in by_key.values()) or 1
             results: list[AttributionResult] = []
 
-            for key, (job, mem) in by_key.items():
+            for key, (job_or_tag, mem, forced_confidence) in by_key.items():
                 frac = mem / total_mem
+
+                if forced_confidence == "api_tag":
+                    # job_or_tag is a TagRecord here
+                    tag = job_or_tag  # type: ignore[assignment]
+                    results.append(AttributionResult(
+                        team_id=tag.team_id or "unresolved",
+                        model_tag=tag.model_tag or "untagged",
+                        job_id=tag.job_id,
+                        scheduler_source="api_tag",
+                        power_w=round(total_power_w * frac, 3),
+                        gpu_fraction=round(frac, 4),
+                        energy_delta_j=round(energy_delta_j * frac, 4) if energy_delta_j is not None else None,
+                        confidence="api_tag",
+                        confidence_score=CONFIDENCE_SCORES["api_tag"],
+                    ))
+                    continue
+
+                job = job_or_tag  # type: ignore[assignment]
                 if job:
                     team_id = job.team_id
                     model_tag = job.model_tag
@@ -132,6 +221,7 @@ class AttributionEngine:
                     gpu_fraction=round(frac, 4),
                     energy_delta_j=round(energy_delta_j * frac, 4) if energy_delta_j is not None else None,
                     confidence=confidence,
+                    confidence_score=CONFIDENCE_SCORES.get(confidence, 0.0),
                 ))
 
             return results
@@ -148,6 +238,7 @@ class AttributionEngine:
                 gpu_fraction=1.0,
                 energy_delta_j=energy_delta_j,
                 confidence="scheduler_poll",
+                confidence_score=CONFIDENCE_SCORES["scheduler_poll"],
             )]
 
         # Fallback: idle
@@ -162,6 +253,7 @@ class AttributionEngine:
                 gpu_fraction=1.0,
                 energy_delta_j=energy_delta_j,
                 confidence="idle",
+                confidence_score=CONFIDENCE_SCORES["idle"],
             )]
 
         # No attribution configured — emit raw (backward compat)

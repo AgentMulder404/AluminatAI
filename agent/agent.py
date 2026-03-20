@@ -182,6 +182,7 @@ try:
         CLUSTER_TAG, LOCATION_HINT,
         IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS,
         DCGM_ENABLED,
+        PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD,
     )
     _UPLOADER = True
 except ImportError:
@@ -203,6 +204,8 @@ except ImportError:
     IDLE_BASELINE_WINDOW = 30
     WARMUP_DISCARD_SECONDS = 45
     DCGM_ENABLED = True
+    PID_SMOOTH_WINDOW = 30.0
+    PID_STABLE_THRESHOLD = 0.60
 
 try:
     from baseline import IdleBaseline
@@ -215,6 +218,12 @@ try:
     _DCGM = True
 except ImportError:
     _DCGM = False
+
+try:
+    from pid_smoother import PidSmoother
+    _PID_SMOOTHER = True
+except ImportError:
+    _PID_SMOOTHER = False
 
 try:
     from schedulers import detect_scheduler
@@ -450,13 +459,27 @@ class Agent:
             self.tag_client.start()
             log.info("TagClient: polling %s every %ds", API_ENDPOINT, TAG_POLL_INTERVAL)
 
+        # PID temporal smoother (filters transient spawn workers before attribution)
+        self._smoother = None
+        if _PID_SMOOTHER and PID_SMOOTH_WINDOW > 0:
+            self._smoother = PidSmoother(
+                window_s=PID_SMOOTH_WINDOW,
+                stable_threshold=PID_STABLE_THRESHOLD,
+            )
+            log.info(
+                "PidSmoother: window=%.0fs threshold=%.0f%%",
+                PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD * 100,
+            )
+
         # Attribution engine
         self.attribution_engine = None
         if _ATTRIBUTION and self.scheduler:
             probe = ProcessProbe()
             resolver = PidResolver(self.scheduler)
             self.attribution_engine = AttributionEngine(
-                probe, resolver, self.scheduler, tag_client=self.tag_client
+                probe, resolver, self.scheduler,
+                tag_client=self.tag_client,
+                smoother=self._smoother,
             )
             log.info("Attribution: process-level GPU attribution enabled")
 
@@ -599,6 +622,17 @@ class Agent:
                     continue
 
                 self.sample_count += 1
+
+                # PID smoother update — feed current NVML PID sets into the
+                # sliding window *before* engine.resolve() consults stable_pids().
+                if self._smoother:
+                    _now_ts = time.monotonic()
+                    for _m in metrics:
+                        _raw_pids = frozenset(
+                            p["pid"] for p in (_m.processes or [])
+                            if isinstance(p, dict)
+                        )
+                        self._smoother.update(_m.gpu_index, _now_ts, _raw_pids)
 
                 # DCGM phase decomposition — runs every tick regardless of warmup.
                 # Decomposes total GPU power into tensor / fp16 / memory / idle
@@ -906,6 +940,13 @@ class Agent:
             log.info("  Baseline    : disabled")
         if WARMUP_DISCARD_SECONDS > 0:
             log.info("  Warmup      : %ds discarded", WARMUP_DISCARD_SECONDS)
+        if self._smoother:
+            log.info(
+                "  PID smooth  : %.0fs window / %.0f%% threshold",
+                PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD * 100,
+            )
+        else:
+            log.info("  PID smooth  : disabled")
         if self.dcgm_probe:
             log.info("  DCGM        : %s", self.dcgm_probe.mode)
         else:

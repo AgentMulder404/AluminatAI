@@ -71,6 +71,8 @@ _CONFIG_KEY_TO_ENV: dict[str, str] = {
     "idle_baseline_window":     "IDLE_BASELINE_WINDOW",
     "warmup_discard_seconds":   "WARMUP_DISCARD_SECONDS",
     "dcgm_enabled":             "DCGM_ENABLED",
+    "pid_smooth_window":        "PID_SMOOTH_WINDOW",
+    "pid_stable_threshold":     "PID_STABLE_THRESHOLD",
 }
 
 
@@ -167,6 +169,19 @@ ENABLE_LOCAL_BACKUP = True  # WAL is always active when DATA_DIR is writable
 # ── Sampling ──────────────────────────────────────────────────────────────────
 
 SAMPLE_INTERVAL = float(os.getenv("SAMPLE_INTERVAL", "5.0"))     # seconds between NVML reads
+
+# ── PID Temporal Smoothing ────────────────────────────────────────────────────
+
+# Width (seconds) of the sliding window used to determine PID stability.
+# At SAMPLE_INTERVAL=5s this gives ~6 observations per GPU in steady state.
+PID_SMOOTH_WINDOW = float(os.getenv("PID_SMOOTH_WINDOW", "30.0"))
+
+# Fraction [0–1] of window samples a PID must appear in to be "stable".
+# PIDs below this threshold are filtered from attribution (transient helpers,
+# DDP spawn workers still allocating memory, one-shot CUDA utilities).
+# The attribution engine always falls back to the raw NVML list when filtering
+# would remove *all* current processes (ensures new jobs are never dropped).
+PID_STABLE_THRESHOLD = float(os.getenv("PID_STABLE_THRESHOLD", "0.60"))
 
 # ── DCGM Phase Decomposition ──────────────────────────────────────────────────
 
