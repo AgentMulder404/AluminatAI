@@ -41,7 +41,8 @@ Upload / WAL health:
   aluminatai_wal_replay_failed_total
 
 Attribution:
-  aluminatai_attribution_confidence{gpu_uuid, method}
+  aluminatai_attribution_confidence{gpu_index, job_id, method}
+  aluminatai_attribution_uncertainty_pct{gpu_index, job_id, method}
   aluminatai_attribution_unresolved_total
 
 Agent health:
@@ -173,6 +174,12 @@ class MetricsServer:
             "Attribution confidence score (0.0–1.0), labelled by resolution method",
             ["gpu_index", "job_id", "method"],
         )
+        self._uncertainty = Gauge(
+            "aluminatai_attribution_uncertainty_pct",
+            "Estimated ± power attribution uncertainty as a percentage of reported power_w; "
+            "reflects how much the true attribution could deviate based on resolution method",
+            ["gpu_index", "job_id", "method"],
+        )
         self._attribution_unresolved = Counter(
             "aluminatai_attribution_unresolved_total",
             "Collection cycles where the attribution engine returned no result for a GPU",
@@ -269,6 +276,9 @@ class MetricsServer:
             if conf_score is None:
                 conf_score = _CONF_SCORES.get(conf, 0.0)
             self._confidence.labels(gpu_index=gpu_idx, job_id=job_id, method=conf).set(conf_score)
+            uncertainty = row.get("attribution_uncertainty_pct")
+            if uncertainty is not None:
+                self._uncertainty.labels(gpu_index=gpu_idx, job_id=job_id, method=conf).set(uncertainty)
 
     def update_upload_stats(self, success_delta: int, failure_delta: int, buffer_size: int) -> None:
         if not _PROM or not self._started:

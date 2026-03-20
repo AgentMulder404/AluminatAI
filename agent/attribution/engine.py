@@ -69,6 +69,26 @@ CONFIDENCE_SCORES: dict[str, float] = {
     "idle":            0.30,   # ALUMINATAI_IDLE_TEAM fallback
 }
 
+# Estimated ± power-attribution uncertainty (percentage of reported power_w).
+# Reflects how much the true power share could deviate from the attributed value:
+#   tagged/api_tag  — user set the tag explicitly; measurement noise only (~2–5 %)
+#   scheduler       — env var on the process; reliable but kernel timing jitter (~10 %)
+#   scheduler_poll  — poll lag can span job boundaries (~20 %)
+#   rules           — regex heuristics; may hit wrong process (~25 %)
+#   heuristic       — cmdline guesses; significant false-positive risk (~35 %)
+#   memory_split    — proportional fallback; real share unknown (~50 %)
+#   idle            — catch-all; baseline noise dominates (~15 %)
+UNCERTAINTY_PCT: dict[str, float] = {
+    "tagged":          2.0,
+    "api_tag":         5.0,
+    "scheduler":      10.0,
+    "scheduler_poll": 20.0,
+    "rules":          25.0,
+    "heuristic":      35.0,
+    "memory_split":   50.0,
+    "idle":           15.0,
+}
+
 
 @dataclass
 class AttributionResult:
@@ -80,7 +100,8 @@ class AttributionResult:
     gpu_fraction: float                   # 0.0–1.0
     energy_delta_j: Optional[float]
     confidence: str        # "tagged"|"api_tag"|"scheduler"|"scheduler_poll"|"rules"|"heuristic"|"memory_split"|"idle"
-    confidence_score: float = field(default=0.0)  # numeric confidence in [0, 1]
+    confidence_score: float = field(default=0.0)   # numeric confidence in [0, 1]
+    uncertainty_pct: float = field(default=0.0)    # ± % of power_w the true attribution could deviate
 
 
 class AttributionEngine:
@@ -194,6 +215,7 @@ class AttributionEngine:
                         energy_delta_j=round(energy_delta_j * frac, 4) if energy_delta_j is not None else None,
                         confidence="api_tag",
                         confidence_score=CONFIDENCE_SCORES["api_tag"],
+                        uncertainty_pct=UNCERTAINTY_PCT["api_tag"],
                     ))
                     continue
 
@@ -222,6 +244,7 @@ class AttributionEngine:
                     energy_delta_j=round(energy_delta_j * frac, 4) if energy_delta_j is not None else None,
                     confidence=confidence,
                     confidence_score=CONFIDENCE_SCORES.get(confidence, 0.0),
+                    uncertainty_pct=UNCERTAINTY_PCT.get(confidence, 50.0),
                 ))
 
             return results
@@ -239,6 +262,7 @@ class AttributionEngine:
                 energy_delta_j=energy_delta_j,
                 confidence="scheduler_poll",
                 confidence_score=CONFIDENCE_SCORES["scheduler_poll"],
+                uncertainty_pct=UNCERTAINTY_PCT["scheduler_poll"],
             )]
 
         # Fallback: idle
@@ -254,6 +278,7 @@ class AttributionEngine:
                 energy_delta_j=energy_delta_j,
                 confidence="idle",
                 confidence_score=CONFIDENCE_SCORES["idle"],
+                uncertainty_pct=UNCERTAINTY_PCT["idle"],
             )]
 
         # No attribution configured — emit raw (backward compat)

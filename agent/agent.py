@@ -695,6 +695,7 @@ class Agent:
                                     gpu_fraction=attr.gpu_fraction,
                                     attribution_confidence=attr.confidence,
                                     attribution_confidence_score=attr.confidence_score,
+                                    attribution_uncertainty_pct=attr.uncertainty_pct,
                                     machine_id=self.machine_id,
                                     cluster_tag=CLUSTER_TAG,
                                 )
