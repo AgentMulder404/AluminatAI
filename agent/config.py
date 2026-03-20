@@ -70,6 +70,7 @@ _CONFIG_KEY_TO_ENV: dict[str, str] = {
     "grid_zone":                "ALUMINATAI_GRID_ZONE",
     "idle_baseline_window":     "IDLE_BASELINE_WINDOW",
     "warmup_discard_seconds":   "WARMUP_DISCARD_SECONDS",
+    "dcgm_enabled":             "DCGM_ENABLED",
 }
 
 
@@ -166,6 +167,14 @@ ENABLE_LOCAL_BACKUP = True  # WAL is always active when DATA_DIR is writable
 # ── Sampling ──────────────────────────────────────────────────────────────────
 
 SAMPLE_INTERVAL = float(os.getenv("SAMPLE_INTERVAL", "5.0"))     # seconds between NVML reads
+
+# ── DCGM Phase Decomposition ──────────────────────────────────────────────────
+
+# Set to "0" to disable DCGM even when pydcgm is installed.
+# When enabled, the agent tries to connect to the local nv-hostengine daemon
+# for tensor/fp16/fp32/DRAM activity counters; falls back to NVML utilization
+# rates automatically if DCGM is unavailable.
+DCGM_ENABLED = os.getenv("DCGM_ENABLED", "1").lower() not in ("0", "false", "no")
 
 # ── Idle Baseline + Warmup ────────────────────────────────────────────────────
 

@@ -32,7 +32,13 @@ dependencies = [
 prometheus    = ["prometheus-client>=0.19"]
 secure        = ["cryptography>=42.0"]
 observability = ["PyYAML>=6.0"]
-all           = ["prometheus-client>=0.19", "cryptography>=42.0", "PyYAML>=6.0"]
+benchmark     = ["numpy>=1.24"]
+# dcgm bindings ship with the NVIDIA DCGM system package, not PyPI.
+# Install the system package first: apt install datacenter-gpu-manager
+# then add /usr/lib/dcgm/bindings/python3 to PYTHONPATH, or install the
+# unofficial wrapper: pip install pydcgm  (if available for your DCGM version)
+dcgm          = ["pydcgm>=3.0"]
+all           = ["prometheus-client>=0.19", "cryptography>=42.0", "PyYAML>=6.0", "numpy>=1.24"]
 
 [project.scripts]
 aluminatiai = "aluminatiai.cli:main"

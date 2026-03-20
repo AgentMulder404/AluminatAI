@@ -25,6 +25,12 @@ GPU metrics:
   aluminatai_gpu_utilization_pct{gpu_uuid, gpu_index}
   aluminatai_gpu_temperature_c{gpu_uuid, gpu_index}
 
+Phase decomposition (requires DCGM or NVML fallback):
+  aluminatai_gpu_tensor_power_watts{gpu_uuid, gpu_index}
+  aluminatai_gpu_fp16_power_watts{gpu_uuid, gpu_index}
+  aluminatai_gpu_memory_power_watts{gpu_uuid, gpu_index}
+  aluminatai_gpu_idle_power_watts{gpu_uuid, gpu_index}
+
 Upload / WAL health:
   aluminatai_upload_success_total
   aluminatai_upload_failure_total
@@ -164,13 +170,38 @@ class MetricsServer:
         )
         self._confidence = Gauge(
             "aluminatai_attribution_confidence",
-            "Attribution confidence score, labelled by resolution method",
-            ["method", "gpu_uuid"],
+            "Attribution confidence score (0.0–1.0), labelled by resolution method",
+            ["gpu_index", "job_id", "method"],
         )
         self._attribution_unresolved = Counter(
             "aluminatai_attribution_unresolved_total",
             "Collection cycles where the attribution engine returned no result for a GPU",
         )
+
+        # Phase decomposition gauges (populated by DcgmProbe)
+        self._tensor_power = Gauge(
+            "aluminatai_gpu_tensor_power_watts",
+            "Estimated tensor-core power draw in watts (DCGM mode); "
+            "0 when DCGM unavailable",
+            labels,
+        )
+        self._fp16_power = Gauge(
+            "aluminatai_gpu_fp16_power_watts",
+            "Estimated FP16 pipeline power draw in watts (DCGM mode); "
+            "0 when DCGM unavailable",
+            labels,
+        )
+        self._memory_power = Gauge(
+            "aluminatai_gpu_memory_power_watts",
+            "Estimated memory-subsystem power draw in watts",
+            labels,
+        )
+        self._idle_power = Gauge(
+            "aluminatai_gpu_idle_power_watts",
+            "Estimated idle / baseline power draw in watts",
+            labels,
+        )
+
         self._agent_uptime = Gauge(
             "aluminatai_agent_uptime_seconds",
             "Seconds since the agent process started",
@@ -219,20 +250,25 @@ class MetricsServer:
             if m.energy_delta_j:
                 self._energy.labels(gpu_uuid=uuid).inc(m.energy_delta_j)
 
+        # Fallback score map for agents that don't yet send attribution_confidence_score
         _CONF_SCORES = {
-            "tagged":          1.0,
-            "scheduler":       0.9,
-            "scheduler_poll":  0.7,
-            "rules":           0.6,
-            "heuristic":       0.4,
-            "memory_split":    0.2,
-            "idle":            0.1,
+            "tagged":          1.00,
+            "api_tag":         0.95,
+            "scheduler":       0.90,
+            "scheduler_poll":  0.75,
+            "rules":           0.60,
+            "heuristic":       0.40,
+            "memory_split":    0.20,
+            "idle":            0.30,
         }
         for row in attributed_rows:
             conf = row.get("attribution_confidence", "unknown")
-            uuid = row.get("gpu_uuid", "unknown")
-            conf_score = _CONF_SCORES.get(conf, 0.0)
-            self._confidence.labels(method=conf, gpu_uuid=uuid).set(conf_score)
+            gpu_idx = str(row.get("gpu_index", ""))
+            job_id = str(row.get("job_id", ""))
+            conf_score = row.get("attribution_confidence_score")
+            if conf_score is None:
+                conf_score = _CONF_SCORES.get(conf, 0.0)
+            self._confidence.labels(gpu_index=gpu_idx, job_id=job_id, method=conf).set(conf_score)
 
     def update_upload_stats(self, success_delta: int, failure_delta: int, buffer_size: int) -> None:
         if not _PROM or not self._started:
@@ -279,3 +315,23 @@ class MetricsServer:
         if not _PROM or not self._started or count <= 0:
             return
         self._attribution_unresolved.inc(count)
+
+    def update_dcgm(
+        self,
+        gpu_uuid: str,
+        gpu_index: str,
+        decomp: dict,
+    ) -> None:
+        """
+        Update phase-decomposition power gauges from DcgmProbe.decompose_power().
+
+        decomp keys: tensor_power_w, fp32_power_w, fp16_power_w,
+                     memory_power_w, idle_power_w
+        """
+        if not _PROM or not self._started:
+            return
+        lbl = {"gpu_uuid": gpu_uuid, "gpu_index": gpu_index}
+        self._tensor_power.labels(**lbl).set(decomp.get("tensor_power_w", 0.0))
+        self._fp16_power.labels(**lbl).set(decomp.get("fp16_power_w", 0.0))
+        self._memory_power.labels(**lbl).set(decomp.get("memory_power_w", 0.0))
+        self._idle_power.labels(**lbl).set(decomp.get("idle_power_w", 0.0))

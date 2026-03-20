@@ -181,6 +181,7 @@ try:
         DRY_RUN, PROMETHEUS_ONLY, LOG_LEVEL, LOG_FORMAT,
         CLUSTER_TAG, LOCATION_HINT,
         IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS,
+        DCGM_ENABLED,
     )
     _UPLOADER = True
 except ImportError:
@@ -201,12 +202,19 @@ except ImportError:
     LOCATION_HINT = ""
     IDLE_BASELINE_WINDOW = 30
     WARMUP_DISCARD_SECONDS = 45
+    DCGM_ENABLED = True
 
 try:
     from baseline import IdleBaseline
     _BASELINE = True
 except ImportError:
     _BASELINE = False
+
+try:
+    from dcgm_probe import DcgmProbe
+    _DCGM = True
+except ImportError:
+    _DCGM = False
 
 try:
     from schedulers import detect_scheduler
@@ -458,6 +466,12 @@ class Agent:
             self.metrics_server = MetricsServer()
             self.metrics_server.start()
 
+        # DCGM phase-decomposition probe
+        self.dcgm_probe = None
+        if _DCGM and DCGM_ENABLED:
+            self.dcgm_probe = DcgmProbe()
+            self.dcgm_probe.start()
+
         # OpenTelemetry exporter (auto-enabled when OTEL_EXPORTER_OTLP_ENDPOINT is set)
         self.otel_exporter = None
         if _OTEL and os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
@@ -585,6 +599,20 @@ class Agent:
                     continue
 
                 self.sample_count += 1
+
+                # DCGM phase decomposition — runs every tick regardless of warmup.
+                # Decomposes total GPU power into tensor / fp16 / memory / idle
+                # components and pushes them to Prometheus.
+                if self.dcgm_probe and self.metrics_server:
+                    for m in metrics:
+                        activity = self.dcgm_probe.get_activity(m.gpu_index, fallback=m)
+                        idle_w   = self._baselines.get(m.gpu_index, 0.0)
+                        decomp   = self.dcgm_probe.decompose_power(
+                            m.power_draw_w, activity, m.gpu_name, idle_w
+                        )
+                        self.metrics_server.update_dcgm(
+                            m.gpu_uuid, str(m.gpu_index), decomp
+                        )
 
                 # Warmup gate: discard uploads + CSV writes for the first N seconds
                 # to avoid skewing attribution with warm-up transients.
@@ -786,6 +814,10 @@ class Agent:
             except Exception:
                 pass
 
+            # Stop DCGM probe
+            if self.dcgm_probe:
+                self.dcgm_probe.shutdown()
+
             # Stop Prometheus server
             if self.metrics_server:
                 self.metrics_server.stop()
@@ -874,6 +906,10 @@ class Agent:
             log.info("  Baseline    : disabled")
         if WARMUP_DISCARD_SECONDS > 0:
             log.info("  Warmup      : %ds discarded", WARMUP_DISCARD_SECONDS)
+        if self.dcgm_probe:
+            log.info("  DCGM        : %s", self.dcgm_probe.mode)
+        else:
+            log.info("  DCGM        : disabled")
         if self.dry_run:
             log.info("  Mode        : DRY RUN (no uploads, no WAL)")
         elif self.prometheus_only:
