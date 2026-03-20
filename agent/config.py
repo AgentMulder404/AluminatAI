@@ -47,6 +47,7 @@ _CONFIG_KEY_TO_ENV: dict[str, str] = {
     "wal_max_age_hours":        "WAL_MAX_AGE_HOURS",
     "wal_max_mb":               "WAL_MAX_MB",
     "scheduler_poll_interval":  "SCHEDULER_POLL_INTERVAL",
+    "tag_poll_interval":        "TAG_POLL_INTERVAL",
     "heartbeat_interval":       "HEARTBEAT_INTERVAL",
     "metrics_port":             "METRICS_PORT",
     "metrics_bind_host":        "METRICS_BIND_HOST",
@@ -64,6 +65,11 @@ _CONFIG_KEY_TO_ENV: dict[str, str] = {
     "client_key":               "ALUMINATAI_CLIENT_KEY",
     "attribution_config":       "ALUMINATAI_ATTRIBUTION_CONFIG",
     "trusted_uids":             "ALUMINATAI_TRUSTED_UIDS",
+    "cluster_tag":              "ALUMINATAI_CLUSTER_TAG",
+    "location_hint":            "ALUMINATAI_LOCATION_HINT",
+    "grid_zone":                "ALUMINATAI_GRID_ZONE",
+    "idle_baseline_window":     "IDLE_BASELINE_WINDOW",
+    "warmup_discard_seconds":   "WARMUP_DISCARD_SECONDS",
 }
 
 
@@ -161,9 +167,31 @@ ENABLE_LOCAL_BACKUP = True  # WAL is always active when DATA_DIR is writable
 
 SAMPLE_INTERVAL = float(os.getenv("SAMPLE_INTERVAL", "5.0"))     # seconds between NVML reads
 
+# ── Idle Baseline + Warmup ────────────────────────────────────────────────────
+
+# Seconds to sample GPU power during startup calibration (requires all GPUs idle).
+# Set to 0 to disable automatic calibration.
+IDLE_BASELINE_WINDOW = int(os.getenv("IDLE_BASELINE_WINDOW", "30"))
+
+# Samples collected in this window after agent start are excluded from uploads
+# and energy accounting to avoid skewing job attribution with warm-up transients.
+# Set to 0 to disable.  Must be > IDLE_BASELINE_WINDOW when calibration is enabled
+# (the agent finishes calibrating, then discards the overlap).
+WARMUP_DISCARD_SECONDS = int(os.getenv("WARMUP_DISCARD_SECONDS", "45"))
+
 # ── Scheduler Integration ─────────────────────────────────────────────────────
 
 SCHEDULER_POLL_INTERVAL = int(os.getenv("SCHEDULER_POLL_INTERVAL", "30"))
+
+# ── Cluster Identity ───────────────────────────────────────────────────────────
+
+CLUSTER_TAG   = os.getenv("ALUMINATAI_CLUSTER_TAG", "")    # e.g. "aws-us-west-2"
+LOCATION_HINT = os.getenv("ALUMINATAI_LOCATION_HINT", "")  # free-text, shown in UI
+GRID_ZONE     = os.getenv("ALUMINATAI_GRID_ZONE", "")      # Electricity Maps zone, e.g. "US-CAL-CISO"
+
+# How often the agent polls GET /api/v1/tag for user-registered job tags.
+# Defaults to the same cadence as the scheduler poll.
+TAG_POLL_INTERVAL = int(os.getenv("TAG_POLL_INTERVAL", str(SCHEDULER_POLL_INTERVAL)))
 
 # ── Heartbeat ─────────────────────────────────────────────────────────────────
 

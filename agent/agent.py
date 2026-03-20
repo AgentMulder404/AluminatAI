@@ -179,6 +179,8 @@ try:
         SCHEDULER_POLL_INTERVAL, SAMPLE_INTERVAL,
         AGENT_VERSION, HEARTBEAT_INTERVAL,
         DRY_RUN, PROMETHEUS_ONLY, LOG_LEVEL, LOG_FORMAT,
+        CLUSTER_TAG, LOCATION_HINT,
+        IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS,
     )
     _UPLOADER = True
 except ImportError:
@@ -195,6 +197,16 @@ except ImportError:
     PROMETHEUS_ONLY = False
     LOG_LEVEL = "INFO"
     LOG_FORMAT = "text"
+    CLUSTER_TAG = ""
+    LOCATION_HINT = ""
+    IDLE_BASELINE_WINDOW = 30
+    WARMUP_DISCARD_SECONDS = 45
+
+try:
+    from baseline import IdleBaseline
+    _BASELINE = True
+except ImportError:
+    _BASELINE = False
 
 try:
     from schedulers import detect_scheduler
@@ -211,6 +223,12 @@ except ImportError:
     _ATTRIBUTION = False
 
 try:
+    from tag_client import TagClient
+    _TAG_CLIENT = True
+except ImportError:
+    _TAG_CLIENT = False
+
+try:
     from metrics_server import MetricsServer
     _METRICS_SERVER = True
 except ImportError:
@@ -221,6 +239,15 @@ try:
     _OTEL = True
 except ImportError:
     _OTEL = False
+
+try:
+    from machine_id import get_machine_id
+    _MACHINE_ID = True
+except ImportError:
+    _MACHINE_ID = False
+    def get_machine_id() -> str:  # type: ignore[misc]
+        import uuid
+        return str(uuid.uuid4())
 
 # ── ManifestWriter — atomic-flush CSV output ──────────────────────────────────
 
@@ -309,6 +336,10 @@ def send_heartbeat(
     scheduler_name: str,
     uptime_sec: float = 0.0,
     config_hash: str = "",
+    machine_id: str = "",
+    cluster_tag: str = "",
+    location_hint: str = "",
+    gpu_names: Optional[List[str]] = None,
 ) -> None:
     url = endpoint.rstrip("/") + "/api/agent/heartbeat"
     payload = {
@@ -319,6 +350,10 @@ def send_heartbeat(
         "scheduler": scheduler_name,
         "uptime_sec": round(uptime_sec, 1),
         "config_hash": config_hash,
+        "machine_id": machine_id,
+        "cluster_tag": cluster_tag,
+        "location_hint": location_hint,
+        "gpu_names": list(dict.fromkeys(gpu_names)) if gpu_names else [],
     }
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
@@ -399,12 +434,22 @@ class Agent:
         elif not quiet:
             log.info("Scheduler integration unavailable")
 
+        # Tag client (polls /api/v1/tag for REST-registered job tags)
+        self.tag_client = None
+        if _TAG_CLIENT and UPLOAD_ENABLED and API_KEY:
+            from config import TAG_POLL_INTERVAL
+            self.tag_client = TagClient(API_ENDPOINT, API_KEY, poll_interval=TAG_POLL_INTERVAL)
+            self.tag_client.start()
+            log.info("TagClient: polling %s every %ds", API_ENDPOINT, TAG_POLL_INTERVAL)
+
         # Attribution engine
         self.attribution_engine = None
         if _ATTRIBUTION and self.scheduler:
             probe = ProcessProbe()
             resolver = PidResolver(self.scheduler)
-            self.attribution_engine = AttributionEngine(probe, resolver, self.scheduler)
+            self.attribution_engine = AttributionEngine(
+                probe, resolver, self.scheduler, tag_client=self.tag_client
+            )
             log.info("Attribution: process-level GPU attribution enabled")
 
         # Prometheus metrics server
@@ -423,8 +468,15 @@ class Agent:
         # Rich console
         self.console = Console() if (_RICH and not quiet) else None
 
+        # Machine identity
+        self.machine_id = get_machine_id()
+
         # Heartbeat state
         self.last_heartbeat = 0.0
+        self._last_gpu_names: List[str] = []
+
+        # Idle baselines: {gpu_index: idle_power_w} — populated in run() after NVML init
+        self._baselines: dict[int, float] = {}
 
         # Signal handlers
         signal.signal(signal.SIGINT, self._on_signal)
@@ -452,10 +504,17 @@ class Agent:
 
         gpu_count = collector.get_gpu_count()
         gpu_uuids = [info["uuid"] for info in collector.get_gpu_info()]
+        gpu_info  = collector.get_gpu_info()
         scheduler_name = self.scheduler.name if self.scheduler else "none"
 
         for i in range(gpu_count):
             self.total_energy[i] = 0.0
+
+        # Load or calibrate idle power baselines (runs before WAL replay so
+        # the 30s calibration window doesn't delay the first upload flush).
+        self._baselines = self._load_or_calibrate_baselines(
+            collector.gpu_handles, gpu_uuids, gpu_info
+        )
 
         # Replay WAL on startup
         if self.uploader:
@@ -487,10 +546,16 @@ class Agent:
 
         # Initial heartbeat (skipped in dry-run / prometheus-only modes)
         if self.uploader and API_KEY and not self.dry_run and not self.prometheus_only:
+            gpu_info = collector.get_gpu_info()
+            self._last_gpu_names = [g.get("name", "") for g in gpu_info if g.get("name")]
             send_heartbeat(
                 API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name,
                 uptime_sec=0.0,
                 config_hash=self._config_hash,
+                machine_id=self.machine_id,
+                cluster_tag=CLUSTER_TAG,
+                location_hint=LOCATION_HINT,
+                gpu_names=self._last_gpu_names,
             )
             self.last_heartbeat = time.time()
 
@@ -521,16 +586,39 @@ class Agent:
 
                 self.sample_count += 1
 
+                # Warmup gate: discard uploads + CSV writes for the first N seconds
+                # to avoid skewing attribution with warm-up transients.
+                # Prometheus is still updated (so dashboards see live data).
+                _in_warmup = (
+                    WARMUP_DISCARD_SECONDS > 0
+                    and (time.monotonic() - start_time) < WARMUP_DISCARD_SECONDS
+                )
+
+                # Update gpu_names from latest metrics (for heartbeat)
+                self._last_gpu_names = list(dict.fromkeys(
+                    m.gpu_name for m in metrics if getattr(m, "gpu_name", None)
+                ))
+
                 # Attribution + upload buffering
                 attributed_rows: list[dict] = []
                 for m in metrics:
+                    # Baseline-corrected power for attribution.
+                    # Raw m.power_draw_w is kept unchanged for Prometheus gauges.
+                    idle_w = self._baselines.get(m.gpu_index, 0.0)
+                    effective_power_w = max(0.0, m.power_draw_w - idle_w)
+                    # Scale energy delta by the same ratio to stay consistent.
+                    if m.energy_delta_j is not None and m.power_draw_w > 0:
+                        adj_energy_j: Optional[float] = m.energy_delta_j * (effective_power_w / m.power_draw_w)
+                    else:
+                        adj_energy_j = m.energy_delta_j
+
                     handle = collector.gpu_handles[m.gpu_index]
                     if self.attribution_engine:
                         attributions = self.attribution_engine.resolve(
                             handle=handle,
                             gpu_index=m.gpu_index,
-                            total_power_w=m.power_draw_w,
-                            energy_delta_j=m.energy_delta_j,
+                            total_power_w=effective_power_w,
+                            energy_delta_j=adj_energy_j,
                         )
                         if attributions:
                             for attr in attributions:
@@ -544,9 +632,12 @@ class Agent:
                                     energy_delta_j=attr.energy_delta_j,
                                     gpu_fraction=attr.gpu_fraction,
                                     attribution_confidence=attr.confidence,
+                                    attribution_confidence_score=attr.confidence_score,
+                                    machine_id=self.machine_id,
+                                    cluster_tag=CLUSTER_TAG,
                                 )
                                 attributed_rows.append(d)
-                                if manifest:
+                                if manifest and not _in_warmup:
                                     manifest.write_row([
                                         d.get("timestamp"), d.get("job_id"),
                                         d.get("gpu_uuid"), d.get("gpu_index"),
@@ -558,8 +649,10 @@ class Agent:
                                     ])
                         else:
                             d = m.to_dict()
+                            d["machine_id"] = self.machine_id
+                            d["cluster_tag"] = CLUSTER_TAG
                             attributed_rows.append(d)
-                            if manifest:
+                            if manifest and not _in_warmup:
                                 manifest.write_row([
                                     d.get("timestamp"), d.get("job_id"),
                                     d.get("gpu_uuid"), d.get("gpu_index"),
@@ -579,8 +672,10 @@ class Agent:
                                 m.model_tag = job.model_tag
                                 m.scheduler_source = job.scheduler_source
                         d = m.to_dict()
+                        d["machine_id"] = self.machine_id
+                        d["cluster_tag"] = CLUSTER_TAG
                         attributed_rows.append(d)
-                        if manifest:
+                        if manifest and not _in_warmup:
                             manifest.write_row([
                                 d.get("timestamp"), d.get("job_id"),
                                 d.get("gpu_uuid"), d.get("gpu_index"),
@@ -590,10 +685,16 @@ class Agent:
                                 d.get("team_id"), d.get("model_tag"), None, None,
                             ])
 
-                if self.uploader and attributed_rows:
-                    self.uploader.add_metrics(attributed_rows)
+                if not _in_warmup:
+                    if self.uploader and attributed_rows:
+                        self.uploader.add_metrics(attributed_rows)
+                elif self.sample_count == 1:
+                    log.info(
+                        "Warmup window active — discarding first %ds of samples",
+                        WARMUP_DISCARD_SECONDS,
+                    )
 
-                # Prometheus metrics update (GPU + attribution)
+                # Prometheus metrics update (GPU + attribution) — always, even during warmup
                 if self.metrics_server:
                     self.metrics_server.update(metrics, attributed_rows)
 
@@ -608,10 +709,11 @@ class Agent:
                         mode=_mode,
                     )
 
-                # Energy accumulation
-                for m in metrics:
-                    if m.energy_delta_j:
-                        self.total_energy[m.gpu_index] += m.energy_delta_j / 3_600_000
+                # Energy accumulation (skipped during warmup to avoid inflating totals)
+                if not _in_warmup:
+                    for m in metrics:
+                        if m.energy_delta_j:
+                            self.total_energy[m.gpu_index] += m.energy_delta_j / 3_600_000
 
                 # Periodic upload flush
                 if self.uploader and (time.time() - self.last_upload_time >= UPLOAD_INTERVAL):
@@ -640,6 +742,10 @@ class Agent:
                         API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name,
                         uptime_sec=time.monotonic() - self._start_time,
                         config_hash=self._config_hash,
+                        machine_id=self.machine_id,
+                        cluster_tag=CLUSTER_TAG,
+                        location_hint=LOCATION_HINT,
+                        gpu_names=self._last_gpu_names,
                     )
                     self.last_heartbeat = time.time()
 
@@ -684,6 +790,10 @@ class Agent:
             if self.metrics_server:
                 self.metrics_server.stop()
 
+            # Stop tag client polling
+            if self.tag_client:
+                self.tag_client.stop()
+
             # Shutdown OTel exporter (flushes remaining spans)
             if self.otel_exporter:
                 self.otel_exporter.stop()
@@ -702,6 +812,51 @@ class Agent:
 
         return 0
 
+    # ── Idle baseline ────────────────────────────────────────────────────
+
+    def _load_or_calibrate_baselines(
+        self,
+        handles: list,
+        gpu_uuids: list[str],
+        gpu_info: list[dict],
+    ) -> dict[int, float]:
+        """
+        Load persisted idle baselines matched by GPU UUID, or run a fresh
+        calibration if the baselines file is absent / stale and all GPUs
+        are currently idle.
+
+        Returns {gpu_index: baseline_w}. Always safe to call; returns {}
+        if baselines are unavailable (calibration skipped or failed).
+        """
+        if not _BASELINE or IDLE_BASELINE_WINDOW == 0:
+            return {}
+
+        ib = IdleBaseline()
+
+        # Try loading from cache first (avoids 30s startup delay on busy nodes)
+        if not ib.is_stale():
+            by_uuid = ib.load()
+            if by_uuid:
+                result: dict[int, float] = {}
+                for info in gpu_info:
+                    uuid = info["uuid"]
+                    if uuid in by_uuid:
+                        result[info["index"]] = by_uuid[uuid]
+                if result:
+                    log.info(
+                        "Loaded idle baselines from cache: %s",
+                        {k: f"{v:.1f}W" for k, v in result.items()},
+                    )
+                    return result
+
+        # Cache miss or stale — attempt live calibration
+        calibrated = ib.calibrate(handles, gpu_uuids, duration_s=IDLE_BASELINE_WINDOW)
+        if calibrated:
+            return calibrated
+
+        log.info("No idle baseline available — baseline subtraction disabled")
+        return {}
+
     # ── Display helpers ──────────────────────────────────────────────────
 
     def _print_banner(self, gpu_count: int, scheduler: str):
@@ -712,6 +867,13 @@ class Agent:
         log.info("  Interval    : %.2fs", self.interval)
         log.info("  Scheduler   : %s", scheduler)
         log.info("  Attribution : %s", "process-level" if self.attribution_engine else "scheduler-poll")
+        if self._baselines:
+            baseline_str = "  ".join(f"GPU{k}={v:.1f}W" for k, v in sorted(self._baselines.items()))
+            log.info("  Baseline    : %s", baseline_str)
+        else:
+            log.info("  Baseline    : disabled")
+        if WARMUP_DISCARD_SECONDS > 0:
+            log.info("  Warmup      : %ds discarded", WARMUP_DISCARD_SECONDS)
         if self.dry_run:
             log.info("  Mode        : DRY RUN (no uploads, no WAL)")
         elif self.prometheus_only:
