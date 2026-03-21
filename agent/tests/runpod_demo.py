@@ -322,9 +322,9 @@ def _print_results(
             adj_w = max(0.0, r.avg_power_w - idle_w)
             tflops_str = f"{r.tflops:.1f}" if r.tflops else "—"
             kwh_tflop = r.kwh_per_tflop
-            kwh_tflop_str = f"{kwh_tflop:.5f}" if kwh_tflop else "—"
+            kwh_tflop_str = f"{kwh_tflop:.2e}" if kwh_tflop is not None else "—"
             kwh_1m = r.kwh_per_1m_tokens
-            kwh_1m_str = f"{kwh_1m:.5f}" if kwh_1m else "—"
+            kwh_1m_str = f"{kwh_1m:.2e}" if kwh_1m is not None else "—"
             cost_hr = _cost_usd(r.avg_power_w, 3600, rate_per_hr)
             cost_mo = cost_hr * MONTHLY_HOURS
             table.add_row(
@@ -340,18 +340,21 @@ def _print_results(
 
         console.print(table)
 
-        # Highlight the best workload
-        efficient = min(
-            (r for r in results if r.tflops),
-            key=lambda r: (r.avg_power_w / max(r.tflops, 1e-9)),
-            default=None,
-        )
-        if efficient:
-            saving = results[0].avg_power_w - efficient.avg_power_w
-            saving_pct = saving / max(results[0].avg_power_w, 1) * 100
+        # Highlight the best workload by W/TFLOP (lower = more efficient)
+        tflop_results = [r for r in results if r.tflops and r.tflops > 0]
+        if tflop_results:
+            worst  = max(tflop_results, key=lambda r: r.avg_power_w / r.tflops)
+            efficient = min(tflop_results, key=lambda r: r.avg_power_w / r.tflops)
+            worst_w_per_tflop = worst.avg_power_w / worst.tflops
+            best_w_per_tflop  = efficient.avg_power_w / efficient.tflops
+            improvement_pct   = (worst_w_per_tflop - best_w_per_tflop) / worst_w_per_tflop * 100
+            time_saving_pct   = (1.0 - worst.tflops / efficient.tflops) * 100  # same work, less time
+            cost_saving_pct   = time_saving_pct  # RunPod charges by time
             console.print(
-                f"\n[bold green]Most efficient:[/] {efficient.name} — "
-                f"[green]{saving_pct:.1f}% lower avg power[/] vs {results[0].name}"
+                f"\n[bold green]Most compute-efficient:[/] [cyan]{efficient.name}[/] "
+                f"— [green]{improvement_pct:.0f}% less W/TFLOP[/] vs {worst.name}\n"
+                f"  Same job finishes [bold]{efficient.tflops/worst.tflops:.1f}×[/] faster "
+                f"→ [bold green]{cost_saving_pct:.0f}% lower RunPod cost[/] for that workload"
             )
         console.print(
             f"\n[dim]Baseline idle: {idle_w:.1f} W subtracted from all attributed samples.[/]"
