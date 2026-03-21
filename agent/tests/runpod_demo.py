@@ -174,7 +174,7 @@ class WorkloadResult:
     @property
     def kwh_per_1m_tokens(self) -> Optional[float]:
         if self.tokens_per_sec and self.tokens_per_sec > 0:
-            return round(self.avg_power_w / (self.tokens_per_sec * 1000.0), 6)
+            return self.avg_power_w / (self.tokens_per_sec * 1000.0)
         return None
 
 
