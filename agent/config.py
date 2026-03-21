@@ -143,7 +143,7 @@ _load_config_file()
 
 # ── API Configuration ─────────────────────────────────────────────────────────
 
-API_ENDPOINT = os.getenv("ALUMINATAI_API_ENDPOINT", "https://aluminatiai.com/v1/metrics/ingest")
+API_ENDPOINT = os.getenv("ALUMINATAI_API_ENDPOINT", "https://www.aluminatiai.com/v1/metrics/ingest")
 API_KEY = os.getenv("ALUMINATAI_API_KEY", "")
 
 # ── Upload Configuration ──────────────────────────────────────────────────────
