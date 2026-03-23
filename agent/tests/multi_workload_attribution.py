@@ -123,6 +123,7 @@ def write_and_launch(name, code, team):
     return p
 
 pid_team_cache = {}
+_any_pid_to_team = {}   # populated at startup: all pid variants -> team
 
 def _read_environ_team(pid):
     try:
@@ -135,6 +136,17 @@ def _read_environ_team(pid):
         pass
     return None
 
+def _nspids(pid):
+    """Return all NSpid values from /proc/<pid>/status (handles PID namespaces)."""
+    try:
+        with open(f'/proc/{pid}/status') as f:
+            for line in f:
+                if line.startswith('NSpid:'):
+                    return [int(x) for x in line.split()[1:]]
+    except (FileNotFoundError, ValueError):
+        pass
+    return [pid]
+
 def _ppid(pid):
     try:
         with open(f'/proc/{pid}/status') as f:
@@ -145,10 +157,34 @@ def _ppid(pid):
         pass
     return None
 
+def build_team_map():
+    """Scan /proc for all processes with ALUMINATAI_TEAM, map all their PID variants."""
+    global _any_pid_to_team
+    result = {}
+    try:
+        for entry in os.scandir('/proc'):
+            if not entry.name.isdigit():
+                continue
+            pid = int(entry.name)
+            team = _read_environ_team(pid)
+            if team:
+                for ns_pid in _nspids(pid):
+                    result[ns_pid] = team
+                result[pid] = team
+    except (PermissionError, OSError):
+        pass
+    _any_pid_to_team = result
+    return result
+
 def get_team(pid):
-    """Walk process tree upward until ALUMINATAI_TEAM is found."""
+    """Look up team by checking PID map (handles namespace gaps) then tree walk."""
     if pid in pid_team_cache:
         return pid_team_cache[pid]
+    # Direct hit from pre-built map
+    if pid in _any_pid_to_team:
+        pid_team_cache[pid] = _any_pid_to_team[pid]
+        return _any_pid_to_team[pid]
+    # Walk parent tree (for child CUDA processes)
     current, visited = pid, set()
     while current and current not in visited:
         visited.add(current)
@@ -156,6 +192,9 @@ def get_team(pid):
         if team:
             pid_team_cache[pid] = team
             return team
+        if current in _any_pid_to_team:
+            pid_team_cache[pid] = _any_pid_to_team[current]
+            return _any_pid_to_team[current]
         parent = _ppid(current)
         if not parent or parent == current:
             break
@@ -196,6 +235,11 @@ def main():
 
     time.sleep(90)
 
+    # Build PID->team map (handles PID namespace gaps between /proc and NVML)
+    print("Building PID→team map...")
+    found = build_team_map()
+    print(f"  found {len(found)} PID entries: {set(found.values())}")
+
     # Init NVML
     pynvml.nvmlInit()
     handle = pynvml.nvmlDeviceGetHandleByIndex(GPU_INDEX)
@@ -224,6 +268,7 @@ def main():
             samples[team].append((power_w * frac, mem_mb, frac))
 
         if time.time() >= next_print:
+            build_team_map()  # refresh to pick up any new child pids
             elapsed = int(time.time() - start)
             print(f"\n  [{elapsed}s] total GPU: {power_w:.1f}W")
             for p in gpu_procs:
