@@ -124,20 +124,44 @@ def write_and_launch(name, code, team):
 
 pid_team_cache = {}
 
-def get_team(pid):
-    if pid in pid_team_cache:
-        return pid_team_cache[pid]
+def _read_environ_team(pid):
     try:
         with open(f'/proc/{pid}/environ', 'rb') as f:
             env = f.read().decode('utf-8', errors='replace')
         for kv in env.split('\x00'):
             if kv.startswith('ALUMINATAI_TEAM='):
-                team = kv.split('=', 1)[1]
-                pid_team_cache[pid] = team
-                return team
+                return kv.split('=', 1)[1]
     except (PermissionError, FileNotFoundError):
         pass
-    return f'pid:{pid}'
+    return None
+
+def _ppid(pid):
+    try:
+        with open(f'/proc/{pid}/status') as f:
+            for line in f:
+                if line.startswith('PPid:'):
+                    return int(line.split()[1])
+    except (FileNotFoundError, ValueError):
+        pass
+    return None
+
+def get_team(pid):
+    """Walk process tree upward until ALUMINATAI_TEAM is found."""
+    if pid in pid_team_cache:
+        return pid_team_cache[pid]
+    current, visited = pid, set()
+    while current and current not in visited:
+        visited.add(current)
+        team = _read_environ_team(current)
+        if team:
+            pid_team_cache[pid] = team
+            return team
+        parent = _ppid(current)
+        if not parent or parent == current:
+            break
+        current = parent
+    pid_team_cache[pid] = f'pid:{pid}'
+    return pid_team_cache[pid]
 
 # ── Main ──────────────────────────────────────────────────────────
 
