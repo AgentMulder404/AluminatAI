@@ -38,18 +38,25 @@ def main() -> None:
     if here not in sys.path:
         sys.path.insert(0, here)
 
-    # ── Pre-parse --config before any module imports ───────────────────────
-    # config.py runs _load_config_file() at import time; by setting
-    # ALUMINATAI_CONFIG here first, the file is loaded before any constant
-    # in config.py is evaluated — including those imported by agent.py.
+    # ── Pre-parse subcommand + --config before any module imports ─────────
+    # We pre-parse the first positional argument as a subcommand so that
+    # `aluminatiai benchmark ...` dispatches to benchmark.py without loading
+    # the full agent stack.  Unknown args are forwarded to the sub-handler.
     _pre = argparse.ArgumentParser(add_help=False)
+    _pre.add_argument("subcommand", nargs="?", default="run",
+                      choices=["run", "benchmark"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
-    _known, _ = _pre.parse_known_args()
+    _known, _rest = _pre.parse_known_args()
+
     if _known.config:
         os.environ["ALUMINATAI_CONFIG"] = _known.config
 
-    # Delegate to agent.main() — it owns the full argparse + run loop.
+    if _known.subcommand == "benchmark":
+        from benchmark import make_parser, run_benchmark  # noqa: PLC0415
+        sys.exit(run_benchmark(make_parser().parse_args(_rest)))
+
+    # Default: delegate to agent.main() — it owns the full argparse + run loop.
     from agent import main as _main  # noqa: PLC0415
     sys.exit(_main())
 
