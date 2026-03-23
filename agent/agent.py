@@ -358,7 +358,10 @@ def send_heartbeat(
     location_hint: str = "",
     gpu_names: Optional[List[str]] = None,
 ) -> None:
-    url = endpoint.rstrip("/") + "/api/agent/heartbeat"
+    from urllib.parse import urlparse
+    parsed = urlparse(endpoint)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    url = base + "/api/agent/heartbeat"
     payload = {
         "agent_version": AGENT_VERSION,
         "hostname": socket.gethostname(),
