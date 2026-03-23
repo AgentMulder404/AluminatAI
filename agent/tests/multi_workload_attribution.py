@@ -28,7 +28,6 @@ PROMETHEUS_PORT = 9100
 
 WORKER_INFERENCE = textwrap.dedent("""\
     import os, sys
-    os.environ['ALUMINATAI_TEAM'] = 'inference'
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     import torch
     from transformers import pipeline
@@ -56,7 +55,6 @@ WORKER_INFERENCE = textwrap.dedent("""\
 
 WORKER_TRAINING = textwrap.dedent("""\
     import os
-    os.environ['ALUMINATAI_TEAM'] = 'training'
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     import torch
     from torch.optim import AdamW
@@ -90,7 +88,6 @@ WORKER_TRAINING = textwrap.dedent("""\
 
 WORKER_STRESS = textwrap.dedent(f"""\
     import os, torch
-    os.environ['ALUMINATAI_TEAM'] = 'stress'
 
     GB = {STRESS_GB}
     print(f'[stress] allocating {{GB}}GB on GPU...', flush=True)
@@ -112,16 +109,17 @@ WORKER_STRESS = textwrap.dedent(f"""\
 
 # ── Helpers ───────────────────────────────────────────────────────
 
-def write_and_launch(name, code):
+def write_and_launch(name, code, team):
     path = pathlib.Path(f'/tmp/worker_{name}.py')
     path.write_text(code)
     p = subprocess.Popen(
         [sys.executable, str(path)],
-        env={**os.environ},
+        # Pass team in launch env so /proc/<pid>/environ contains it
+        env={**os.environ, 'ALUMINATAI_TEAM': team},
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    print(f"  launched {name:<12} PID={p.pid}")
+    print(f"  launched {name:<12} team={team:<12} PID={p.pid}")
     return p
 
 pid_team_cache = {}
@@ -157,13 +155,22 @@ def main():
     # Launch workers
     print("Launching workers...")
     procs = {
-        'inference': write_and_launch('inference', WORKER_INFERENCE),
-        'training':  write_and_launch('training',  WORKER_TRAINING),
-        'stress':    write_and_launch('stress',     WORKER_STRESS),
+        'inference': write_and_launch('inference', WORKER_INFERENCE, 'inference'),
+        'training':  write_and_launch('training',  WORKER_TRAINING,  'training'),
+        'stress':    write_and_launch('stress',     WORKER_STRESS,    'stress'),
     }
 
-    print(f"\nWaiting 45s for models to load...")
-    time.sleep(45)
+    print(f"\nWaiting 90s for models to load (TinyLlama + BERT-tiny)...")
+    import threading, io
+
+    def drain(name, proc):
+        for line in io.TextIOWrapper(proc.stdout, errors='replace'):
+            print(f"  [{name}] {line.rstrip()}", flush=True)
+
+    for name, p in procs.items():
+        threading.Thread(target=drain, args=(name, p), daemon=True).start()
+
+    time.sleep(90)
 
     # Init NVML
     pynvml.nvmlInit()
