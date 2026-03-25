@@ -61,6 +61,10 @@ WORKER_TRAINING = textwrap.dedent("""\
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
     from datasets import load_dataset
 
+    # Pre-allocate so NVML sees this process before model loads
+    _warmup = torch.zeros(512, 512, device='cuda')
+    del _warmup
+
     print('[training] loading bert-tiny...', flush=True)
     tok = AutoTokenizer.from_pretrained('prajjwal1/bert-tiny')
     model = AutoModelForSequenceClassification.from_pretrained(
@@ -72,6 +76,9 @@ WORKER_TRAINING = textwrap.dedent("""\
     input_ids      = enc['input_ids'].cuda()
     attention_mask = enc['attention_mask'].cuda()
     labels         = torch.tensor(ds['label']).cuda()
+
+    # Hold 1GB so NVML reports a meaningful memory footprint for this process
+    _hold = torch.zeros(256, 1024, 1024, device='cuda', dtype=torch.float32)
 
     opt = AdamW(model.parameters(), lr=2e-5)
     step = 0
