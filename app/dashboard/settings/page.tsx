@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import CarbonExportButton from "@/components/dashboard/CarbonExportButton";
+import { PLAN_DISPLAY, type PlanTier } from "@/lib/plans";
 
 export default function SettingsPage() {
   const [optIn, setOptIn] = useState(false);
@@ -15,6 +16,12 @@ export default function SettingsPage() {
   const [keyCopied, setKeyCopied] = useState(false);
   const [keyVisible, setKeyVisible] = useState(false);
 
+  // Billing state
+  const [plan, setPlan] = useState<PlanTier>("free");
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
   useEffect(() => {
     fetch("/api/user/profile")
       .then((r) => (r.ok ? r.json() : null))
@@ -22,10 +29,20 @@ export default function SettingsPage() {
         if (d) {
           setOptIn(Boolean(d.benchmark_opt_in));
           if (d.api_key) setApiKey(d.api_key);
+          if (d.plan) setPlan(d.plan as PlanTier);
+          if (d.plan_period_end) setPeriodEnd(d.plan_period_end);
+          if (d.plan_cancel_at_period_end) setCancelAtPeriodEnd(true);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Check for billing callback
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("billing") === "success") {
+      // Refresh to get updated plan
+      setTimeout(() => window.location.replace("/dashboard/settings"), 1500);
+    }
   }, []);
 
   function copyKey() {
@@ -78,6 +95,80 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6">
       <h1 className="text-lg font-semibold mb-6">Settings</h1>
+
+      {/* Billing & Plan */}
+      <section className="border border-neutral-800 rounded-lg p-5 max-w-lg mb-4">
+        <h2 className="text-sm font-semibold text-neutral-300 mb-1">Plan & Billing</h2>
+        <p className="text-xs text-neutral-500 mb-4">
+          Manage your subscription and billing details.
+        </p>
+
+        {loading ? (
+          <div className="h-8 w-full bg-neutral-800 rounded animate-pulse" />
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded ${
+                  plan === "enterprise" ? "bg-purple-900 text-purple-300" :
+                  plan === "pro" ? "bg-blue-900 text-blue-300" :
+                  "bg-neutral-800 text-neutral-400"
+                }`}>
+                  {PLAN_DISPLAY[plan].name}
+                </span>
+                {cancelAtPeriodEnd && (
+                  <span className="ml-2 text-xs text-amber-400">Cancels at period end</span>
+                )}
+              </div>
+              {plan !== "free" && periodEnd && (
+                <span className="text-xs text-neutral-500">
+                  {cancelAtPeriodEnd ? "Expires" : "Renews"}{" "}
+                  {new Date(periodEnd).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              {plan === "free" ? (
+                <Link
+                  href="/pricing"
+                  className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded transition"
+                >
+                  Upgrade Plan
+                </Link>
+              ) : (
+                <button
+                  onClick={async () => {
+                    setPortalLoading(true);
+                    try {
+                      const res = await fetch("/api/stripe/portal", {
+                        method: "POST",
+                      });
+                      const data = await res.json();
+                      if (data.url) window.location.href = data.url;
+                      else alert(data.error || "Failed to open billing portal");
+                    } catch {
+                      alert("Something went wrong");
+                    } finally {
+                      setPortalLoading(false);
+                    }
+                  }}
+                  disabled={portalLoading}
+                  className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-200 px-4 py-2 rounded transition disabled:opacity-50"
+                >
+                  {portalLoading ? "Opening..." : "Manage Billing"}
+                </button>
+              )}
+              <Link
+                href="/pricing"
+                className="text-xs text-neutral-400 hover:text-neutral-200 px-4 py-2 border border-neutral-700 rounded transition"
+              >
+                View Plans
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* API Key section */}
       <section className="border border-neutral-800 rounded-lg p-5 max-w-lg mb-4">

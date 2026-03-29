@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { checkCountLimit } from "@/lib/plans";
 
 export const runtime = "edge";
 
@@ -74,6 +75,17 @@ export async function POST(req: NextRequest) {
       { error: "limit_usd must be a positive number" },
       { status: 400 }
     );
+  }
+
+  // Plan limit check
+  const supabaseCount = createSupabaseServerClient();
+  const { count: budgetCount } = await supabaseCount
+    .from("budgets")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  const limitCheck = await checkCountLimit(user.id, "max_budgets", budgetCount ?? 0);
+  if (!limitCheck.allowed) {
+    return NextResponse.json({ error: limitCheck.reason, limit: limitCheck.limit }, { status: 403 });
   }
 
   const supabase = createSupabaseServerClient();

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getTeamScope } from "@/lib/rbac";
+import { checkCountLimit } from "@/lib/plans";
 
 export const runtime = "edge";
 
@@ -42,6 +43,14 @@ export async function POST(req: NextRequest) {
       { error: "name is required (min 2 characters)" },
       { status: 400 }
     );
+  }
+
+  // Plan limit check
+  const { teams: existingTeams } = await getTeamScope(user.id);
+  const ownedCount = existingTeams.filter((t: { owner_id: string }) => t.owner_id === user.id).length;
+  const limitCheck = await checkCountLimit(user.id, "max_teams", ownedCount);
+  if (!limitCheck.allowed) {
+    return NextResponse.json({ error: limitCheck.reason, limit: limitCheck.limit }, { status: 403 });
   }
 
   // Generate slug from name

@@ -62,7 +62,7 @@ export async function GET(_req: NextRequest) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("users")
-    .select("benchmark_opt_in, api_key")
+    .select("benchmark_opt_in, api_key, plan, plan_period_end, plan_cancel_at_period_end")
     .eq("id", user.id)
     .single();
 

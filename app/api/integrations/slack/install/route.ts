@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { requirePlan } from "@/lib/plans";
 
 export const runtime = "edge";
 
@@ -27,6 +28,15 @@ export async function GET(req: NextRequest) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Plan gate: Slack requires Pro+
+  const planCheck = await requirePlan(user.id, "slack_integration");
+  if (!planCheck.allowed) {
+    return NextResponse.json(
+      { error: planCheck.reason, upgrade_to: planCheck.upgrade_to },
+      { status: 403 }
+    );
   }
 
   const code = req.nextUrl.searchParams.get("code");

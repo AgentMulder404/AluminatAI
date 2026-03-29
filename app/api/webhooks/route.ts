@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { checkCountLimit } from "@/lib/plans";
 
 export const runtime = "edge";
 
@@ -71,6 +72,17 @@ export async function POST(req: NextRequest) {
 
   if (!url || typeof url !== "string") {
     return NextResponse.json({ error: "url is required" }, { status: 400 });
+  }
+
+  // Plan limit check
+  const supabaseCount = createSupabaseServerClient();
+  const { count: webhookCount } = await supabaseCount
+    .from("webhooks")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  const limitCheck = await checkCountLimit(user.id, "max_webhooks", webhookCount ?? 0);
+  if (!limitCheck.allowed) {
+    return NextResponse.json({ error: limitCheck.reason, limit: limitCheck.limit }, { status: 403 });
   }
 
   // Validate URL

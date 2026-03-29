@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { checkCountLimit } from "@/lib/plans";
 
 export const runtime = "edge";
 
@@ -61,6 +62,17 @@ export async function POST(req: NextRequest) {
     secret_key,
     gcs_credentials,
   } = body;
+
+  // Plan limit check
+  const supabaseCount = createSupabaseServerClient();
+  const { count: exportCount } = await supabaseCount
+    .from("export_configs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  const limitCheck = await checkCountLimit(user.id, "max_export_configs", exportCount ?? 0);
+  if (!limitCheck.allowed) {
+    return NextResponse.json({ error: limitCheck.reason, limit: limitCheck.limit }, { status: 403 });
+  }
 
   if (!provider || !["s3", "gcs"].includes(provider)) {
     return NextResponse.json(

@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { requirePlan } from "@/lib/plans";
 
 export const runtime = "edge";
 
@@ -25,6 +26,15 @@ export async function GET() {
   }
   if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // SLA dashboard requires Enterprise plan
+  const planCheck = await requirePlan(user.id, "sla_dashboard");
+  if (!planCheck.allowed) {
+    return NextResponse.json(
+      { error: planCheck.reason, upgrade_to: planCheck.upgrade_to },
+      { status: 403 }
+    );
   }
 
   const supabase = createSupabaseServerClient();
