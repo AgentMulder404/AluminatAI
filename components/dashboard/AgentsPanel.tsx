@@ -39,16 +39,31 @@ function groupByCluster(agents: AgentRow[]): Map<string, AgentRow[]> {
 export default function AgentsPanel() {
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setError(false);
     fetch("/api/agent/agents")
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then((data) => setAgents(data as AgentRow[]))
-      .catch(() => setAgents([]))
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading || agents.length === 0) return null;
+  if (loading) return null;
+
+  if (error) {
+    return (
+      <div className="border border-neutral-800 bg-neutral-950 rounded-lg p-4">
+        <p className="text-red-400 text-sm">Failed to load agents.</p>
+      </div>
+    );
+  }
+
+  if (agents.length === 0) return null;
 
   const groups = groupByCluster(agents);
 

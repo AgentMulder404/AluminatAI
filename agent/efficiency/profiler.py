@@ -459,8 +459,8 @@ class ScientificEnergyProfiler:
                 try:
                     sample = self._read_power_sample()
                     samples.append(sample)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Power sample read failed: %s", exc)
                 # Precise sleep using monotonic clock
                 target = time.monotonic() + self._sample_interval
                 while time.monotonic() < target and not stop_event.is_set():
@@ -1114,8 +1114,8 @@ class ScientificEnergyProfiler:
         """Release NVML resources."""
         try:
             pynvml.nvmlShutdown()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("NVML shutdown error: %s", exc)
 
     def __enter__(self):
         return self

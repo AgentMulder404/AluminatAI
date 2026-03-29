@@ -132,8 +132,8 @@ class DcgmProbe:
         if self._dcgm_handle is not None:
             try:
                 self._dcgm_handle.Disconnect()
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("DCGM disconnect error: %s", exc)
             self._dcgm_handle = None
 
     @property

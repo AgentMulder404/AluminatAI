@@ -36,16 +36,27 @@ function gpuHours(job: Job): string {
   return `${hrs.toFixed(2)}h`;
 }
 
-export default function JobsCarbonTable({ clusterParam = "" }: { clusterParam?: string }) {
+export default function JobsCarbonTable({
+  clusterParam = "",
+  onJobClick,
+}: {
+  clusterParam?: string;
+  onJobClick?: (jobId: string) => void;
+}) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setError(false);
     const url = `/api/dashboard/jobs${clusterParam ? `?${clusterParam}` : ""}`;
     fetch(url)
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then((d) => setJobs(Array.isArray(d) ? d.slice(0, 50) : []))
-      .catch(() => {})
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [clusterParam]);
 
@@ -54,6 +65,14 @@ export default function JobsCarbonTable({ clusterParam = "" }: { clusterParam?: 
       <div className="border border-neutral-800 rounded-lg p-5">
         <div className="h-4 w-32 bg-neutral-800 rounded animate-pulse mb-3" />
         <div className="h-24 bg-neutral-900 rounded animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border border-neutral-800 rounded-lg p-5">
+        <p className="text-red-400 text-sm">Failed to load jobs.</p>
       </div>
     );
   }
@@ -93,7 +112,8 @@ export default function JobsCarbonTable({ clusterParam = "" }: { clusterParam?: 
               return (
                 <tr
                   key={job.job_id}
-                  className="border-b border-neutral-900 hover:bg-neutral-900/50 transition-colors"
+                  className={`border-b border-neutral-900 hover:bg-neutral-900/50 transition-colors ${onJobClick ? "cursor-pointer" : ""}`}
+                  onClick={() => onJobClick?.(job.job_id)}
                 >
                   <td className="px-4 py-2 font-mono text-neutral-300 max-w-[140px] truncate">
                     {job.job_id}

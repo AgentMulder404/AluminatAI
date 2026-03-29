@@ -150,5 +150,5 @@ class AluminatAIOtelExporter:
         if self._provider:
             try:
                 self._provider.shutdown()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("OTel provider shutdown error: %s", exc)

@@ -723,8 +723,8 @@ def run_job(
                 t1 = datetime.fromisoformat(s.timestamp)
                 dt = (t1 - t0).total_seconds()
                 energy_delta = s.gpu_power_w * dt  # E = P * dt (joules)
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                pass  # malformed timestamp — skip energy delta
         prev_ts = s.timestamp
 
         payloads.append(build_metric_payload(
@@ -877,8 +877,8 @@ def run_mlx_job(
                 t1 = datetime.fromisoformat(s.timestamp)
                 dt = (t1 - t0).total_seconds()
                 energy_delta = s.gpu_power_w * dt
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                pass  # malformed timestamp — skip energy delta
         prev_ts = s.timestamp
         payloads.append(build_metric_payload(
             reading=s,

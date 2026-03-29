@@ -53,8 +53,10 @@ Agent health:
 from __future__ import annotations
 
 import base64
+import json
 import logging
 import threading
+import time
 from typing import Any, List
 from wsgiref.simple_server import WSGIServer, WSGIRequestHandler, make_server
 
@@ -101,6 +103,10 @@ class MetricsServer:
         self._basic_auth: str = ""
         self._started = False
         self._srv = None
+        self._start_time = time.monotonic()
+        self._last_collection_ts: float = 0.0
+        self._last_upload_ok: bool = True
+        self._gpu_count: int = 0
 
         try:
             from config import METRICS_PORT, METRICS_BIND_HOST, METRICS_BASIC_AUTH
@@ -220,11 +226,50 @@ class MetricsServer:
             ["version", "hostname", "mode"],
         )
 
+    def _health_response(self) -> tuple[str, bytes]:
+        """Build JSON health check response."""
+        uptime = time.monotonic() - self._start_time
+        since_collection = time.monotonic() - self._last_collection_ts if self._last_collection_ts else None
+
+        # Determine status: healthy / degraded / unhealthy
+        if since_collection is None:
+            status = "unhealthy"  # never collected
+        elif since_collection > 120:
+            status = "unhealthy"  # no data for 2+ minutes
+        elif since_collection > 30 or not self._last_upload_ok:
+            status = "degraded"
+        else:
+            status = "healthy"
+
+        body = json.dumps({
+            "status": status,
+            "uptime_seconds": round(uptime, 1),
+            "last_collection_ago_seconds": round(since_collection, 1) if since_collection else None,
+            "last_upload_ok": self._last_upload_ok,
+            "gpu_count": self._gpu_count,
+        }).encode()
+        return status, body
+
+    def _health_middleware(self, app):
+        """WSGI middleware that intercepts GET /health."""
+        def _inner(environ, start_response):
+            if environ.get("PATH_INFO", "") == "/health":
+                status, body = self._health_response()
+                http_status = "200 OK" if status != "unhealthy" else "503 Service Unavailable"
+                start_response(http_status, [
+                    ("Content-Type", "application/json"),
+                    ("Content-Length", str(len(body))),
+                ])
+                return [body]
+            return app(environ, start_response)
+        return _inner
+
     def start(self) -> None:
         if not _PROM or self._port == 0 or self._started:
             return
         try:
             app = make_wsgi_app()
+            app = self._health_middleware(app)
             if self._basic_auth:
                 app = _basic_auth_middleware(app, self._basic_auth)
                 logger.warning(
@@ -236,6 +281,7 @@ class MetricsServer:
             threading.Thread(target=srv.serve_forever, daemon=True).start()
             self._started = True
             logger.info("Prometheus metrics server on %s:%d/metrics", bind, self._port)
+            logger.info("Health endpoint on %s:%d/health", bind, self._port)
         except OSError as exc:
             logger.warning("Could not start metrics server on :%d: %s", self._port, exc)
 
@@ -245,6 +291,8 @@ class MetricsServer:
 
     def update(self, metrics: List[Any], attributed_rows: List[dict]) -> None:
         """Called from the main loop after each collection cycle."""
+        self._last_collection_ts = time.monotonic()
+        self._gpu_count = len(metrics)
         if not _PROM or not self._started:
             return
 
@@ -281,6 +329,7 @@ class MetricsServer:
                 self._uncertainty.labels(gpu_index=gpu_idx, job_id=job_id, method=conf).set(uncertainty)
 
     def update_upload_stats(self, success_delta: int, failure_delta: int, buffer_size: int) -> None:
+        self._last_upload_ok = failure_delta == 0
         if not _PROM or not self._started:
             return
         if success_delta > 0:

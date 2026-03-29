@@ -7,6 +7,26 @@
     {
       "path": "/api/cron/carbon-refresh",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/budget-alerts",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/waste-detect",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/data-retention",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/slack-daily",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/export",
+      "schedule": "0 4 * * 0"
     }
   ]
 }

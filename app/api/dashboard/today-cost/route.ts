@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { getUserKwhRate } from "@/lib/cost";
+import { requireRole } from "@/lib/rbac";
 
 export const runtime = "edge";
 
-const KWH_RATE = 0.12; // USD per kWh
-
 export async function GET(req: NextRequest) {
-  const cookieClient = createSupabaseCookieClient();
+  const cookieClient = await createSupabaseCookieClient();
   const {
     data: { user },
     error: authError,
@@ -18,6 +18,15 @@ export async function GET(req: NextRequest) {
   }
 
   const clusterTag = req.nextUrl.searchParams.get("cluster_tag") ?? "";
+  const teamId = req.nextUrl.searchParams.get("team_id") ?? "";
+
+  // RBAC check if team_id is provided
+  if (teamId) {
+    const { allowed } = await requireRole(user.id, teamId, "viewer");
+    if (!allowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   const supabase = createSupabaseServerClient();
   const startOfDay = new Date();
@@ -29,6 +38,9 @@ export async function GET(req: NextRequest) {
     .eq("user_id", user.id)
     .gte("time", startOfDay.toISOString());
 
+  if (teamId) {
+    query = query.eq("team_id", teamId);
+  }
   if (clusterTag) {
     query = query.eq("cluster_tag", clusterTag);
   }
@@ -56,7 +68,8 @@ export async function GET(req: NextRequest) {
   }
 
   const totalKwh = totalJ / 3_600_000;
-  const costUsd = totalKwh * KWH_RATE;
+  const kwhRate = await getUserKwhRate(user.id);
+  const costUsd = totalKwh * kwhRate;
 
   return NextResponse.json({ cost_usd: costUsd, kwh: totalKwh, co2e_g: totalCo2eG, grid_zone: gridZone });
 }

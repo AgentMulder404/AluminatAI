@@ -72,14 +72,23 @@ class IdleBaseline:
             return {}
 
     def save(self, records: dict[str, dict]) -> None:
-        """Persist calibration results.  records: {gpu_uuid: {baseline_w, ...}}"""
+        """Persist calibration results atomically via .tmp rename."""
         self._path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        tmp = self._path.with_suffix(".tmp")
         try:
-            with open(self._path, "w") as f:
+            with open(tmp, "w") as f:
                 json.dump(records, f, indent=2)
+                f.flush()
+                import os
+                os.fsync(f.fileno())
+            tmp.replace(self._path)  # atomic on POSIX
             log.debug("Baselines saved → %s", self._path)
         except OSError as exc:
             log.warning("Could not save baselines to %s: %s", self._path, exc)
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     def is_stale(self) -> bool:
         """Return True if the baselines file is absent or older than _STALE_AFTER_HOURS."""
@@ -88,6 +97,36 @@ class IdleBaseline:
             return age_hours > _STALE_AFTER_HOURS
         except OSError:
             return True
+
+    def maybe_recalibrate(
+        self,
+        handles: list,
+        gpu_uuids: list[str],
+    ) -> Optional[dict[int, float]]:
+        """Re-calibrate if baselines are stale (>24h) and all GPUs are currently idle.
+
+        Returns new baselines dict on success, None if skipped.
+        Intended to be called periodically from the main loop (e.g. every 60s).
+        """
+        if not self.is_stale():
+            return None
+
+        try:
+            import pynvml
+        except ImportError:
+            return None
+
+        # Quick idle check — don't burn 30s if any GPU has work
+        for idx, handle in enumerate(handles):
+            try:
+                procs = pynvml.nvmlDeviceGetComputeRunningProcesses(handle)
+                if procs:
+                    return None
+            except pynvml.NVMLError:
+                return None
+
+        log.info("Baselines stale (>%dh) and all GPUs idle — recalibrating", _STALE_AFTER_HOURS)
+        return self.calibrate(handles, gpu_uuids)
 
     # ── Calibration ───────────────────────────────────────────────────────
 
@@ -128,8 +167,9 @@ class IdleBaseline:
                         len(procs),
                     )
                     return None
-            except Exception:
-                pass  # NVML error → assume not idle, skip
+            except pynvml.NVMLError as exc:
+                log.debug("GPU %d NVML check failed: %s — skipping calibration", idx, exc)
+                return None
 
         log.info(
             "All GPUs idle — calibrating power baseline over %ds…",
@@ -153,14 +193,14 @@ class IdleBaseline:
                         )
                         aborted = True
                         break
-                except Exception:
-                    pass
+                except pynvml.NVMLError as exc:
+                    log.debug("GPU %d process check failed at tick %d: %s", idx, tick + 1, exc)
 
                 try:
                     mw = pynvml.nvmlDeviceGetPowerUsage(handle)
                     power_samples[idx].append(mw / 1000.0)
-                except Exception:
-                    pass
+                except pynvml.NVMLError as exc:
+                    log.debug("GPU %d power read failed at tick %d: %s", idx, tick + 1, exc)
 
             if aborted:
                 return None

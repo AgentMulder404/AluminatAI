@@ -26,6 +26,7 @@ Default search order when ALUMINATAI_CONFIG is unset:
   ./aluminatai.json → ./aluminatai.yaml → ~/.config/aluminatai/config.json
 """
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -262,6 +263,7 @@ ATTRIBUTION_CONFIG = os.getenv("ALUMINATAI_ATTRIBUTION_CONFIG", "")
 
 def _parse_trusted_uids() -> set:
     """Parse ALUMINATAI_TRUSTED_UIDS=0,1000,1001 into a set of ints."""
+    _log = logging.getLogger(__name__)
     result: set[int] = set()
     for part in os.getenv("ALUMINATAI_TRUSTED_UIDS", "").split(","):
         part = part.strip()
@@ -269,7 +271,7 @@ def _parse_trusted_uids() -> set:
             try:
                 result.add(int(part))
             except ValueError:
-                pass
+                _log.warning("Ignoring invalid UID in ALUMINATAI_TRUSTED_UIDS: %r", part)
     return result
 
 

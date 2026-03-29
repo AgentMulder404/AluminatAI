@@ -2,14 +2,23 @@
 
 import { Suspense, useCallback, useState } from "react";
 import { useSearchParams } from "next/navigation";
+
+import ClusterFilter from "@/components/dashboard/ClusterFilter";
+import DateRangePicker from "@/components/dashboard/DateRangePicker";
+import StatCard from "@/components/dashboard/StatCard";
+import CostTrendChart from "@/components/dashboard/CostTrendChart";
+import CostBreakdownPanel from "@/components/dashboard/CostBreakdownPanel";
+import WasteAlerts from "@/components/dashboard/WasteAlerts";
+import UtilizationHeatmap from "@/components/dashboard/UtilizationHeatmap";
+import RecommendationsCard from "@/components/dashboard/RecommendationsCard";
+import JobsCarbonTable from "@/components/dashboard/JobsCarbonTable";
+import JobDetailDrawer from "@/components/dashboard/JobDetailDrawer";
 import AgentsPanel from "@/components/dashboard/AgentsPanel";
 import BenchmarkPercentileCard from "@/components/dashboard/BenchmarkPercentileCard";
-import ClusterFilter from "@/components/dashboard/ClusterFilter";
-import JobsCarbonTable from "@/components/dashboard/JobsCarbonTable";
-// Existing dashboard components (adjust import paths as needed)
-// import StatCard from "@/components/dashboard/StatCard";
-// import UtilizationChart from "@/components/dashboard/UtilizationChart";
-// import JobsTable from "@/components/dashboard/JobsTable";
+
+function daysAgo(n: number): string {
+  return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+}
 
 export default function DashboardPage() {
   return (
@@ -24,38 +33,103 @@ function DashboardInner() {
   const [selectedCluster, setSelectedCluster] = useState<string | null>(
     searchParams.get("cluster") ?? null
   );
+  const [dateRange, setDateRange] = useState({
+    from: daysAgo(30),
+    to: new Date().toISOString().slice(0, 10),
+  });
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   const handleClusterChange = useCallback((tag: string | null) => {
     setSelectedCluster(tag);
   }, []);
 
-  // Build cluster-scoped query param for child fetch URLs
   const clusterParam = selectedCluster
     ? `cluster_tag=${encodeURIComponent(selectedCluster)}`
     : "";
 
+  const clusterTag = selectedCluster ?? undefined;
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6 space-y-6">
-      {/* Cluster filter — renders nothing for single-cluster users */}
-      <ClusterFilter onClusterChange={handleClusterChange} />
+      {/* Top bar: Cluster filter + Date range */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <ClusterFilter onClusterChange={handleClusterChange} />
+        <DateRangePicker
+          from={dateRange.from}
+          to={dateRange.to}
+          onChange={(from, to) => setDateRange({ from, to })}
+        />
+      </div>
 
-      {/* KPI cards row — pass clusterParam to each card's fetch URL */}
-      {/* <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Today's Cost" fetchUrl={`/api/dashboard/today-cost?${clusterParam}`} />
-        ...
-      </div> */}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="Today's Cost"
+          fetchUrl={`/api/dashboard/today-cost?${clusterParam}`}
+          valueKey="cost_usd"
+          format="currency"
+        />
+        <StatCard
+          title="Energy (kWh)"
+          fetchUrl={`/api/dashboard/today-cost?${clusterParam}`}
+          valueKey="kwh"
+          format="number"
+          suffix=" kWh"
+        />
+        <StatCard
+          title="Active GPUs"
+          fetchUrl="/api/dashboard/clusters"
+          valueKey="gpu_count"
+          format="number"
+        />
+        <StatCard
+          title="CO2 Emissions"
+          fetchUrl={`/api/dashboard/today-cost?${clusterParam}`}
+          valueKey="co2e_g"
+          format="co2"
+        />
+      </div>
 
-      {/* Utilization chart */}
-      {/* <UtilizationChart fetchUrl={`/api/dashboard/utilization-chart?${clusterParam}`} /> */}
+      {/* Cost Trend Chart */}
+      <CostTrendChart
+        clusterParam={clusterTag}
+        from={dateRange.from}
+        to={dateRange.to}
+      />
 
-      {/* Benchmark percentile card */}
-      <BenchmarkPercentileCard />
+      {/* Cost Breakdown + Waste Alerts (2-column) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CostBreakdownPanel
+          clusterParam={clusterTag}
+          from={dateRange.from}
+          to={dateRange.to}
+        />
+        <WasteAlerts clusterParam={clusterTag} />
+      </div>
 
-      {/* Agents panel — shows multi-cluster breakdown */}
-      <AgentsPanel />
+      {/* Utilization Heatmap */}
+      <UtilizationHeatmap clusterParam={clusterTag} />
 
-      {/* Jobs carbon table */}
-      <JobsCarbonTable clusterParam={clusterParam} />
+      {/* Recommendations */}
+      <RecommendationsCard clusterParam={clusterTag} />
+
+      {/* Jobs Table — click a row to open detail drawer */}
+      <JobsCarbonTable
+        clusterParam={clusterParam}
+        onJobClick={(jobId: string) => setSelectedJobId(jobId)}
+      />
+
+      {/* Agents + Benchmark (2-column) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AgentsPanel />
+        <BenchmarkPercentileCard />
+      </div>
+
+      {/* Job Detail Drawer */}
+      <JobDetailDrawer
+        jobId={selectedJobId}
+        onClose={() => setSelectedJobId(null)}
+      />
     </div>
   );
 }

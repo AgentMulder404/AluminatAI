@@ -49,6 +49,9 @@ from config import (
     OFFLINE_MODE, DRY_RUN,
 )
 
+MAX_BUFFER_SIZE = 10_000
+QUARANTINE_FILE = WAL_DIR / "metrics.quarantine"
+
 logger = logging.getLogger(__name__)
 
 # ── WAL encryption (optional — requires cryptography package) ─────────────────
@@ -77,6 +80,30 @@ def _init_fernet():
 
 
 _FERNET = _init_fernet()
+
+
+def _quarantine_lines(lines: list[str]) -> None:
+    """Append unreadable WAL lines to the quarantine file for post-mortem analysis."""
+    if not lines:
+        return
+    try:
+        QUARANTINE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(QUARANTINE_FILE, "a") as f:
+            if _HAS_FCNTL:
+                fcntl.flock(f, fcntl.LOCK_EX)
+            try:
+                for raw in lines:
+                    f.write(raw + "\n")
+            finally:
+                if _HAS_FCNTL:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+        logger.error(
+            "WAL: quarantined %d unreadable lines → %s",
+            len(lines), QUARANTINE_FILE,
+        )
+    except OSError as exc:
+        logger.error("WAL: failed to write quarantine file: %s", exc)
+
 
 # ── WAL helpers ───────────────────────────────────────────────────────────────
 
@@ -133,7 +160,7 @@ def _wal_read_valid() -> List[Dict]:
     except OSError:
         return []
 
-    skipped_decrypt = 0
+    quarantine_batch: list[str] = []
     for line in raw_lines:
         line = line.strip()
         if not line:
@@ -147,20 +174,21 @@ def _wal_read_valid() -> List[Dict]:
                 try:
                     entry = json.loads(line)
                 except (json.JSONDecodeError, KeyError):
-                    skipped_decrypt += 1
+                    quarantine_batch.append(line)
                     continue
         else:
             try:
                 entry = json.loads(line)
             except (json.JSONDecodeError, KeyError):
+                quarantine_batch.append(line)
                 continue
         if entry and entry.get("ts", 0) >= cutoff:
             try:
                 rows.append(entry["row"])
             except KeyError:
                 pass
-    if skipped_decrypt:
-        logger.warning("WAL: skipped %d lines (decrypt failed — key mismatch?)", skipped_decrypt)
+    if quarantine_batch:
+        _quarantine_lines(quarantine_batch)
 
     # Size cap: drop oldest if WAL is too large
     wal_mb = WAL_FILE.stat().st_size / (1024 * 1024) if WAL_FILE.exists() else 0
@@ -262,7 +290,17 @@ class MetricsUploader:
             logger.info("Uploader initialised → %s", api_endpoint)
 
     def add_metrics(self, metrics: List[Dict]) -> None:
-        self.buffer.extend(metrics)
+        if len(self.buffer) + len(metrics) > MAX_BUFFER_SIZE:
+            overflow = self.buffer + list(metrics)
+            flush_rows = overflow[:MAX_BUFFER_SIZE]
+            logger.warning(
+                "Buffer exceeded %d rows — flushing %d to WAL",
+                MAX_BUFFER_SIZE, len(flush_rows),
+            )
+            _wal_append(flush_rows)
+            self.buffer = overflow[MAX_BUFFER_SIZE:]
+        else:
+            self.buffer.extend(metrics)
 
     def upload_batch(self, metrics: List[Dict]) -> bool:
         """

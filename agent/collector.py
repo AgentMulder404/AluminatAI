@@ -19,17 +19,23 @@ GPU Metrics Collector using NVIDIA Management Library (NVML)
 This module provides low-overhead GPU monitoring with energy calculation.
 """
 
+import concurrent.futures
+import logging
 import time
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
+
+logger = logging.getLogger(__name__)
 
 try:
     import pynvml
     NVML_AVAILABLE = True
 except ImportError:
     NVML_AVAILABLE = False
-    print("Warning: pynvml not available. Install with: pip install nvidia-ml-py3")
+    logging.getLogger(__name__).warning(
+        "pynvml not available — install nvidia-ml-py3 for GPU collection"
+    )
 
 
 @dataclass
@@ -173,15 +179,17 @@ class GPUCollector:
 
         for i, handle in enumerate(self.gpu_handles):
             try:
-                gpu_metrics = self._collect_single_gpu(
-                    handle,
-                    i,
-                    timestamp,
-                    current_time
-                )
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        self._collect_single_gpu, handle, i, timestamp, current_time
+                    )
+                    gpu_metrics = future.result(timeout=2.0)
                 metrics.append(gpu_metrics)
+            except concurrent.futures.TimeoutError:
+                logger.warning("GPU %d collection timed out after 2s — skipping", i)
+                continue
             except pynvml.NVMLError as e:
-                print(f"Warning: Failed to collect metrics for GPU {i}: {e}")
+                logger.warning("Failed to collect metrics for GPU %d: %s", i, e)
                 continue
 
         return metrics

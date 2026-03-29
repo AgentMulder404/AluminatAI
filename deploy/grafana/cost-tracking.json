@@ -1,0 +1,189 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "type": "datasource",
+      "pluginId": "prometheus"
+    }
+  ],
+  "description": "AluminatAI cost tracking — energy costs, waste detection, and budget monitoring derived from GPU power metrics",
+  "editable": true,
+  "panels": [
+    {
+      "title": "Hourly Energy Cost (kWh × rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "increase(aluminatai_gpu_energy_joules_total[1h]) / 3600000 * $kwh_rate",
+          "legendFormat": "GPU {{gpu_uuid}}",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "color": { "mode": "palette-classic" } }
+      }
+    },
+    {
+      "title": "Total Energy Rate (All GPUs)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(aluminatai_gpu_power_watts) / 1000",
+          "legendFormat": "Total kW",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "kilowatt" } }
+    },
+    {
+      "title": "Cost Rate ($/hour)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(aluminatai_gpu_power_watts) / 1000 * $kwh_rate",
+          "legendFormat": "$/hr",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "title": "Projected Daily Cost",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(aluminatai_gpu_power_watts) / 1000 * $kwh_rate * 24",
+          "legendFormat": "$/day (projected)",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } }
+    },
+    {
+      "title": "GPU Utilization vs Cost Efficiency",
+      "description": "Low utilization + high power = waste. Green = efficient, Red = wasteful.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "aluminatai_gpu_utilization_pct",
+          "legendFormat": "GPU {{gpu_index}} util%",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "red" },
+              { "value": 30, "color": "yellow" },
+              { "value": 70, "color": "green" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Idle Power Waste",
+      "description": "Power consumed by idle GPUs (baseline power when utilization < 5%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "aluminatai_gpu_idle_power_watts",
+          "legendFormat": "GPU {{gpu_index}} idle",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "color": { "fixedColor": "red", "mode": "fixed" }
+        }
+      }
+    },
+    {
+      "title": "WAL Replay Health",
+      "description": "Failed uploads queued in WAL — indicates connectivity or auth issues",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "aluminatai_wal_entries_pending",
+          "legendFormat": "Pending",
+          "datasource": "${DS_PROMETHEUS}"
+        },
+        {
+          "expr": "rate(aluminatai_wal_replay_uploaded_total[5m])",
+          "legendFormat": "Replay rate",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ]
+    },
+    {
+      "title": "Upload Success Rate",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(aluminatai_upload_success_total[5m]) / (rate(aluminatai_upload_success_total[5m]) + rate(aluminatai_upload_failure_total[5m]))",
+          "legendFormat": "Success %",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "value": null, "color": "red" },
+              { "value": 0.9, "color": "yellow" },
+              { "value": 0.99, "color": "green" }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Attribution Unresolved",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 24 },
+      "targets": [
+        {
+          "expr": "rate(aluminatai_attribution_unresolved_total[5m])",
+          "legendFormat": "Unresolved/sec",
+          "datasource": "${DS_PROMETHEUS}"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["aluminatai", "cost", "energy"],
+  "templating": {
+    "list": [
+      {
+        "name": "kwh_rate",
+        "label": "$/kWh Rate",
+        "type": "textbox",
+        "current": { "value": "0.12" },
+        "options": [{ "value": "0.12", "selected": true }]
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "AluminatAI — Cost Tracking",
+  "uid": "aluminatai-cost-tracking",
+  "version": 1
+}

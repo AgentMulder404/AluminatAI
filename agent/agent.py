@@ -34,6 +34,7 @@ Signal handling:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import csv
 import hashlib
 import shutil
@@ -98,18 +99,39 @@ def _setup_logging(level: str = "INFO", fmt: str = "text") -> None:
         level: Standard logging level name ("DEBUG", "INFO", "WARNING", …).
         fmt:   "text" (human-readable) or "json" (newline-delimited JSON).
     """
+    from logging.handlers import RotatingFileHandler as _RFH
+
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
     root.handlers.clear()
-    handler = logging.StreamHandler(sys.stderr)
+
     if fmt == "json":
-        handler.setFormatter(_JsonFormatter())
+        formatter = _JsonFormatter()
     else:
-        handler.setFormatter(logging.Formatter(
+        formatter = logging.Formatter(
             "%(asctime)s [%(levelname)s] %(message)s",
             datefmt="%Y-%m-%dT%H:%M:%S",
-        ))
-    root.addHandler(handler)
+        )
+
+    # Always log to stderr
+    stream_handler = logging.StreamHandler(sys.stderr)
+    stream_handler.setFormatter(formatter)
+    root.addHandler(stream_handler)
+
+    # Optional file handler with rotation (10MB, 5 backups)
+    try:
+        from config import LOG_DIR
+        if LOG_DIR and str(LOG_DIR) != ".":
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            file_handler = _RFH(
+                LOG_DIR / "agent.log",
+                maxBytes=10 * 1024 * 1024,  # 10 MB
+                backupCount=5,
+            )
+            file_handler.setFormatter(formatter)
+            root.addHandler(file_handler)
+    except (ImportError, OSError) as exc:
+        root.warning("Could not set up file logging: %s", exc)
 
 
 # ── Config hash ───────────────────────────────────────────────────────────────
@@ -580,6 +602,20 @@ class Agent:
         if not self.quiet:
             self._print_banner(gpu_count, scheduler_name)
 
+        # SIGHUP hot-reload: re-read mutable config settings without restart.
+        # Only available on POSIX (Linux/macOS); silently skipped on Windows.
+        def _handle_sighup(signum, frame):
+            try:
+                import importlib
+                import config as _cfg_mod
+                importlib.reload(_cfg_mod)
+                log.info("Config reloaded via SIGHUP")
+            except Exception as exc:
+                log.warning("SIGHUP config reload failed: %s", exc)
+
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, _handle_sighup)
+
         self.running = True
         start_time = time.monotonic()
         self.last_upload_time = time.time()
@@ -608,13 +644,19 @@ class Agent:
                 loop_start = time.monotonic()
                 now = time.time()
 
-                # Scheduler poll
+                # Scheduler poll — runs in a thread with 10s timeout to prevent
+                # a hung scheduler adapter from blocking the entire collection loop.
                 if self.scheduler and (now - self.last_scheduler_poll >= SCHEDULER_POLL_INTERVAL):
                     try:
-                        self.scheduler.discover_jobs()
-                        self.last_scheduler_poll = now
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                            future = pool.submit(self.scheduler.discover_jobs)
+                            future.result(timeout=10)
+                    except concurrent.futures.TimeoutError:
+                        log.warning("Scheduler poll timed out after 10s — skipping this cycle")
                     except Exception as exc:
                         log.warning("Scheduler poll failed: %s", exc)
+                    finally:
+                        self.last_scheduler_poll = now
 
                 # Collect
                 try:
@@ -849,8 +891,8 @@ class Agent:
             # Shutdown collector
             try:
                 collector.shutdown()
-            except Exception:
-                pass
+            except Exception as exc:
+                log.debug("Collector shutdown error: %s", exc)
 
             # Stop DCGM probe
             if self.dcgm_probe:

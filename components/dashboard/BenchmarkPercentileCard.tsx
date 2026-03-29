@@ -75,7 +75,7 @@ export default function BenchmarkPercentileCard() {
           setData(json as PercentileData);
         }
       } catch {
-        // Silently fail — card simply doesn't render
+        // Card won't render if benchmark data unavailable
       } finally {
         if (!cancelled) setLoading(false);
       }

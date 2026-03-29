@@ -156,8 +156,8 @@ class ProcessProbe:
                 k, _, v = entry.partition(b"=")
                 try:
                     env[k.decode("utf-8", errors="replace")] = v.decode("utf-8", errors="replace")
-                except Exception:
-                    pass
+                except (UnicodeDecodeError, ValueError):
+                    pass  # malformed env entry — skip
         return _filter_environ(env)
 
     def _read_cmdline(self, pid: int) -> str:

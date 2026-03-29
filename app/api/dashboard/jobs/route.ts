@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { getUserKwhRate } from "@/lib/cost";
+import { requireRole } from "@/lib/rbac";
 
 export const runtime = "edge";
-
-const KWH_RATE = 0.12; // USD per kWh
 
 interface MetricRow {
   job_id: string | null;
@@ -23,7 +23,7 @@ interface MetricRow {
 }
 
 export async function GET(req: NextRequest) {
-  const cookieClient = createSupabaseCookieClient();
+  const cookieClient = await createSupabaseCookieClient();
   const {
     data: { user },
     error: authError,
@@ -34,6 +34,14 @@ export async function GET(req: NextRequest) {
   }
 
   const clusterTag = req.nextUrl.searchParams.get("cluster_tag") ?? "";
+  const teamId = req.nextUrl.searchParams.get("team_id") ?? "";
+
+  if (teamId) {
+    const { allowed } = await requireRole(user.id, teamId, "viewer");
+    if (!allowed) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
 
   const supabase = createSupabaseServerClient();
 
@@ -48,6 +56,9 @@ export async function GET(req: NextRequest) {
     .order("time", { ascending: false })
     .limit(2000);
 
+  if (teamId) {
+    query = query.eq("team_id", teamId);
+  }
   if (clusterTag) {
     query = query.eq("cluster_tag", clusterTag);
   }
@@ -118,6 +129,8 @@ export async function GET(req: NextRequest) {
     if (row.time > agg.last_time) agg.last_time = row.time;
   }
 
+  const kwhRate = await getUserKwhRate(user.id);
+
   const jobs = [...jobMap.values()].map((agg) => {
     const totalKwh = agg.total_energy_j / 3_600_000;
     return {
@@ -131,7 +144,7 @@ export async function GET(req: NextRequest) {
       gpu_name: agg.gpu_name,
       total_energy_j: agg.total_energy_j,
       total_kwh: totalKwh,
-      cost_usd: totalKwh * KWH_RATE,
+      cost_usd: totalKwh * kwhRate,
       total_co2e_g: agg.total_co2e_g,
       grid_zone: agg.grid_zone,
       start_time: agg.first_time,
