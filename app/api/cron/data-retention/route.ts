@@ -19,6 +19,13 @@ const TABLE_TS_COLUMN: Record<string, string> = {
   budget_alerts: "created_at",
 };
 
+// Audit log retention by plan tier
+const AUDIT_RETENTION_DAYS: Record<string, number> = {
+  free: 30,
+  pro: 90,
+  enterprise: 365,
+};
+
 export async function GET(req: NextRequest) {
   const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
   if (!isAuthed) {
@@ -104,6 +111,30 @@ export async function GET(req: NextRequest) {
       errors.push(`${tableName}/default: ${defErr.message}`);
     } else {
       totalDeleted += defaultCount ?? 0;
+    }
+  }
+
+  // Prune audit_log per user's plan tier
+  const { data: usersWithPlans } = await supabase
+    .from("users")
+    .select("id, plan");
+
+  for (const u of usersWithPlans ?? []) {
+    const retDays = AUDIT_RETENTION_DAYS[u.plan ?? "free"] ?? AUDIT_RETENTION_DAYS.free;
+    const auditCutoff = new Date(
+      Date.now() - retDays * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    const { count: auditCount, error: auditErr } = await supabase
+      .from("audit_log")
+      .delete({ count: "exact" })
+      .eq("user_id", u.id)
+      .lt("created_at", auditCutoff);
+
+    if (auditErr) {
+      errors.push(`audit_log/${u.id}: ${auditErr.message}`);
+    } else {
+      totalDeleted += auditCount ?? 0;
     }
   }
 

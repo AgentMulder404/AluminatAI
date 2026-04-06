@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getUserKwhRate, getPeriodStart } from "@/lib/cost";
-import { dispatchBudgetAlert } from "@/lib/notifications";
+import { dispatchBudgetAlert, createInAppNotification } from "@/lib/notifications";
 import { dispatchWebhook } from "@/lib/webhooks";
 import { verifyCronSecret } from "@/lib/auth-helpers";
 
@@ -115,6 +115,13 @@ export async function GET(req: NextRequest) {
         };
         await dispatchBudgetAlert(budget.notify_channels, alertPayload);
         await dispatchWebhook("budget.exceeded", budget.user_id, alertPayload);
+        void createInAppNotification(
+          budget.user_id,
+          "budget_alert",
+          `Budget exceeded: ${budget.name}`,
+          `Spend $${alertPayload.spend_usd.toFixed(2)} exceeds limit $${budget.limit_usd.toFixed(2)} (${budget.period})`,
+          { budget_id: budget.id, alert_type: "exceeded" }
+        );
         alertsSent++;
       }
     }
@@ -143,6 +150,13 @@ export async function GET(req: NextRequest) {
         };
         await dispatchBudgetAlert(budget.notify_channels, alertPayload);
         await dispatchWebhook("budget.warning", budget.user_id, alertPayload);
+        void createInAppNotification(
+          budget.user_id,
+          "budget_alert",
+          `Budget warning: ${budget.name}`,
+          `Spend $${alertPayload.spend_usd.toFixed(2)} is approaching limit $${budget.limit_usd.toFixed(2)} (${budget.period})`,
+          { budget_id: budget.id, alert_type: "warn" }
+        );
         alertsSent++;
       }
     }

@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import ChartErrorBoundary from "@/components/ChartErrorBoundary";
 
 type Granularity = "day" | "week" | "month";
 
@@ -129,7 +130,9 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
       {points.length === 0 ? (
         <p className="text-neutral-500 text-sm text-center py-12">No cost data yet.</p>
       ) : (
-        <ResponsiveContainer width="100%" height={220}>
+        <ChartErrorBoundary fallbackHeight="h-[180px] sm:h-[220px]">
+        <div className="h-[180px] sm:h-[220px]">
+        <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={points}>
             <defs>
               <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
@@ -191,6 +194,8 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
             />
           </AreaChart>
         </ResponsiveContainer>
+        </div>
+        </ChartErrorBoundary>
       )}
     </div>
   );

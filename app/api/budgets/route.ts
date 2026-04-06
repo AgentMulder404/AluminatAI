@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { checkCountLimit } from "@/lib/plans";
+import { logAudit } from "@/lib/audit";
 
 export const runtime = "edge";
 
@@ -109,6 +110,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  void logAudit({
+    userId: user.id,
+    action: "budget.create",
+    resourceType: "budget",
+    resourceId: data?.id,
+    metadata: { name, scope_type, period, limit_usd },
+  });
+
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -148,6 +157,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  void logAudit({
+    userId: user.id,
+    action: "budget.update",
+    resourceType: "budget",
+    resourceId: id,
+    metadata: { fields_updated: Object.keys(safeUpdates).filter(k => k !== "updated_at") },
+  });
+
   return NextResponse.json(data);
 }
 
@@ -174,6 +191,13 @@ export async function DELETE(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void logAudit({
+    userId: user.id,
+    action: "budget.delete",
+    resourceType: "budget",
+    resourceId: id,
+  });
 
   return NextResponse.json({ deleted: true });
 }

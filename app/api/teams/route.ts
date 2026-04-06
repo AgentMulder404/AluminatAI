@@ -6,6 +6,7 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getTeamScope } from "@/lib/rbac";
 import { checkCountLimit } from "@/lib/plans";
+import { logAudit } from "@/lib/audit";
 
 export const runtime = "edge";
 
@@ -89,6 +90,14 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void logAudit({
+    userId: user.id,
+    action: "team.create",
+    resourceType: "team",
+    resourceId: team?.id,
+    metadata: { name: name.trim(), slug },
+  });
 
   return NextResponse.json(team, { status: 201 });
 }

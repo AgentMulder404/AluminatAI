@@ -6,6 +6,7 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { checkCountLimit } from "@/lib/plans";
 import { encrypt } from "@/lib/crypto";
+import { logAudit } from "@/lib/audit";
 
 export const runtime = "edge";
 
@@ -128,6 +129,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  void logAudit({
+    userId: user.id,
+    action: "export_config.create",
+    resourceType: "export_config",
+    resourceId: data?.id,
+    metadata: { provider, bucket, format: format ?? "csv", schedule: schedule ?? "weekly" },
+  });
+
   return NextResponse.json(data, { status: 201 });
 }
 
@@ -188,6 +197,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  void logAudit({
+    userId: user.id,
+    action: "export_config.update",
+    resourceType: "export_config",
+    resourceId: id,
+    metadata: { fields_updated: Object.keys(safeUpdates).filter(k => k !== "updated_at") },
+  });
+
   return NextResponse.json(data);
 }
 
@@ -215,6 +232,13 @@ export async function DELETE(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void logAudit({
+    userId: user.id,
+    action: "export_config.delete",
+    resourceType: "export_config",
+    resourceId: id,
+  });
 
   return NextResponse.json({ deleted: true });
 }

@@ -30,3 +30,22 @@ jobs:
 
       - name: Run tests
         run: pytest agent/tests/ -v --tb=short --ignore=agent/tests/powercap_ab_test.py --ignore=agent/tests/test_collector.py
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend (install · test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test

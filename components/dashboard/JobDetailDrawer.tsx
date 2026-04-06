@@ -11,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import ChartErrorBoundary from "@/components/ChartErrorBoundary";
 
 interface JobDetail {
   job_id: string;
@@ -118,7 +119,7 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
           {data && (
             <>
               {/* Metadata */}
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
                 {[
                   { label: "Team", value: data.team_id ?? "—" },
                   { label: "Model", value: data.model_tag ?? "—" },
@@ -135,7 +136,7 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
               </div>
 
               {/* Summary Stats */}
-              <div className="grid grid-cols-4 gap-3 mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 {[
                   { label: "Cost", value: `$${data.summary.cost_usd.toFixed(2)}` },
                   { label: "Energy", value: `${data.summary.total_kwh.toFixed(3)} kWh` },
@@ -200,7 +201,9 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                 <h3 className="text-sm font-medium text-neutral-200 mb-3">
                   Power &amp; Utilization Timeline
                 </h3>
-                <ResponsiveContainer width="100%" height={200}>
+                <ChartErrorBoundary fallbackHeight="h-[160px] sm:h-[200px]">
+                <div className="h-[160px] sm:h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.timeseries}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
                     <XAxis
@@ -256,6 +259,8 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                     />
                   </LineChart>
                 </ResponsiveContainer>
+                </div>
+                </ChartErrorBoundary>
               </div>
 
               {/* Temperature & Memory (if available) */}
@@ -264,7 +269,9 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                   <h3 className="text-sm font-medium text-neutral-200 mb-3">
                     Temperature &amp; Memory
                   </h3>
-                  <ResponsiveContainer width="100%" height={150}>
+                  <ChartErrorBoundary fallbackHeight="h-[120px] sm:h-[150px]">
+                  <div className="h-[120px] sm:h-[150px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={data.timeseries}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
                       <XAxis
@@ -301,6 +308,8 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                       />
                     </LineChart>
                   </ResponsiveContainer>
+                  </div>
+                  </ChartErrorBoundary>
                 </div>
               )}
             </>

@@ -16,6 +16,7 @@ import JobsCarbonTable from "@/components/dashboard/JobsCarbonTable";
 import JobDetailDrawer from "@/components/dashboard/JobDetailDrawer";
 import AgentsPanel from "@/components/dashboard/AgentsPanel";
 import BenchmarkPercentileCard from "@/components/dashboard/BenchmarkPercentileCard";
+import NotificationBell from "@/components/dashboard/NotificationBell";
 
 function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
@@ -55,11 +56,14 @@ function DashboardInner() {
       {/* Top bar: Cluster filter + Date range */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <ClusterFilter onClusterChange={handleClusterChange} />
-        <DateRangePicker
+        <div className="flex items-center gap-3">
+          <NotificationBell />
+          <DateRangePicker
           from={dateRange.from}
           to={dateRange.to}
           onChange={(from, to) => setDateRange({ from, to })}
         />
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -70,6 +74,7 @@ function DashboardInner() {
           fetchUrl={`/api/dashboard/today-cost?${clusterParam}`}
           valueKey="cost_usd"
           format="currency"
+          streamEvent="metrics"
         />
         <StatCard
           title="Active GPUs"

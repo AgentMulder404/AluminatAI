@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requireRole, type TeamRole } from "@/lib/rbac";
+import { logAudit } from "@/lib/audit";
 
 export const runtime = "edge";
 
@@ -154,6 +155,14 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  void logAudit({
+    userId: user.id,
+    action: "team.member.add",
+    resourceType: "team",
+    resourceId: teamId,
+    metadata: { target_user_id: targetUser.id, role: memberRole },
+  });
+
   return NextResponse.json(member, { status: 201 });
 }
 
@@ -213,6 +222,14 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void logAudit({
+    userId: user.id,
+    action: "team.member.remove",
+    resourceType: "team",
+    resourceId: teamId,
+    metadata: { target_user_id: user_id },
+  });
 
   return NextResponse.json({ removed: true });
 }

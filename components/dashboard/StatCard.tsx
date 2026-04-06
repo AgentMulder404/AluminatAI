@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useEventSource } from "@/lib/use-event-source";
 
 type Format = "currency" | "number" | "percent" | "co2";
 
@@ -11,6 +12,7 @@ interface StatCardProps {
   format: Format;
   suffix?: string;
   refreshInterval?: number;
+  streamEvent?: string; // SSE event name for live updates
 }
 
 function formatValue(value: number | null, format: Format, suffix?: string): string {
@@ -40,11 +42,29 @@ export default function StatCard({
   format,
   suffix,
   refreshInterval = 60000,
+  streamEvent,
 }: StatCardProps) {
   const [value, setValue] = useState<number | null>(null);
   const [prevValue, setPrevValue] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  // SSE live updates (optional)
+  const { data: streamData } = useEventSource<Record<string, unknown>>(
+    "/api/dashboard/stream",
+    streamEvent ?? "",
+    { enabled: !!streamEvent, fallbackInterval: refreshInterval }
+  );
+
+  // Update value from SSE stream
+  useEffect(() => {
+    if (streamData && valueKey in streamData) {
+      setPrevValue(value);
+      setValue(streamData[valueKey] as number);
+      setLoading(false);
+      setError(false);
+    }
+  }, [streamData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = useCallback(() => {
     fetch(fetchUrl)
@@ -61,11 +81,18 @@ export default function StatCard({
       .finally(() => setLoading(false));
   }, [fetchUrl, valueKey, value]);
 
+  // REST polling fallback (skip if SSE is active)
   useEffect(() => {
+    if (streamEvent) return; // SSE handles updates
     fetchData();
     const interval = setInterval(fetchData, refreshInterval);
     return () => clearInterval(interval);
-  }, [fetchUrl, valueKey, refreshInterval]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fetchUrl, valueKey, refreshInterval, streamEvent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initial fetch even with SSE (SSE may take a moment to connect)
+  useEffect(() => {
+    fetchData();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const trend =
     prevValue != null && value != null && prevValue !== 0

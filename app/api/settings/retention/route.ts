@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { logAudit } from "@/lib/audit";
 
 export const runtime = "edge";
 
@@ -106,6 +107,14 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void logAudit({
+    userId: user.id,
+    action: "retention.update",
+    resourceType: "data_retention_policy",
+    resourceId: data?.id,
+    metadata: { table_name, retention_days },
+  });
 
   return NextResponse.json(data);
 }

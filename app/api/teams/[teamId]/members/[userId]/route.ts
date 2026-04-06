@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requireRole, isTeamOwner, type TeamRole } from "@/lib/rbac";
+import { logAudit } from "@/lib/audit";
 
 export const runtime = "edge";
 
@@ -92,6 +93,14 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void logAudit({
+    userId: user.id,
+    action: "team.member.role_change",
+    resourceType: "team",
+    resourceId: teamId,
+    metadata: { target_user_id: targetUserId, old_role: targetMember.role, new_role: newRole },
+  });
 
   return NextResponse.json(data);
 }

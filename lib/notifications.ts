@@ -1,5 +1,7 @@
-// Notification dispatch library for budget alerts and waste detection.
-// Supports Slack webhooks and email (via Resend).
+// Notification dispatch library for budget alerts, waste detection, and in-app notifications.
+// Supports Slack webhooks, email (via Resend), PagerDuty, OpsGenie, and in-app.
+
+import { createSupabaseServerClient } from "./supabase-client";
 
 interface SlackMessage {
   text: string;
@@ -207,4 +209,120 @@ export async function dispatchBudgetAlert(
   }
 
   return sent;
+}
+
+/**
+ * Create an in-app notification for a user.
+ * Fire-and-forget — errors are logged but don't throw.
+ */
+export async function createInAppNotification(
+  userId: string,
+  type: "budget_alert" | "waste_detected" | "agent_offline" | "system" | "team",
+  title: string,
+  message: string,
+  metadata?: Record<string, unknown>
+): Promise<boolean> {
+  try {
+    const supabase = createSupabaseServerClient();
+
+    // Check if user has in-app notifications enabled
+    const { data: prefs } = await supabase
+      .from("notification_preferences")
+      .select("in_app")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    // Default to enabled if no preferences row exists
+    if (prefs && prefs.in_app === false) return false;
+
+    const { error } = await supabase.from("notifications").insert({
+      user_id: userId,
+      type,
+      title,
+      message,
+      metadata: metadata ?? {},
+    });
+
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Unified notification dispatcher.
+ * Checks user's channel preferences, then dispatches to all enabled channels.
+ * Use this instead of calling individual channel functions directly.
+ */
+export async function dispatchNotification(
+  userId: string,
+  type: "budget_alert" | "waste_detected" | "agent_offline" | "system" | "team",
+  title: string,
+  message: string,
+  opts?: {
+    channels?: NotifyChannel[];
+    metadata?: Record<string, unknown>;
+    budgetContext?: BudgetAlertContext;
+  }
+): Promise<{ sent: string[] }> {
+  const sent: string[] = [];
+
+  try {
+    const supabase = createSupabaseServerClient();
+    const { data: prefs } = await supabase
+      .from("notification_preferences")
+      .select("in_app, email, slack, pagerduty, opsgenie")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    // Defaults: all channels enabled
+    const p = {
+      in_app: prefs?.in_app ?? true,
+      email: prefs?.email ?? true,
+      slack: prefs?.slack ?? true,
+      pagerduty: prefs?.pagerduty ?? true,
+      opsgenie: prefs?.opsgenie ?? true,
+    };
+
+    // In-app notification
+    if (p.in_app) {
+      const ok = await createInAppNotification(userId, type, title, message, opts?.metadata);
+      if (ok) sent.push("in_app");
+    }
+
+    // External channels
+    if (opts?.channels) {
+      for (const ch of opts.channels) {
+        if (ch.type === "email" && !p.email) continue;
+        if (ch.type === "slack" && !p.slack) continue;
+        if (ch.type === "pagerduty" && !p.pagerduty) continue;
+        if (ch.type === "opsgenie" && !p.opsgenie) continue;
+
+        if (opts.budgetContext) {
+          // Budget alerts use the specialized dispatcher
+          const results = await dispatchBudgetAlert([ch], opts.budgetContext);
+          sent.push(...results);
+        } else {
+          // Generic notification to external channels
+          if (ch.type === "slack") {
+            const ok = await sendSlackWebhook(ch.target, { text: `*${title}*\n${message}` });
+            if (ok) sent.push("slack");
+          } else if (ch.type === "email") {
+            const ok = await sendEmail(ch.target, `[AluminatAI] ${title}`, message);
+            if (ok) sent.push("email");
+          } else if (ch.type === "pagerduty") {
+            const ok = await sendPagerDutyAlert(ch.target, `${title}: ${message}`);
+            if (ok) sent.push("pagerduty");
+          } else if (ch.type === "opsgenie") {
+            const ok = await sendOpsGenieAlert(ch.target, `${title}: ${message}`);
+            if (ok) sent.push("opsgenie");
+          }
+        }
+      }
+    }
+  } catch {
+    // Notification dispatch should never block operations
+  }
+
+  return { sent };
 }

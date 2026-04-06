@@ -4,6 +4,7 @@ export const runtime = "edge";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { logAudit } from "@/lib/audit";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
   apiVersion: "2024-12-18.acacia",
@@ -75,6 +76,14 @@ export async function POST(req: NextRequest) {
           amountUsd: session.amount_total
             ? session.amount_total / 100
             : undefined,
+        });
+
+        void logAudit({
+          userId,
+          action: "plan.checkout_completed",
+          resourceType: "subscription",
+          resourceId: subscriptionId,
+          metadata: { plan, amount_usd: session.amount_total ? session.amount_total / 100 : null },
         });
         break;
       }
@@ -171,6 +180,13 @@ export async function POST(req: NextRequest) {
           stripeEventId: event.id,
           eventType: event.type,
           plan: "free",
+        });
+
+        void logAudit({
+          userId,
+          action: "plan.subscription_deleted",
+          resourceType: "subscription",
+          metadata: { downgraded_to: "free" },
         });
         break;
       }

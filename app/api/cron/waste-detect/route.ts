@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getUserKwhRate } from "@/lib/cost";
 import { dispatchWebhook } from "@/lib/webhooks";
+import { createInAppNotification } from "@/lib/notifications";
 import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
@@ -190,6 +191,13 @@ export async function GET(req: NextRequest) {
             estimated_waste_usd: e.estimated_waste_usd,
           })),
         });
+        void createInAppNotification(
+          userId,
+          "waste_detected",
+          `${wasteEvents.length} GPU waste event${wasteEvents.length > 1 ? "s" : ""} detected`,
+          `Estimated waste: $${(Math.round(totalWasteUsd * 100) / 100).toFixed(2)} — check your dashboard for details`,
+          { event_count: wasteEvents.length, total_waste_usd: Math.round(totalWasteUsd * 100) / 100 }
+        );
       }
     }
 

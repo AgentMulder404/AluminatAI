@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import CarbonExportButton from "@/components/dashboard/CarbonExportButton";
+import NotificationPreferences from "@/components/dashboard/NotificationPreferences";
 import { PLAN_DISPLAY, type PlanTier } from "@/lib/plans";
 
 export default function SettingsPage() {
@@ -286,6 +287,17 @@ export default function SettingsPage() {
         {saved && (
           <p className="mt-2 text-xs text-green-400">Saved.</p>
         )}
+      </section>
+
+      {/* Notification Preferences */}
+      <section className="border border-neutral-800 rounded-lg p-5 max-w-lg mt-4">
+        <h2 className="text-sm font-semibold text-neutral-300 mb-1">
+          Notification Preferences
+        </h2>
+        <p className="text-xs text-neutral-500 mb-4">
+          Choose which channels receive budget alerts, waste detection, and other notifications.
+        </p>
+        <NotificationPreferences />
       </section>
 
       {/* Carbon tracking section */}
