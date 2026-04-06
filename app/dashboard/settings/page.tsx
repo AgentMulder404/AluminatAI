@@ -12,9 +12,11 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [gridZone, setGridZone] = useState<string | null>(null);
   const [carbonGPerKwh, setCarbonGPerKwh] = useState<number | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [apiKeyMasked, setApiKeyMasked] = useState<string | null>(null);
+  const [apiKeyFull, setApiKeyFull] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
   const [keyVisible, setKeyVisible] = useState(false);
+  const [keyRevealing, setKeyRevealing] = useState(false);
 
   // Billing state
   const [plan, setPlan] = useState<PlanTier>("free");
@@ -28,7 +30,7 @@ export default function SettingsPage() {
       .then((d) => {
         if (d) {
           setOptIn(Boolean(d.benchmark_opt_in));
-          if (d.api_key) setApiKey(d.api_key);
+          if (d.api_key_masked) setApiKeyMasked(d.api_key_masked);
           if (d.plan) setPlan(d.plan as PlanTier);
           if (d.plan_period_end) setPeriodEnd(d.plan_period_end);
           if (d.plan_cancel_at_period_end) setCancelAtPeriodEnd(true);
@@ -45,9 +47,54 @@ export default function SettingsPage() {
     }
   }, []);
 
+  async function revealKey() {
+    if (apiKeyFull) {
+      setKeyVisible((v) => !v);
+      return;
+    }
+    setKeyRevealing(true);
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reveal_key" }),
+      });
+      const d = await res.json();
+      if (d.api_key) {
+        setApiKeyFull(d.api_key);
+        setKeyVisible(true);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setKeyRevealing(false);
+    }
+  }
+
   function copyKey() {
-    if (!apiKey) return;
-    navigator.clipboard.writeText(apiKey).then(() => {
+    const key = apiKeyFull || apiKeyMasked;
+    if (!key) return;
+    // If we don't have the full key yet, fetch it first
+    if (!apiKeyFull) {
+      fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reveal_key" }),
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.api_key) {
+            setApiKeyFull(d.api_key);
+            navigator.clipboard.writeText(d.api_key).then(() => {
+              setKeyCopied(true);
+              setTimeout(() => setKeyCopied(false), 2000);
+            });
+          }
+        })
+        .catch(() => {});
+      return;
+    }
+    navigator.clipboard.writeText(apiKeyFull).then(() => {
       setKeyCopied(true);
       setTimeout(() => setKeyCopied(false), 2000);
     });
@@ -178,16 +225,17 @@ export default function SettingsPage() {
         </p>
         {loading ? (
           <div className="h-8 w-full bg-neutral-800 rounded animate-pulse" />
-        ) : apiKey ? (
+        ) : apiKeyMasked ? (
           <div className="flex items-center gap-2">
             <code className="flex-1 bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-xs text-neutral-200 font-mono truncate">
-              {keyVisible ? apiKey : apiKey.slice(0, 8) + "•".repeat(20)}
+              {keyVisible && apiKeyFull ? apiKeyFull : apiKeyMasked}
             </code>
             <button
-              onClick={() => setKeyVisible((v) => !v)}
-              className="text-xs text-neutral-400 hover:text-neutral-200 px-2 py-2 border border-neutral-700 rounded"
+              onClick={revealKey}
+              disabled={keyRevealing}
+              className="text-xs text-neutral-400 hover:text-neutral-200 px-2 py-2 border border-neutral-700 rounded disabled:opacity-50"
             >
-              {keyVisible ? "Hide" : "Show"}
+              {keyRevealing ? "..." : keyVisible ? "Hide" : "Show"}
             </button>
             <button
               onClick={copyKey}

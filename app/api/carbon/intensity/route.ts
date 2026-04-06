@@ -5,12 +5,22 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 export const runtime = "edge";
 
 const ZONE_RE = /^[A-Z0-9\-]+$/i;
 
 export async function GET(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = await rateLimit(`pub:intensity:${ip}`, 30);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const zone = req.nextUrl.searchParams.get("zone") ?? "";
 
   if (!zone || zone.length > 32 || !ZONE_RE.test(zone)) {

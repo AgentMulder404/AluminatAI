@@ -30,6 +30,13 @@ interface JobDetail {
     peak_utilization_pct: number;
     sample_count: number;
   };
+  cloud_comparison: {
+    cloud_equivalent_usd: number;
+    savings_usd: number;
+    savings_pct: number;
+    reference_provider: string;
+    reference_rate_hr: number;
+  } | null;
   timeseries: Array<{
     time: string;
     power_draw_w: number;
@@ -141,6 +148,52 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                   </div>
                 ))}
               </div>
+
+              {/* Cloud Cost Comparison */}
+              {data.cloud_comparison && (
+                <div
+                  className={`rounded-lg p-4 mb-6 border ${
+                    data.cloud_comparison.savings_usd > 0
+                      ? "bg-green-950/30 border-green-800/40"
+                      : "bg-neutral-900 border-neutral-800"
+                  }`}
+                >
+                  <p className="text-xs text-neutral-400 mb-2">Cost Comparison</p>
+                  <div className="flex items-baseline gap-4">
+                    <div>
+                      <p className="text-xs text-neutral-500">Your cost</p>
+                      <p className="text-lg font-semibold text-neutral-100">
+                        ${data.summary.cost_usd.toFixed(2)}
+                      </p>
+                    </div>
+                    <span className="text-neutral-600">vs</span>
+                    <div>
+                      <p className="text-xs text-neutral-500">
+                        Cloud ({data.cloud_comparison.reference_provider.toUpperCase()})
+                      </p>
+                      <p className="text-lg font-semibold text-neutral-400">
+                        ${data.cloud_comparison.cloud_equivalent_usd.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-neutral-500">Saved</p>
+                      <p
+                        className={`text-lg font-semibold ${
+                          data.cloud_comparison.savings_usd > 0
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {data.cloud_comparison.savings_usd > 0 ? "+" : ""}$
+                        {data.cloud_comparison.savings_usd.toFixed(2)}{" "}
+                        <span className="text-xs">
+                          ({Math.round(data.cloud_comparison.savings_pct)}%)
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Power Timeline */}
               <div className="mb-6">

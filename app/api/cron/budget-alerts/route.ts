@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getUserKwhRate, getPeriodStart } from "@/lib/cost";
 import { dispatchBudgetAlert } from "@/lib/notifications";
 import { dispatchWebhook } from "@/lib/webhooks";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
 
@@ -24,9 +25,8 @@ interface Budget {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  const secret = process.env.CRON_SECRET;
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

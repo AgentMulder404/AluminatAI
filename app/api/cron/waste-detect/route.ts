@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getUserKwhRate } from "@/lib/cost";
 import { dispatchWebhook } from "@/lib/webhooks";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
 
@@ -16,9 +17,8 @@ const IDLE_THRESHOLD = 1; // % — below this is considered idle
 const MIN_DURATION_HOURS = 1; // minimum duration to flag
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  const secret = process.env.CRON_SECRET;
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

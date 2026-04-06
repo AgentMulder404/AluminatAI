@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
 
@@ -19,9 +20,8 @@ const TABLE_TS_COLUMN: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  const secret = process.env.CRON_SECRET;
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -87,17 +87,18 @@ export async function GET(req: NextRequest) {
 
     // Delete old rows for users without a custom policy
     // This is a bulk delete — any row older than 90 days from a user without a policy
-    const { count: defaultCount, error: defErr } = await supabase
+    // Build the NOT IN filter safely — Supabase PostgREST expects (val1,val2) without quotes for UUIDs
+    const idArray = Array.from(policyUserIds);
+    let query = supabase
       .from(tableName)
       .delete({ count: "exact" })
-      .lt(tsColumn, defaultCutoff)
-      .not(
-        "user_id",
-        "in",
-        `(${Array.from(policyUserIds)
-          .map((id) => `"${id}"`)
-          .join(",")})`
-      );
+      .lt(tsColumn, defaultCutoff);
+
+    if (idArray.length > 0) {
+      query = query.not("user_id", "in", `(${idArray.join(",")})`);
+    }
+
+    const { count: defaultCount, error: defErr } = await query;
 
     if (defErr) {
       errors.push(`${tableName}/default: ${defErr.message}`);

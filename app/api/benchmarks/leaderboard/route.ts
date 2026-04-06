@@ -3,12 +3,22 @@
 // Calls benchmark_leaderboard_stats() RPC (only groups with ≥10 submissions).
 // Cached 1 hour at the CDN edge.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 export const runtime = "edge";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const rl = await rateLimit(`pub:bench:${ip}`, 30);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase.rpc("benchmark_leaderboard_stats");
 

@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
 
@@ -17,10 +18,8 @@ interface ElectricityMapsResponse {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  const secret = process.env.CRON_SECRET ?? "";
-
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

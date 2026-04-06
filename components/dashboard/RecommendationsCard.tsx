@@ -44,7 +44,7 @@ export default function RecommendationsCard({ clusterParam }: RecommendationsCar
   const [savings, setSavings] = useState<SavingsEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [showSavings, setShowSavings] = useState(false);
+  const [showSavings] = useState(true);
 
   useEffect(() => {
     setLoading(true);
@@ -89,15 +89,7 @@ export default function RecommendationsCard({ clusterParam }: RecommendationsCar
     <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-neutral-200">Recommendations</h3>
-        {savings.length > 0 && (
-          <button
-            onClick={() => setShowSavings(!showSavings)}
-            className="text-xs text-indigo-400 hover:text-indigo-300"
-          >
-            {showSavings ? "Hide" : "Show"} Savings Calculator
-          </button>
-        )}
-      </div>
+        </div>
 
       {/* Recommendations */}
       {recs.length > 0 && (

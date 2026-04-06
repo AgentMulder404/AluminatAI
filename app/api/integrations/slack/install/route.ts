@@ -14,6 +14,40 @@ const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET ?? "";
 const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI ?? "";
 const SLACK_SCOPES = "chat:write,commands,channels:read";
 
+// CSRF state token helpers — HMAC-SHA256 signed, 10-minute expiry
+const STATE_SECRET = process.env.SLACK_CLIENT_SECRET ?? "fallback-oauth-state-key";
+
+async function signState(userId: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(STATE_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const nonce = crypto.getRandomValues(new Uint8Array(16));
+  const nonceHex = Array.from(nonce).map(b => b.toString(16).padStart(2, "0")).join("");
+  const exp = Date.now() + 10 * 60 * 1000; // 10 min
+  const payload = `${userId}.${nonceHex}.${exp}`;
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(payload)));
+  const sigHex = Array.from(sig).map(b => b.toString(16).padStart(2, "0")).join("");
+  return `${payload}.${sigHex}`;
+}
+
+async function verifyState(state: string): Promise<string | null> {
+  const parts = state.split(".");
+  if (parts.length !== 4) return null;
+  const [userId, , expStr, sigHex] = parts;
+  const exp = Number(expStr);
+  if (isNaN(exp) || Date.now() > exp) return null; // expired
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(STATE_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+  );
+  const payload = parts.slice(0, 3).join(".");
+  const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+  const valid = await crypto.subtle.verify("HMAC", key, sigBytes, enc.encode(payload));
+  return valid ? userId : null;
+}
+
 async function authenticate() {
   const cookieClient = await createSupabaseCookieClient();
   const {
@@ -54,9 +88,19 @@ export async function GET(req: NextRequest) {
     authorizeUrl.searchParams.set("client_id", SLACK_CLIENT_ID);
     authorizeUrl.searchParams.set("scope", SLACK_SCOPES);
     authorizeUrl.searchParams.set("redirect_uri", SLACK_REDIRECT_URI);
-    authorizeUrl.searchParams.set("state", user.id); // simple CSRF via user_id
+    authorizeUrl.searchParams.set("state", await signState(user.id));
 
     return NextResponse.redirect(authorizeUrl.toString());
+  }
+
+  // Verify CSRF state token
+  const state = req.nextUrl.searchParams.get("state");
+  if (!state) {
+    return NextResponse.json({ error: "Missing OAuth state" }, { status: 400 });
+  }
+  const stateUserId = await verifyState(state);
+  if (!stateUserId || stateUserId !== user.id) {
+    return NextResponse.json({ error: "Invalid or expired OAuth state" }, { status: 403 });
   }
 
   // Step 2: Exchange code for tokens

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import ClusterFilter from "@/components/dashboard/ClusterFilter";
 import DateRangePicker from "@/components/dashboard/DateRangePicker";
 import StatCard from "@/components/dashboard/StatCard";
+import SavingsCard from "@/components/dashboard/SavingsCard";
 import CostTrendChart from "@/components/dashboard/CostTrendChart";
 import CostBreakdownPanel from "@/components/dashboard/CostBreakdownPanel";
 import WasteAlerts from "@/components/dashboard/WasteAlerts";
@@ -63,18 +64,12 @@ function DashboardInner() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <SavingsCard />
         <StatCard
           title="Today's Cost"
           fetchUrl={`/api/dashboard/today-cost?${clusterParam}`}
           valueKey="cost_usd"
           format="currency"
-        />
-        <StatCard
-          title="Energy (kWh)"
-          fetchUrl={`/api/dashboard/today-cost?${clusterParam}`}
-          valueKey="kwh"
-          format="number"
-          suffix=" kWh"
         />
         <StatCard
           title="Active GPUs"

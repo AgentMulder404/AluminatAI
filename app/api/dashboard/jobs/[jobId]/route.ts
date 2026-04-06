@@ -79,6 +79,44 @@ export async function GET(
   const totalKwh = totalJ / 3_600_000;
   const firstRow = data[0];
   const lastRow = data[data.length - 1];
+  const costUsd = Math.round(totalKwh * kwhRate * 100) / 100;
+
+  // Cloud cost comparison
+  let cloudComparison = null;
+  const gpuName = firstRow.gpu_name as string | null;
+  if (gpuName) {
+    const { data: refs } = await supabase
+      .from("gpu_reference_pricing")
+      .select("gpu_model, provider, rate_usd_per_gpu_hour")
+      .order("rate_usd_per_gpu_hour", { ascending: false });
+
+    // Find matching reference price (highest on-demand = worst-case cloud cost)
+    const match = (refs ?? []).find(
+      (r) =>
+        gpuName.includes(r.gpu_model as string) ||
+        (r.gpu_model as string).includes(gpuName.replace("NVIDIA ", ""))
+    );
+
+    if (match) {
+      const durationHours =
+        (new Date(lastRow.time).getTime() - new Date(firstRow.time).getTime()) / 3_600_000;
+      const gpuHours = durationHours * Math.max(gpuUuids.size, 1);
+      const cloudCost =
+        Math.round((match.rate_usd_per_gpu_hour as number) * gpuHours * 100) / 100;
+      const savingsUsd = Math.round((cloudCost - costUsd) * 100) / 100;
+
+      cloudComparison = {
+        cloud_equivalent_usd: cloudCost,
+        savings_usd: savingsUsd,
+        savings_pct:
+          cloudCost > 0
+            ? Math.round((savingsUsd / cloudCost) * 10000) / 100
+            : 0,
+        reference_provider: match.provider,
+        reference_rate_hr: match.rate_usd_per_gpu_hour,
+      };
+    }
+  }
 
   return NextResponse.json({
     job_id: jobId,
@@ -92,12 +130,13 @@ export async function GET(
     end_time: lastRow.time,
     summary: {
       total_kwh: Math.round(totalKwh * 1000) / 1000,
-      cost_usd: Math.round(totalKwh * kwhRate * 100) / 100,
+      cost_usd: costUsd,
       total_co2e_g: Math.round(totalCo2eG * 100) / 100,
       max_power_w: Math.round(maxPowerW),
       peak_utilization_pct: Math.round(peakUtil),
       sample_count: data.length,
     },
+    cloud_comparison: cloudComparison,
     timeseries: data,
   });
 }

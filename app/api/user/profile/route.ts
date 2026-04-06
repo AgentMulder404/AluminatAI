@@ -48,6 +48,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 // GET /api/user/profile — fetch current user profile fields
+// API key is returned MASKED — use POST with action:"reveal_key" for full key
 export async function GET(_req: NextRequest) {
   const cookieClient = await createSupabaseCookieClient();
   const {
@@ -70,5 +71,53 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data ?? { benchmark_opt_in: false, api_key: null });
+  // Mask the API key — never return full key in GET
+  const masked = data?.api_key
+    ? data.api_key.slice(0, 9) + "••••••••••••••••" + data.api_key.slice(-4)
+    : null;
+
+  return NextResponse.json({
+    benchmark_opt_in: data?.benchmark_opt_in ?? false,
+    api_key_masked: masked,
+    plan: data?.plan ?? "free",
+    plan_period_end: data?.plan_period_end ?? null,
+    plan_cancel_at_period_end: data?.plan_cancel_at_period_end ?? false,
+  });
+}
+
+// POST /api/user/profile — actions (reveal_key)
+export async function POST(req: NextRequest) {
+  const cookieClient = await createSupabaseCookieClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await cookieClient.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (body.action === "reveal_key") {
+    const supabase = createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("users")
+      .select("api_key")
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ api_key: data?.api_key ?? null });
+  }
+
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }

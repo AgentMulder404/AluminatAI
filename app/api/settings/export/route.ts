@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { checkCountLimit } from "@/lib/plans";
+import { encrypt } from "@/lib/crypto";
 
 export const runtime = "edge";
 
@@ -114,9 +115,9 @@ export async function POST(req: NextRequest) {
       region: region ?? null,
       format: format ?? "csv",
       schedule: schedule ?? "weekly",
-      access_key_id: provider === "s3" ? access_key_id : null,
-      secret_key: provider === "s3" ? secret_key : null,
-      gcs_credentials: provider === "gcs" ? gcs_credentials : null,
+      access_key_id: provider === "s3" ? await encrypt(access_key_id) : null,
+      secret_key: provider === "s3" ? await encrypt(secret_key) : null,
+      gcs_credentials: provider === "gcs" ? await encrypt(typeof gcs_credentials === "string" ? gcs_credentials : JSON.stringify(gcs_credentials)) : null,
     })
     .select(
       "id, provider, bucket, prefix, region, format, schedule, is_active, created_at"
@@ -155,12 +156,19 @@ export async function PATCH(req: NextRequest) {
     "gcs_credentials",
     "is_active",
   ];
+  const CREDENTIAL_FIELDS = ["access_key_id", "secret_key", "gcs_credentials"];
   const safeUpdates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   };
   for (const key of allowed) {
     if (updates[key] !== undefined) {
-      safeUpdates[key] = updates[key];
+      if (CREDENTIAL_FIELDS.includes(key) && typeof updates[key] === "string") {
+        safeUpdates[key] = await encrypt(updates[key]);
+      } else if (key === "gcs_credentials" && typeof updates[key] === "object") {
+        safeUpdates[key] = await encrypt(JSON.stringify(updates[key]));
+      } else {
+        safeUpdates[key] = updates[key];
+      }
     }
   }
 

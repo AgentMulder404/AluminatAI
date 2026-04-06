@@ -82,6 +82,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ inserted: 0 });
   }
 
+  // Cap batch size to prevent abuse
+  if (metrics.length > 1000) {
+    return NextResponse.json(
+      { error: "Batch too large — max 1000 metrics per request" },
+      { status: 400 }
+    );
+  }
+
   // Collect unique grid zones from this batch for a single carbon intensity lookup
   const supabase = createSupabaseServerClient();
   const zoneIntensityMap = new Map<string, number | null>();
@@ -115,6 +123,21 @@ export async function POST(req: NextRequest) {
         (m.temperature_c < 0 || m.temperature_c > 120)
       )
         return null;
+      if (
+        typeof m.utilization_gpu_pct === "number" &&
+        (m.utilization_gpu_pct < 0 || m.utilization_gpu_pct > 100)
+      )
+        return null;
+      if (
+        typeof m.memory_used_mb === "number" &&
+        (m.memory_used_mb < 0 || m.memory_used_mb > 1_000_000)
+      )
+        return null;
+      if (
+        typeof m.gpu_fraction === "number" &&
+        (m.gpu_fraction < 0 || m.gpu_fraction > 1)
+      )
+        return null;
 
       return {
         user_id: auth.userId,
@@ -141,7 +164,7 @@ export async function POST(req: NextRequest) {
         attribution_confidence: m.attribution_confidence ?? null,
         attribution_confidence_score: m.attribution_confidence_score ?? null,
         machine_id: sanitizeIdentity(m.machine_id),
-        cluster_tag: sanitizeIdentity(m.cluster_tag) ?? "",
+        cluster_tag: sanitizeIdentity(m.cluster_tag) ?? null,
         grid_zone: sanitizeZone(m.grid_zone),
         carbon_g_per_kwh: (() => {
           const z = sanitizeZone(m.grid_zone);

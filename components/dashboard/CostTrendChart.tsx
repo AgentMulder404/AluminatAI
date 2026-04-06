@@ -18,6 +18,7 @@ interface TrendPoint {
   cost_usd: number;
   kwh: number;
   co2e_g: number | null;
+  cloud_equivalent_usd?: number;
 }
 
 interface TrendData {
@@ -33,6 +34,7 @@ interface CostTrendChartProps {
 
 export default function CostTrendChart({ clusterParam, from, to }: CostTrendChartProps) {
   const [granularity, setGranularity] = useState<Granularity>("day");
+  const [showCloud, setShowCloud] = useState(true);
   const [data, setData] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -45,6 +47,7 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
     if (clusterParam) params.set("cluster_tag", clusterParam);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
+    if (showCloud) params.set("include_cloud", "true");
 
     fetch(`/api/cost/trend?${params}`)
       .then((r) => {
@@ -54,7 +57,7 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
       .then((d) => setData(d))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [granularity, clusterParam, from, to]);
+  }, [granularity, clusterParam, from, to, showCloud]);
 
   if (loading) {
     return (
@@ -74,6 +77,7 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
   }
 
   const points = data?.points ?? [];
+  const hasCloudData = points.some((p) => p.cloud_equivalent_usd != null);
 
   return (
     <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5">
@@ -94,20 +98,31 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
             </p>
           )}
         </div>
-        <div className="flex gap-1">
-          {(["day", "week", "month"] as Granularity[]).map((g) => (
-            <button
-              key={g}
-              onClick={() => setGranularity(g)}
-              className={`px-2 py-0.5 text-xs rounded font-medium ${
-                granularity === g
-                  ? "bg-indigo-600 text-white"
-                  : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
-              }`}
-            >
-              {g === "day" ? "Daily" : g === "week" ? "Weekly" : "Monthly"}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showCloud}
+              onChange={(e) => setShowCloud(e.target.checked)}
+              className="rounded border-neutral-600 bg-neutral-800 text-green-500 focus:ring-green-500 h-3 w-3"
+            />
+            <span className="text-xs text-neutral-400">Cloud comparison</span>
+          </label>
+          <div className="flex gap-1">
+            {(["day", "week", "month"] as Granularity[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => setGranularity(g)}
+                className={`px-2 py-0.5 text-xs rounded font-medium ${
+                  granularity === g
+                    ? "bg-indigo-600 text-white"
+                    : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
+                }`}
+              >
+                {g === "day" ? "Daily" : g === "week" ? "Weekly" : "Monthly"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -120,6 +135,10 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
               <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
                 <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="cloudGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#737373" stopOpacity={0.15} />
+                <stop offset="95%" stopColor="#737373" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
@@ -148,8 +167,21 @@ export default function CostTrendChart({ clusterParam, from, to }: CostTrendChar
                 fontSize: "12px",
               }}
               labelStyle={{ color: "#a3a3a3" }}
-              formatter={(v: number) => [`$${v.toFixed(2)}`, "Cost"]}
+              formatter={(v: number, name: string) => [
+                `$${v.toFixed(2)}`,
+                name === "cloud_equivalent_usd" ? "Cloud Equivalent" : "Your Cost",
+              ]}
             />
+            {showCloud && hasCloudData && (
+              <Area
+                type="monotone"
+                dataKey="cloud_equivalent_usd"
+                stroke="#737373"
+                strokeWidth={1.5}
+                strokeDasharray="5 3"
+                fill="url(#cloudGradient)"
+              />
+            )}
             <Area
               type="monotone"
               dataKey="cost_usd"

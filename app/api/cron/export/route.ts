@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { decrypt } from "@/lib/crypto";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
 
@@ -218,9 +220,8 @@ async function uploadToGcs(
 }
 
 export async function GET(req: NextRequest) {
-  const auth = req.headers.get("authorization") ?? "";
-  const secret = process.env.CRON_SECRET;
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -239,7 +240,20 @@ export async function GET(req: NextRequest) {
   let exported = 0;
   const errors: string[] = [];
 
-  for (const config of configs as ExportConfig[]) {
+  for (const rawConfig of configs as ExportConfig[]) {
+    // Decrypt credentials
+    const config = { ...rawConfig };
+    try {
+      if (config.access_key_id) config.access_key_id = await decrypt(config.access_key_id);
+      if (config.secret_key) config.secret_key = await decrypt(config.secret_key);
+      if (config.gcs_credentials && typeof config.gcs_credentials === "string") {
+        config.gcs_credentials = JSON.parse(await decrypt(config.gcs_credentials as unknown as string));
+      }
+    } catch {
+      errors.push(`Config ${config.id}: failed to decrypt credentials`);
+      continue;
+    }
+
     // Determine export window based on schedule
     const now = new Date();
     let fromDate: Date;

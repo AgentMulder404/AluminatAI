@@ -70,9 +70,15 @@ export async function GET(req: NextRequest) {
 
   const supabase = createSupabaseServerClient();
 
+  const includeCloud = params.get("include_cloud") === "true";
+
   let query = supabase
     .from("gpu_metrics")
-    .select("time, energy_delta_j, gpu_fraction, carbon_g_per_kwh")
+    .select(
+      includeCloud
+        ? "time, energy_delta_j, gpu_fraction, carbon_g_per_kwh, gpu_name"
+        : "time, energy_delta_j, gpu_fraction, carbon_g_per_kwh"
+    )
     .eq("user_id", user.id)
     .gte("time", from.toISOString())
     .lte("time", to.toISOString())
@@ -93,20 +99,47 @@ export async function GET(req: NextRequest) {
 
   const kwhRate = await getUserKwhRate(user.id);
 
+  // Load reference pricing if cloud comparison requested
+  let refMap = new Map<string, number>(); // gpu_model → highest on-demand rate
+  if (includeCloud) {
+    const { data: refs } = await supabase
+      .from("gpu_reference_pricing")
+      .select("gpu_model, rate_usd_per_gpu_hour");
+    for (const r of refs ?? []) {
+      const model = r.gpu_model as string;
+      const rate = r.rate_usd_per_gpu_hour as number;
+      if (!refMap.has(model) || rate > refMap.get(model)!) {
+        refMap.set(model, rate);
+      }
+    }
+  }
+
+  function findRefRate(gpuName: string | null): number | null {
+    if (!gpuName) return null;
+    const direct = refMap.get(gpuName);
+    if (direct) return direct;
+    for (const [model, rate] of refMap) {
+      if (gpuName.includes(model) || model.includes(gpuName.replace("NVIDIA ", ""))) {
+        return rate;
+      }
+    }
+    return null;
+  }
+
   // Bucket metrics by period
   const buckets = new Map<
     string,
-    { totalJ: number; totalCo2eG: number | null }
+    { totalJ: number; totalCo2eG: number | null; cloudSamples: number; cloudRate: number | null }
   >();
 
   for (const row of data ?? []) {
-    const key = bucketKey(row.time, granularity);
+    const key = bucketKey(row.time as string, granularity);
     const frac = (row.gpu_fraction ?? 1) as number;
     const energyJ = ((row.energy_delta_j ?? 0) as number) * frac;
 
     let bucket = buckets.get(key);
     if (!bucket) {
-      bucket = { totalJ: 0, totalCo2eG: null };
+      bucket = { totalJ: 0, totalCo2eG: null, cloudSamples: 0, cloudRate: null };
       buckets.set(key, bucket);
     }
     bucket.totalJ += energyJ;
@@ -115,16 +148,32 @@ export async function GET(req: NextRequest) {
       const co2g = (energyJ / 3_600_000) * (row.carbon_g_per_kwh as number);
       bucket.totalCo2eG = (bucket.totalCo2eG ?? 0) + co2g;
     }
+
+    if (includeCloud) {
+      const rate = findRefRate((row as Record<string, unknown>).gpu_name as string | null);
+      if (rate) {
+        bucket.cloudRate = rate;
+        bucket.cloudSamples++;
+      }
+    }
   }
 
   const points = [...buckets.entries()].map(([period, b]) => {
     const kwh = b.totalJ / 3_600_000;
-    return {
+    const point: Record<string, unknown> = {
       period,
       cost_usd: Math.round(kwh * kwhRate * 100) / 100,
       kwh: Math.round(kwh * 1000) / 1000,
       co2e_g: b.totalCo2eG != null ? Math.round(b.totalCo2eG * 100) / 100 : null,
     };
+
+    if (includeCloud && b.cloudRate) {
+      // Estimate GPU-hours from sample count (5s interval)
+      const gpuHours = (b.cloudSamples * 5) / 3600;
+      point.cloud_equivalent_usd = Math.round(b.cloudRate * gpuHours * 100) / 100;
+    }
+
+    return point;
   });
 
   // Monthly projection: extrapolate current month's spend
