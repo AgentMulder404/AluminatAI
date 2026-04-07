@@ -33,6 +33,15 @@ from .profiler import (
     PowerSample,
     IterationResult,
 )
+from .stats import compute_ci, t_critical_95, trapezoidal_energy
+from .power_control import set_power_limit, get_power_limit, get_default_power_limit
+from .carbon import (
+    ElectricityMapsClient,
+    CarbonIntensity,
+    CarbonForecast,
+    ForecastWindow,
+    CO2Estimate,
+)
 
 __all__ = [
     'ArchSpec',
@@ -47,4 +56,15 @@ __all__ = [
     'ConfidenceInterval',
     'PowerSample',
     'IterationResult',
+    'compute_ci',
+    't_critical_95',
+    'trapezoidal_energy',
+    'set_power_limit',
+    'get_power_limit',
+    'get_default_power_limit',
+    'ElectricityMapsClient',
+    'CarbonIntensity',
+    'CarbonForecast',
+    'ForecastWindow',
+    'CO2Estimate',
 ]

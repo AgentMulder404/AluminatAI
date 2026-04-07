@@ -44,7 +44,7 @@ def main() -> None:
     # the full agent stack.  Unknown args are forwarded to the sub-handler.
     _pre = argparse.ArgumentParser(add_help=False)
     _pre.add_argument("subcommand", nargs="?", default="run",
-                      choices=["run", "benchmark"])
+                      choices=["run", "benchmark", "optimize", "ab"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
     _known, _rest = _pre.parse_known_args()
@@ -55,6 +55,14 @@ def main() -> None:
     if _known.subcommand == "benchmark":
         from benchmark import make_parser, run_benchmark  # noqa: PLC0415
         sys.exit(run_benchmark(make_parser().parse_args(_rest)))
+
+    if _known.subcommand == "optimize":
+        from optimize import make_parser as opt_parser, run_optimize  # noqa: PLC0415
+        sys.exit(run_optimize(opt_parser().parse_args(_rest)))
+
+    if _known.subcommand == "ab":
+        from ab import make_parser as ab_parser, run_ab  # noqa: PLC0415
+        sys.exit(run_ab(ab_parser().parse_args(_rest)))
 
     # Default: delegate to agent.main() — it owns the full argparse + run loop.
     from agent import main as _main  # noqa: PLC0415
