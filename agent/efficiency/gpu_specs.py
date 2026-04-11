@@ -148,6 +148,7 @@ GPU_ARCHITECTURES: dict[str, ArchSpec] = {
         ArchSpec('H100-PCIe-80GB',  'Hopper',        350,  756,  51.0,  756,  80, 2039, True),
         ArchSpec('H200-SXM-141GB',  'Hopper',        700,  989,  67.0,  989, 141, 4800, True),
         # Ada Lovelace
+        ArchSpec('RTX 4090',        'Ada Lovelace',  450,  165.2, 82.6, 165.2, 24, 1008, False),
         ArchSpec('L40S',            'Ada Lovelace',  350,  362,  91.6,  362,  48,  864, False),
         ArchSpec('L40',             'Ada Lovelace',  300,  181,  90.5,  181,  48,  864, False),
         # Lower-tier
