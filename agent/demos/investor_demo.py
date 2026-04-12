@@ -260,15 +260,15 @@ def demo_4_carbon(gpu: int, duration: int, iterations: int, warmup: int) -> dict
 
     baseline_cmd = (
         f"{sys.executable} {_WORKLOADS_DIR / 'resnet_workload.py'} "
-        f"--duration {duration} --dtype fp32 --batch-size 32 --gpu {gpu}"
+        f"--duration {duration} --dtype fp32 --batch-size 128 --gpu {gpu}"
     )
     optimized_cmd = (
         f"{sys.executable} {_WORKLOADS_DIR / 'resnet_workload.py'} "
-        f"--duration {duration} --dtype bf16 --batch-size 256 --gpu {gpu}"
+        f"--duration {duration} --dtype bf16 --batch-size 128 --gpu {gpu}"
     )
 
-    print("  Inefficient:  FP32, batch=32")
-    print("  Optimized:    BF16, batch=256")
+    print("  Inefficient:  FP32, batch=128")
+    print("  Optimized:    BF16, batch=128")
     print()
 
     runner = _get_runner(gpu)
