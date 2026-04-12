@@ -205,7 +205,7 @@ def demo_3_idle_waste(gpu: int, sample_duration: int = 15) -> dict | None:
 
     print(f"  Sampling GPU for {sample_duration}s...")
     try:
-        samples = collect_samples(gpu, sample_duration)
+        gpu_name, samples = collect_samples(gpu, sample_duration)
     except Exception as e:
         print(f"  WARNING: Could not collect samples: {e}")
         proc.kill()
@@ -222,15 +222,6 @@ def demo_3_idle_waste(gpu: int, sample_duration: int = 15) -> dict | None:
 
     # Analyze
     from efficiency.gpu_specs import resolve_arch
-    try:
-        import pynvml
-        pynvml.nvmlInit()
-        handle = pynvml.nvmlDeviceGetHandleByIndex(gpu)
-        name = pynvml.nvmlDeviceGetName(handle)
-        gpu_name = name.decode() if isinstance(name, bytes) else name
-    except Exception:
-        gpu_name = "Unknown GPU"
-
     arch = resolve_arch(gpu_name)
     analyzer = WorkloadAnalyzer(arch_spec=arch)
     result = analyzer.analyze(samples, gpu_name, gpu, float(sample_duration))
