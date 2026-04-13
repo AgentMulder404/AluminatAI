@@ -27,12 +27,15 @@ except ImportError:
     pynvml = None  # type: ignore[assignment]
 
 
-def set_power_limit(gpu_index: int, watts: int) -> bool:
+def set_power_limit(gpu_index: int, watts: int, quiet: bool = False) -> bool:
     """
     Set GPU power limit via NVML.
 
     Falls back to nvidia-smi if NVML persistence mode isn't enabled.
     Requires root/sudo on bare metal.
+
+    Args:
+        quiet: If True, suppress all print output (for pre-flight checks).
     """
     if pynvml is not None:
         try:
@@ -40,7 +43,8 @@ def set_power_limit(gpu_index: int, watts: int) -> bool:
             handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)
             pynvml.nvmlDeviceSetPowerManagementLimit(handle, watts * 1000)  # mW
             actual = pynvml.nvmlDeviceGetPowerManagementLimit(handle) / 1000.0
-            print(f"  Power limit set to {actual:.0f}W via NVML")
+            if not quiet:
+                print(f"  Power limit set to {actual:.0f}W via NVML")
             return True
         except pynvml.NVMLError:
             pass
@@ -52,13 +56,16 @@ def set_power_limit(gpu_index: int, watts: int) -> bool:
             capture_output=True, text=True, timeout=10,
         )
         if result.returncode == 0:
-            print(f"  Power limit set to {watts}W via nvidia-smi")
+            if not quiet:
+                print(f"  Power limit set to {watts}W via nvidia-smi")
             return True
         else:
-            print(f"  WARNING: nvidia-smi -pl failed: {result.stderr.strip()}")
+            if not quiet:
+                print(f"  WARNING: nvidia-smi -pl failed: {result.stderr.strip()}")
             return False
     except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        print(f"  WARNING: Could not set power limit: {e}")
+        if not quiet:
+            print(f"  WARNING: Could not set power limit: {e}")
         return False
 
 

@@ -27,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -65,8 +66,26 @@ def _get_carbon_client():
 
 
 def _get_power_control():
-    from efficiency.power_control import get_default_power_limit
-    return get_default_power_limit
+    from efficiency.power_control import get_default_power_limit, set_power_limit
+    return get_default_power_limit, set_power_limit
+
+
+# ── Cloud cost lookup ────────────────────────────────────────────────────────
+
+# Approximate spot/on-demand rates ($/hr) for common cloud GPUs
+CLOUD_RATES_PER_HOUR: dict[str, float] = {
+    "H100": 3.99, "H200": 5.49, "A100": 1.89,
+    "RTX 4090": 0.59, "RTX 3090": 0.44, "L40S": 1.14,
+    "L40": 0.89, "A10G": 0.50, "T4": 0.20, "V100": 0.80,
+}
+
+
+def _lookup_cloud_rate(gpu_name: str) -> float | None:
+    """Match GPU name to cloud hourly rate via substring."""
+    for key, rate in CLOUD_RATES_PER_HOUR.items():
+        if key in gpu_name:
+            return rate
+    return None
 
 
 # ── Console helpers ──────────────────────────────────────────────────────────
@@ -109,11 +128,28 @@ def demo_1_powercap(gpu: int, duration: int, iterations: int, warmup: int) -> di
     """'Free Money' power cap test — same workload, lower TDP."""
     _banner(1, 5, '"Free Money" Power Cap A/B')
 
-    get_default = _get_power_control()
+    get_default, set_limit = _get_power_control()
     try:
         default_w = get_default(gpu)
     except Exception:
         default_w = 450  # RTX 4090 fallback
+
+    # Pre-flight: check if power capping is available
+    can_cap = set_limit(gpu, default_w, quiet=True)
+    if not can_cap:
+        if _rich:
+            Console().print(Panel(
+                "[bold yellow]Power capping not available on this platform[/bold yellow]\n"
+                "Cloud containers typically block GPU power limit changes.\n"
+                "This demo requires bare-metal or on-prem GPU access.\n"
+                "Skipping Demo 1.",
+                border_style="yellow",
+            ))
+        else:
+            print("  Power capping not available on this platform (cloud container).")
+            print("  Skipping Demo 1.")
+        return None
+
     capped_w = int(default_w * 0.70)
 
     print(f"  Default TDP: {default_w}W")
@@ -230,23 +266,44 @@ def demo_3_idle_waste(gpu: int, sample_duration: int = 15) -> dict | None:
     avg_power = result.avg_power_w
     idle_fraction = result.idle_fraction
     monthly_waste_kwh = (avg_power / 1000.0) * 720  # kWh per month
-    monthly_waste_usd = monthly_waste_kwh * 0.12
+    electricity_waste_usd = monthly_waste_kwh * 0.12
+
+    # Cloud instance cost (the real number)
+    cloud_rate = _lookup_cloud_rate(gpu_name)
+    cloud_monthly = cloud_rate * 720 if cloud_rate else None
 
     from optimize import _print_rich as opt_rich, _print_plain as opt_plain
     if _rich:
         opt_rich(result)
         console = Console()
         console.print()
-        console.print(Panel(
-            f"[bold red]This GPU is burning ${monthly_waste_usd:.2f}/month doing nothing[/bold red]\n"
+
+        waste_lines = []
+        if cloud_monthly:
+            waste_lines.append(
+                f"[bold red]This GPU is burning ${cloud_monthly:,.0f}/month in cloud costs doing nothing[/bold red]"
+            )
+            waste_lines.append(
+                f"Cloud instance: ${cloud_rate:.2f}/hr = [bold]${cloud_monthly:,.0f}/month[/bold] | "
+                f"Electricity: ${electricity_waste_usd:.2f}/month"
+            )
+        else:
+            waste_lines.append(
+                f"[bold red]This GPU is burning ${electricity_waste_usd:.2f}/month doing nothing[/bold red]"
+            )
+        waste_lines.append(
             f"Idle fraction: {idle_fraction*100:.0f}% | "
             f"Avg power: {avg_power:.0f}W | "
-            f"Monthly waste: {monthly_waste_kwh:.0f} kWh",
-            border_style="red",
-        ))
+            f"Monthly waste: {monthly_waste_kwh:.0f} kWh"
+        )
+        console.print(Panel("\n".join(waste_lines), border_style="red"))
     else:
         opt_plain(result)
-        print(f"\n  >>> This GPU is burning ${monthly_waste_usd:.2f}/month doing nothing")
+        if cloud_monthly:
+            print(f"\n  >>> This GPU is burning ${cloud_monthly:,.0f}/month in cloud costs doing nothing")
+            print(f"  Cloud: ${cloud_rate:.2f}/hr = ${cloud_monthly:,.0f}/mo | Electricity: ${electricity_waste_usd:.2f}/mo")
+        else:
+            print(f"\n  >>> This GPU is burning ${electricity_waste_usd:.2f}/month doing nothing")
         print(f"  Idle: {idle_fraction*100:.0f}% | Power: {avg_power:.0f}W | Waste: {monthly_waste_kwh:.0f} kWh/mo")
 
     return asdict(result)
@@ -369,8 +426,18 @@ def run_demo(args: argparse.Namespace) -> int:
             ab_results.append(r)
 
         if demo_choice in ("all", "5"):
+            # Load from file if provided
+            if hasattr(args, "result_file") and args.result_file:
+                try:
+                    with open(args.result_file) as f:
+                        ab_results = [json.load(f)]
+                except (FileNotFoundError, json.JSONDecodeError) as e:
+                    print(f"  ERROR: Could not load result file: {e}")
+                    return 1
+
             if not ab_results:
-                print("  Demo 5 requires results from Demos 1, 2, or 4. Run --demo all first.")
+                print("  Demo 5 requires results from Demos 1, 2, or 4.")
+                print("  Run --demo all first, or provide --result-file PATH.")
             else:
                 demo_5_scaling(ab_results)
 
@@ -402,4 +469,6 @@ def make_parser() -> argparse.ArgumentParser:
                    help="Quick mode: 30s, 1 iteration (default)")
     p.add_argument("--full", action="store_true", default=False,
                    help="Full mode: 120s, 3 iterations")
+    p.add_argument("--result-file", type=str, metavar="PATH",
+                   help="Path to ABResult JSON file (for Demo 5 standalone)")
     return p
