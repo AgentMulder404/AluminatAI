@@ -117,7 +117,7 @@ async function uploadToS3(
   ): Promise<ArrayBuffer> {
     const k = await crypto.subtle.importKey(
       "raw",
-      key instanceof ArrayBuffer ? key : new Uint8Array(key) as ArrayBufferView,
+      key as BufferSource,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"]
