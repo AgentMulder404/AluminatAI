@@ -23,14 +23,14 @@ async function authenticate() {
 // GET — list team members
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { teamId: string } }
+  { params }: { params: Promise<{ teamId: string }> }
 ) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { teamId } = params;
+  const { teamId } = await params;
   const { allowed } = await requireRole(user.id, teamId, "viewer");
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -54,14 +54,14 @@ export async function GET(
 // POST — invite a member by email
 export async function POST(
   req: NextRequest,
-  { params }: { params: { teamId: string } }
+  { params }: { params: Promise<{ teamId: string }> }
 ) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { teamId } = params;
+  const { teamId } = await params;
   const { allowed } = await requireRole(user.id, teamId, "admin");
   if (!allowed) {
     return NextResponse.json(
@@ -169,14 +169,14 @@ export async function POST(
 // DELETE — remove a member
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { teamId: string } }
+  { params }: { params: Promise<{ teamId: string }> }
 ) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { teamId } = params;
+  const { teamId } = await params;
   const { allowed } = await requireRole(user.id, teamId, "admin");
   if (!allowed) {
     return NextResponse.json(

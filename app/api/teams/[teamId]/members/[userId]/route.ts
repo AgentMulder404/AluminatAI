@@ -21,14 +21,14 @@ async function authenticate() {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { teamId: string; userId: string } }
+  { params }: { params: Promise<{ teamId: string; userId: string }> }
 ) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { teamId, userId: targetUserId } = params;
+  const { teamId, userId: targetUserId } = await params;
 
   // Only admins+ can change roles
   const { allowed, role: callerRole } = await requireRole(user.id, teamId, "admin");

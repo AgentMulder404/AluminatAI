@@ -11,7 +11,7 @@ export const runtime = "edge";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   const cookieClient = await createSupabaseCookieClient();
   const {
@@ -23,7 +23,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { jobId } = params;
+  const { jobId } = await params;
 
   if (!jobId) {
     return NextResponse.json({ error: "jobId is required" }, { status: 400 });
