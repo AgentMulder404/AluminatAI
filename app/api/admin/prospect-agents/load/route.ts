@@ -43,16 +43,43 @@ export async function POST(req: NextRequest) {
 
   const db = createSupabaseServerClient();
 
-  const rows = prospects.map((p) => ({
-    ...p,
-    source: "apify",
-    status: "new",
-    created_by: user.id,
-  }));
+  // Fetch existing domain+email pairs for dedup
+  const domains = [...new Set(prospects.map((p) => p.domain).filter(Boolean))] as string[];
+  const existingPairs = new Set<string>();
+
+  if (domains.length > 0) {
+    const { data: existing } = await db
+      .from("prospects")
+      .select("domain, contact_email")
+      .in("domain", domains);
+    for (const row of existing ?? []) {
+      if (row.domain && row.contact_email) {
+        existingPairs.add(`${row.domain}::${row.contact_email}`);
+      }
+    }
+  }
+
+  const newRows = prospects
+    .filter((p) => {
+      if (p.domain && p.contact_email) {
+        return !existingPairs.has(`${p.domain}::${p.contact_email}`);
+      }
+      return true;
+    })
+    .map((p) => ({
+      ...p,
+      source: "apify",
+      status: "new",
+      created_by: user.id,
+    }));
+
+  if (newRows.length === 0) {
+    return NextResponse.json({ inserted: 0, total: prospects.length, skipped: prospects.length });
+  }
 
   const { data, error: dbError } = await db
     .from("prospects")
-    .upsert(rows, { onConflict: "domain,contact_email", ignoreDuplicates: true })
+    .insert(newRows)
     .select("id");
 
   if (dbError) {
@@ -60,7 +87,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: dbError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ inserted: data?.length ?? 0, total: prospects.length });
+  return NextResponse.json({
+    inserted: data?.length ?? 0,
+    total: prospects.length,
+    skipped: prospects.length - (data?.length ?? 0),
+  });
 }
 
 export async function GET(req: NextRequest) {
