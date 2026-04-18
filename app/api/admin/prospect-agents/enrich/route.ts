@@ -39,62 +39,74 @@ function extractDomain(url: string | undefined): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const cookieClient = await createSupabaseCookieClient();
-  const { data: { user }, error } = await cookieClient.auth.getUser();
-  if (error || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? ""))
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  try {
+    const cookieClient = await createSupabaseCookieClient();
+    const { data: { user }, error } = await cookieClient.auth.getUser();
+    if (error || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? ""))
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const body = await req.json();
-  const datasetIds: string[] = body.datasetIds ?? [];
-  const maxLeads: number = body.maxLeads ?? 3;
+    const body = await req.json();
+    const datasetIds: string[] = body.datasetIds ?? [];
+    const maxLeads: number = body.maxLeads ?? 3;
 
-  const companies: Array<LinkedInCompany & { domain: string | null }> = [];
-  const seenDomains = new Set<string>();
+    const companies: Array<LinkedInCompany & { domain: string | null }> = [];
+    const seenDomains = new Set<string>();
 
-  for (const dsId of datasetIds) {
-    try {
-      const items = await getDatasetItems<LinkedInCompany>(dsId, 50);
-      for (const item of items) {
+    // Fetch all datasets in parallel
+    const datasetResults = await Promise.allSettled(
+      datasetIds.map((dsId) => getDatasetItems<LinkedInCompany>(dsId, 50))
+    );
+    for (const result of datasetResults) {
+      if (result.status !== "fulfilled") continue;
+      for (const item of result.value) {
         const domain = extractDomain(item.website);
         if (!domain || seenDomains.has(domain)) continue;
         seenDomains.add(domain);
         companies.push({ ...item, domain });
       }
-    } catch (err) {
-      console.error(`Failed to fetch dataset ${dsId}:`, err);
     }
-  }
 
-  const enrichRuns = [];
-  for (const company of companies) {
-    if (!company.domain) continue;
-    try {
-      const run = await startActorRun("snipercoder~decision-maker-email-finder", {
-        domain: company.domain,
-        decision_maker_category: "ceo_founder_owner",
-        max_leads_to_find: maxLeads,
-      });
-      enrichRuns.push({
-        ...run,
-        domain: company.domain,
-        companyName: company.name,
-        linkedinUrl: company.linkedinUrl,
-        website: company.website,
-        industry: company.industry,
-        employeeCount: company.employeeCount,
-        companyDescription: company.description?.slice(0, 500),
-        location: company.locations?.[0]?.country || company.location?.linkedinText,
-      });
-    } catch (err) {
-      console.error(`Enrich failed for ${company.domain}:`, err);
+    // Start enrichment runs in parallel (batches of 5 to avoid Apify rate limits)
+    const enrichRuns = [];
+    const domainsToEnrich = companies.filter((c) => c.domain);
+    for (let i = 0; i < domainsToEnrich.length; i += 5) {
+      const batch = domainsToEnrich.slice(i, i + 5);
+      const results = await Promise.allSettled(
+        batch.map((company) =>
+          startActorRun("snipercoder~decision-maker-email-finder", {
+            domain: company.domain,
+            decision_maker_category: "ceo_founder_owner",
+            max_leads_to_find: maxLeads,
+          }).then((run) => ({
+            ...run,
+            domain: company.domain,
+            companyName: company.name,
+            linkedinUrl: company.linkedinUrl,
+            website: company.website,
+            industry: company.industry,
+            employeeCount: company.employeeCount,
+            companyDescription: company.description?.slice(0, 500),
+            location: company.locations?.[0]?.country || company.location?.linkedinText,
+          }))
+        )
+      );
+      for (const r of results) {
+        if (r.status === "fulfilled") enrichRuns.push(r.value);
+      }
     }
-  }
 
-  return NextResponse.json({
-    companiesFound: companies.length,
-    enrichRuns,
-  });
+    return NextResponse.json({
+      companiesFound: companies.length,
+      enrichRuns,
+    });
+  } catch (err) {
+    console.error("Enrich POST error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Enrichment failed", companiesFound: 0, enrichRuns: [] },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET(req: NextRequest) {

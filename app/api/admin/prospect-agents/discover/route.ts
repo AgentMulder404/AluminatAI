@@ -26,24 +26,31 @@ export async function POST(req: NextRequest) {
   const locations: string[] = body.locations ?? [];
   const maxItems: number = Math.min(body.maxItems ?? 20, 50);
 
-  const runs = [];
   const errors: string[] = [];
 
-  for (const keyword of keywords) {
-    const input: Record<string, unknown> = {
-      searchQuery: keyword,
-      scraperMode: "full",
-      maxItems,
-      companySize,
-    };
-    if (locations.length > 0) input.locations = locations;
+  // Start all discovery runs in parallel
+  const results = await Promise.allSettled(
+    keywords.map((keyword) => {
+      const input: Record<string, unknown> = {
+        searchQuery: keyword,
+        scraperMode: "full",
+        maxItems,
+        companySize,
+      };
+      if (locations.length > 0) input.locations = locations;
+      return startActorRun("harvestapi~linkedin-company-search", input).then((run) => ({
+        keyword,
+        ...run,
+      }));
+    })
+  );
 
-    try {
-      const run = await startActorRun("harvestapi~linkedin-company-search", input);
-      runs.push({ keyword, ...run });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      errors.push(`"${keyword}": ${msg}`);
+  const runs = [];
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      runs.push(r.value);
+    } else {
+      errors.push(r.reason?.message ?? "Unknown error");
     }
   }
 

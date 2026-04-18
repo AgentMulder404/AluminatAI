@@ -88,6 +88,12 @@ const COMPANY_SIZES = [
 
 type PipelineStep = "idle" | "discovering" | "enriching" | "verifying" | "loading" | "done";
 
+async function safeJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  if (!text || text.trim() === "") throw new Error("Empty response from server");
+  return JSON.parse(text);
+}
+
 /* ── Pipeline Tab Component ── */
 function PipelineTab() {
   const [step, setStep] = useState<PipelineStep>("idle");
@@ -159,10 +165,10 @@ function PipelineTab() {
               statusMap[run.runId] = "ERROR";
               continue;
             }
-            const data = await res.json();
-            statusMap[run.runId] = data.status;
+            const data = await safeJson(res);
+            statusMap[run.runId] = data.status as string;
             if (data.status === "SUCCEEDED") {
-              completedDatasets.push({ ...run, datasetId: data.datasetId });
+              completedDatasets.push({ ...run, datasetId: data.datasetId as string });
             }
           } catch {
             statusMap[run.runId] = "ERROR";
@@ -206,12 +212,13 @@ function PipelineTab() {
         try { msg = (await res.json()).error || msg; } catch { /* non-JSON response */ }
         throw new Error(msg);
       }
-      const data = await res.json();
-      setDiscoverRuns(data.runs);
-      addLog(`Started ${data.runs.length} discovery runs. Polling...`);
+      const data = await safeJson(res);
+      const runs = (data.runs ?? []) as RunInfo[];
+      setDiscoverRuns(runs);
+      addLog(`Started ${runs.length} discovery runs. Polling...`);
 
-      const completedDiscovery = await pollRuns(data.runs, setDiscoverStatus);
-      addLog(`Discovery complete. ${completedDiscovery.length}/${data.runs.length} succeeded.`);
+      const completedDiscovery = await pollRuns(runs, setDiscoverStatus);
+      addLog(`Discovery complete. ${completedDiscovery.length}/${runs.length} succeeded.`);
 
       if (completedDiscovery.length === 0) {
         setError("All discovery runs failed");
@@ -235,23 +242,24 @@ function PipelineTab() {
         try { msg = (await enrichRes.json()).error || msg; } catch { /* non-JSON */ }
         throw new Error(msg);
       }
-      const enrichData = await enrichRes.json();
-      setEnrichRuns(enrichData.enrichRuns);
-      addLog(`Found ${enrichData.companiesFound} companies. Started ${enrichData.enrichRuns.length} enrichment runs.`);
+      const enrichData = await safeJson(enrichRes);
+      const enrichRunsList = (enrichData.enrichRuns ?? []) as RunInfo[];
+      setEnrichRuns(enrichRunsList);
+      addLog(`Found ${enrichData.companiesFound ?? 0} companies. Started ${enrichRunsList.length} enrichment runs.`);
 
-      if (enrichData.enrichRuns.length === 0) {
+      if (enrichRunsList.length === 0) {
         addLog("No companies with valid domains found. Pipeline complete.");
         setStep("done");
         return;
       }
 
-      const completedEnrich = await pollRuns(enrichData.enrichRuns, setEnrichStatus);
+      const completedEnrich = await pollRuns(enrichRunsList, setEnrichStatus);
       addLog(`Enrichment complete. ${completedEnrich.length} succeeded.`);
 
       // Fetch contacts from each completed enrichment run
       const assembled: AssembledProspect[] = [];
       for (const run of completedEnrich) {
-        const meta = enrichData.enrichRuns.find((r: RunInfo) => r.runId === run.runId);
+        const meta = enrichRunsList.find((r: RunInfo) => r.runId === run.runId);
         if (!meta) continue;
 
         try {
@@ -259,7 +267,8 @@ function PipelineTab() {
             `/api/admin/prospect-agents/enrich?datasetId=${run.datasetId}`
           );
           if (!contactsRes.ok) continue;
-          const { contacts } = await contactsRes.json();
+          const contactsData = await safeJson(contactsRes);
+          const contacts = (contactsData.contacts ?? []) as Record<string, string>[];
 
           if (contacts && contacts.length > 0) {
             for (const c of contacts) {
@@ -319,7 +328,7 @@ function PipelineTab() {
           body: JSON.stringify({ emails: allEmails }),
         });
         if (verifyRes.ok) {
-          const vData = await verifyRes.json();
+          const vData = await safeJson(verifyRes) as unknown as RunInfo;
           setVerifyRun(vData);
           const verifyCompleted = await pollRuns([vData], (m) =>
             setVerifyStatus(Object.values(m)[0] || "RUNNING")
@@ -329,11 +338,12 @@ function PipelineTab() {
               `/api/admin/prospect-agents/enrich?datasetId=${verifyCompleted[0].datasetId}`
             );
             if (vResultsRes.ok) {
-              const { contacts: vResults } = await vResultsRes.json();
+              const vResultsData = await safeJson(vResultsRes);
+              const vResults = (vResultsData.contacts ?? []) as Array<{ Validation: string; Email: string }>;
               const verifiedSet = new Set(
-                (vResults || [])
-                  .filter((v: { Validation: string }) => v.Validation === "Valid")
-                  .map((v: { Email: string }) => v.Email)
+                vResults
+                  .filter((v) => v.Validation === "Valid")
+                  .map((v) => v.Email)
               );
               for (const p of assembled) {
                 if (p.contact_email) {
@@ -362,8 +372,8 @@ function PipelineTab() {
         try { msg = (await loadRes.json()).error || msg; } catch { /* non-JSON */ }
         throw new Error(msg);
       }
-      const loadData = await loadRes.json();
-      setLoadResult(loadData);
+      const loadData = await safeJson(loadRes);
+      setLoadResult({ inserted: loadData.inserted as number, total: loadData.total as number });
       addLog(`Loaded ${loadData.inserted} prospects into database.`);
       setStep("done");
     } catch (e) {
@@ -611,9 +621,9 @@ export default function OutreachPage() {
         try { msg = (await res.json()).error || msg; } catch { /* non-JSON */ }
         throw new Error(msg);
       }
-      const data = await res.json();
+      const data = await safeJson(res);
       setResults(
-        data.prospects.map((p: Omit<Prospect, "status" | "notes">) => ({
+        ((data.prospects ?? []) as Array<Omit<Prospect, "status" | "notes">>).map((p) => ({
           ...p,
           status: "new" as const,
           notes: "",
