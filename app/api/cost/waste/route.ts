@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const events = data ?? [];
+  const events = (data ?? []) as unknown as Record<string, unknown>[];
   const totalWaste = events.reduce(
     (sum, e) => sum + Number(e.estimated_waste_usd),
     0

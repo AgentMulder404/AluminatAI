@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
   }
 
   const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_MIN * 60 * 1000);
-  const agents = (data ?? []).map((row) => ({
+  const agents = ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
     ...row,
-    is_online: new Date(row.last_seen) > cutoff,
+    is_online: new Date(row.last_seen as string) > cutoff,
   }));
 
   return NextResponse.json(agents, {
