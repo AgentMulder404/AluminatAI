@@ -27,7 +27,5 @@ agent/logs/
 data/
 logs/
 
-# Node (root-level only — not used by agent)
+# Node
 node_modules/
-/package.json
-/package-lock.json
