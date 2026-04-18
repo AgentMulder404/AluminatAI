@@ -19,11 +19,14 @@ export async function startActorRun(
       body: JSON.stringify(input),
     }
   );
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new Error(`Apify start failed (${res.status}): ${text}`);
   }
-  const data = await res.json();
+  if (!text || text.trim() === "") {
+    throw new Error("Apify returned empty response when starting actor run");
+  }
+  const data = JSON.parse(text);
   return {
     runId: data.data.id,
     datasetId: data.data.defaultDatasetId,
@@ -37,8 +40,12 @@ export async function getRunStatus(
   const res = await fetch(
     `${APIFY_BASE}/actor-runs/${runId}?token=${token}`
   );
-  if (!res.ok) throw new Error(`Apify status failed (${res.status})`);
-  const data = await res.json();
+  const statusText = await res.text();
+  if (!res.ok) throw new Error(`Apify status failed (${res.status}): ${statusText}`);
+  if (!statusText || statusText.trim() === "") {
+    throw new Error("Apify returned empty response for run status");
+  }
+  const data = JSON.parse(statusText);
   return {
     status: data.data.status,
     datasetId: data.data.defaultDatasetId,
@@ -55,5 +62,7 @@ export async function getDatasetItems<T = unknown>(
     `${APIFY_BASE}/datasets/${datasetId}/items?token=${token}&limit=${limit}&offset=${offset}`
   );
   if (!res.ok) throw new Error(`Apify dataset failed (${res.status})`);
-  return res.json();
+  const text = await res.text();
+  if (!text || text.trim() === "") return [];
+  return JSON.parse(text);
 }

@@ -53,34 +53,42 @@ export async function POST(req: NextRequest) {
   const seenDomains = new Set<string>();
 
   for (const dsId of datasetIds) {
-    const items = await getDatasetItems<LinkedInCompany>(dsId, 50);
-    for (const item of items) {
-      const domain = extractDomain(item.website);
-      if (!domain || seenDomains.has(domain)) continue;
-      seenDomains.add(domain);
-      companies.push({ ...item, domain });
+    try {
+      const items = await getDatasetItems<LinkedInCompany>(dsId, 50);
+      for (const item of items) {
+        const domain = extractDomain(item.website);
+        if (!domain || seenDomains.has(domain)) continue;
+        seenDomains.add(domain);
+        companies.push({ ...item, domain });
+      }
+    } catch (err) {
+      console.error(`Failed to fetch dataset ${dsId}:`, err);
     }
   }
 
   const enrichRuns = [];
   for (const company of companies) {
     if (!company.domain) continue;
-    const run = await startActorRun("snipercoder~decision-maker-email-finder", {
-      domain: company.domain,
-      decision_maker_category: "ceo_founder_owner",
-      max_leads_to_find: maxLeads,
-    });
-    enrichRuns.push({
-      ...run,
-      domain: company.domain,
-      companyName: company.name,
-      linkedinUrl: company.linkedinUrl,
-      website: company.website,
-      industry: company.industry,
-      employeeCount: company.employeeCount,
-      companyDescription: company.description?.slice(0, 500),
-      location: company.locations?.[0]?.country || company.location?.linkedinText,
-    });
+    try {
+      const run = await startActorRun("snipercoder~decision-maker-email-finder", {
+        domain: company.domain,
+        decision_maker_category: "ceo_founder_owner",
+        max_leads_to_find: maxLeads,
+      });
+      enrichRuns.push({
+        ...run,
+        domain: company.domain,
+        companyName: company.name,
+        linkedinUrl: company.linkedinUrl,
+        website: company.website,
+        industry: company.industry,
+        employeeCount: company.employeeCount,
+        companyDescription: company.description?.slice(0, 500),
+        location: company.locations?.[0]?.country || company.location?.linkedinText,
+      });
+    } catch (err) {
+      console.error(`Enrich failed for ${company.domain}:`, err);
+    }
   }
 
   return NextResponse.json({
@@ -99,6 +107,13 @@ export async function GET(req: NextRequest) {
   const datasetId = req.nextUrl.searchParams.get("datasetId");
   if (!datasetId) return NextResponse.json({ error: "datasetId required" }, { status: 400 });
 
-  const contacts = await getDatasetItems<EnrichedContact>(datasetId, 50);
-  return NextResponse.json({ contacts });
+  try {
+    const contacts = await getDatasetItems<EnrichedContact>(datasetId, 50);
+    return NextResponse.json({ contacts });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to fetch contacts", contacts: [] },
+      { status: 502 }
+    );
+  }
 }

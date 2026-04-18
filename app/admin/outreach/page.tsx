@@ -155,6 +155,10 @@ function PipelineTab() {
           if (statusMap[run.runId] === "SUCCEEDED" || statusMap[run.runId] === "FAILED") continue;
           try {
             const res = await fetch(`/api/admin/prospect-agents/status?runId=${run.runId}`);
+            if (!res.ok) {
+              statusMap[run.runId] = "ERROR";
+              continue;
+            }
             const data = await res.json();
             statusMap[run.runId] = data.status;
             if (data.status === "SUCCEEDED") {
@@ -197,7 +201,11 @@ function PipelineTab() {
           maxItems,
         }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`);
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { msg = (await res.json()).error || msg; } catch { /* non-JSON response */ }
+        throw new Error(msg);
+      }
       const data = await res.json();
       setDiscoverRuns(data.runs);
       addLog(`Started ${data.runs.length} discovery runs. Polling...`);
@@ -222,7 +230,11 @@ function PipelineTab() {
           maxLeads: 3,
         }),
       });
-      if (!enrichRes.ok) throw new Error((await enrichRes.json()).error || "Enrichment failed");
+      if (!enrichRes.ok) {
+        let msg = "Enrichment failed";
+        try { msg = (await enrichRes.json()).error || msg; } catch { /* non-JSON */ }
+        throw new Error(msg);
+      }
       const enrichData = await enrichRes.json();
       setEnrichRuns(enrichData.enrichRuns);
       addLog(`Found ${enrichData.companiesFound} companies. Started ${enrichData.enrichRuns.length} enrichment runs.`);
@@ -345,7 +357,11 @@ function PipelineTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prospects: assembled }),
       });
-      if (!loadRes.ok) throw new Error((await loadRes.json()).error || "Load failed");
+      if (!loadRes.ok) {
+        let msg = "Load failed";
+        try { msg = (await loadRes.json()).error || msg; } catch { /* non-JSON */ }
+        throw new Error(msg);
+      }
       const loadData = await loadRes.json();
       setLoadResult(loadData);
       addLog(`Loaded ${loadData.inserted} prospects into database.`);
@@ -591,8 +607,9 @@ export default function OutreachPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || `HTTP ${res.status}`);
+        let msg = `HTTP ${res.status}`;
+        try { msg = (await res.json()).error || msg; } catch { /* non-JSON */ }
+        throw new Error(msg);
       }
       const data = await res.json();
       setResults(

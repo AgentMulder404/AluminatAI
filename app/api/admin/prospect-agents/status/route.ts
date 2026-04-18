@@ -17,6 +17,13 @@ export async function GET(req: NextRequest) {
   const runId = req.nextUrl.searchParams.get("runId");
   if (!runId) return NextResponse.json({ error: "runId required" }, { status: 400 });
 
-  const status = await getRunStatus(runId);
-  return NextResponse.json(status);
+  try {
+    const status = await getRunStatus(runId);
+    return NextResponse.json(status);
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Status check failed", status: "ERROR" },
+      { status: 502 }
+    );
+  }
 }

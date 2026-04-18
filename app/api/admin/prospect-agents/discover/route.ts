@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
   const maxItems: number = Math.min(body.maxItems ?? 20, 50);
 
   const runs = [];
+  const errors: string[] = [];
+
   for (const keyword of keywords) {
     const input: Record<string, unknown> = {
       searchQuery: keyword,
@@ -36,9 +38,21 @@ export async function POST(req: NextRequest) {
     };
     if (locations.length > 0) input.locations = locations;
 
-    const run = await startActorRun("harvestapi~linkedin-company-search", input);
-    runs.push({ keyword, ...run });
+    try {
+      const run = await startActorRun("harvestapi~linkedin-company-search", input);
+      runs.push({ keyword, ...run });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      errors.push(`"${keyword}": ${msg}`);
+    }
   }
 
-  return NextResponse.json({ runs, total: runs.length });
+  if (runs.length === 0) {
+    return NextResponse.json(
+      { error: `All discovery runs failed: ${errors.join("; ")}`, runs: [], total: 0 },
+      { status: 502 }
+    );
+  }
+
+  return NextResponse.json({ runs, total: runs.length, errors });
 }

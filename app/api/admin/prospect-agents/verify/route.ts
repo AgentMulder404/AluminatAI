@@ -20,9 +20,15 @@ export async function POST(req: NextRequest) {
   if (emails.length === 0)
     return NextResponse.json({ error: "No emails to verify" }, { status: 400 });
 
-  const run = await startActorRun("snipercoder~email-validator", {
-    emails,
-  });
-
-  return NextResponse.json({ ...run, emailCount: emails.length });
+  try {
+    const run = await startActorRun("snipercoder~email-validator", {
+      emails,
+    });
+    return NextResponse.json({ ...run, emailCount: emails.length });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Verification start failed" },
+      { status: 502 }
+    );
+  }
 }
