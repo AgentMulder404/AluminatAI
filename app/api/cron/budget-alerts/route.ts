@@ -21,7 +21,7 @@ interface Budget {
   period: "daily" | "weekly" | "monthly";
   limit_usd: number;
   warn_pct: number;
-  notify_channels: Array<{ type: string; target: string }>;
+  notify_channels: Array<{ type: "email" | "slack" | "pagerduty" | "opsgenie"; target: string }>;
 }
 
 export async function GET(req: NextRequest) {
