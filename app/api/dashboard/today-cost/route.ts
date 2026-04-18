@@ -55,16 +55,17 @@ export async function GET(req: NextRequest) {
   let totalCo2eG: number | null = null;
   let gridZone: string | null = null;
 
-  for (const r of data ?? []) {
-    const frac = r.gpu_fraction ?? 1;
-    const energyJ = (r.energy_delta_j ?? 0) * frac;
+  for (const rawR of data ?? []) {
+    const r = rawR as unknown as Record<string, unknown>;
+    const frac = (r.gpu_fraction as number) ?? 1;
+    const energyJ = ((r.energy_delta_j as number) ?? 0) * frac;
     totalJ += energyJ;
 
     if (r.carbon_g_per_kwh != null) {
-      const co2g = (energyJ / 3_600_000) * r.carbon_g_per_kwh;
+      const co2g = (energyJ / 3_600_000) * (r.carbon_g_per_kwh as number);
       totalCo2eG = (totalCo2eG ?? 0) + co2g;
     }
-    if (r.grid_zone && !gridZone) gridZone = r.grid_zone;
+    if (r.grid_zone && !gridZone) gridZone = r.grid_zone as string;
   }
 
   const totalKwh = totalJ / 3_600_000;

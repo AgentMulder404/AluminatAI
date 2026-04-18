@@ -81,8 +81,9 @@ async function handleCost(userId: string): Promise<string> {
   }
 
   let totalJ = 0;
-  for (const r of data) {
-    totalJ += ((r.energy_delta_j ?? 0) as number) * ((r.gpu_fraction ?? 1) as number);
+  for (const rawR of data) {
+    const r = rawR as unknown as Record<string, unknown>;
+    totalJ += ((r.energy_delta_j as number) ?? 0) * ((r.gpu_fraction as number) ?? 1);
   }
 
   const kwh = totalJ / 3_600_000;
@@ -115,17 +116,18 @@ async function handleWaste(userId: string): Promise<string> {
     return "No active waste events detected. Your GPUs are running efficiently.";
   }
 
-  const totalWaste = data.reduce(
+  const rows = data as unknown as Record<string, unknown>[];
+  const totalWaste = rows.reduce(
     (s, e) => s + Number(e.estimated_waste_usd),
     0
   );
 
-  let msg = `*${data.length} Active Waste Event${data.length > 1 ? "s" : ""}* — $${totalWaste.toFixed(2)} estimated waste\n\n`;
+  let msg = `*${rows.length} Active Waste Event${rows.length > 1 ? "s" : ""}* — $${totalWaste.toFixed(2)} estimated waste\n\n`;
 
-  for (const e of data) {
+  for (const e of rows) {
     const typeLabel =
       e.waste_type === "idle_gpu" ? "Idle" : "Low utilization";
-    msg += `• ${e.gpu_name}: ${typeLabel} (${e.avg_utilization_pct}% util, ${e.duration_hours}h) — $${Number(e.estimated_waste_usd).toFixed(2)}\n`;
+    msg += `• ${e.gpu_name}: ${typeLabel} (${e.avg_utilization_pct}% util, ${e.duration_hours}h) — $${Number(e.estimated_waste_usd as number).toFixed(2)}\n`;
   }
 
   return msg;
@@ -149,8 +151,9 @@ async function handleBudget(userId: string): Promise<string> {
     return "No active budgets configured. Set one up at aluminatai.com/dashboard/settings";
   }
 
-  let msg = `*${data.length} Active Budget${data.length > 1 ? "s" : ""}*\n\n`;
-  for (const b of data) {
+  const budgets = data as unknown as Record<string, unknown>[];
+  let msg = `*${budgets.length} Active Budget${budgets.length > 1 ? "s" : ""}*\n\n`;
+  for (const b of budgets) {
     msg += `• *${b.name}*: $${b.limit_usd}/${b.period} (${b.scope_type})\n`;
   }
 

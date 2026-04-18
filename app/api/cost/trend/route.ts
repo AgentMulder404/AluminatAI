@@ -132,10 +132,11 @@ export async function GET(req: NextRequest) {
     { totalJ: number; totalCo2eG: number | null; cloudSamples: number; cloudRate: number | null }
   >();
 
-  for (const row of data ?? []) {
+  for (const rawRow of data ?? []) {
+    const row = rawRow as unknown as Record<string, unknown>;
     const key = bucketKey(row.time as string, granularity);
-    const frac = (row.gpu_fraction ?? 1) as number;
-    const energyJ = ((row.energy_delta_j ?? 0) as number) * frac;
+    const frac = (row.gpu_fraction as number) ?? 1;
+    const energyJ = ((row.energy_delta_j as number) ?? 0) * frac;
 
     let bucket = buckets.get(key);
     if (!bucket) {
@@ -150,7 +151,7 @@ export async function GET(req: NextRequest) {
     }
 
     if (includeCloud) {
-      const rate = findRefRate((row as Record<string, unknown>).gpu_name as string | null);
+      const rate = findRefRate(row.gpu_name as string | null);
       if (rate) {
         bucket.cloudRate = rate;
         bucket.cloudSamples++;

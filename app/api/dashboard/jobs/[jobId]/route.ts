@@ -62,9 +62,11 @@ export async function GET(
   let peakUtil = 0;
   const gpuUuids = new Set<string>();
 
-  for (const row of data) {
-    const frac = (row.gpu_fraction ?? 1) as number;
-    const energyJ = ((row.energy_delta_j ?? 0) as number) * frac;
+  const rows = data as unknown as Record<string, unknown>[];
+
+  for (const row of rows) {
+    const frac = (row.gpu_fraction as number) ?? 1;
+    const energyJ = ((row.energy_delta_j as number) ?? 0) * frac;
     totalJ += energyJ;
 
     if ((row.power_draw_w as number) > maxPowerW) maxPowerW = row.power_draw_w as number;
@@ -77,8 +79,8 @@ export async function GET(
   }
 
   const totalKwh = totalJ / 3_600_000;
-  const firstRow = data[0];
-  const lastRow = data[data.length - 1];
+  const firstRow = rows[0];
+  const lastRow = rows[rows.length - 1];
   const costUsd = Math.round(totalKwh * kwhRate * 100) / 100;
 
   // Cloud cost comparison
@@ -91,7 +93,7 @@ export async function GET(
       .order("rate_usd_per_gpu_hour", { ascending: false });
 
     // Find matching reference price (highest on-demand = worst-case cloud cost)
-    const match = (refs ?? []).find(
+    const match = ((refs ?? []) as unknown as Record<string, unknown>[]).find(
       (r) =>
         gpuName.includes(r.gpu_model as string) ||
         (r.gpu_model as string).includes(gpuName.replace("NVIDIA ", ""))
@@ -134,9 +136,9 @@ export async function GET(
       total_co2e_g: Math.round(totalCo2eG * 100) / 100,
       max_power_w: Math.round(maxPowerW),
       peak_utilization_pct: Math.round(peakUtil),
-      sample_count: data.length,
+      sample_count: rows.length,
     },
     cloud_comparison: cloudComparison,
-    timeseries: data,
+    timeseries: rows,
   });
 }

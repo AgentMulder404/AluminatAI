@@ -54,8 +54,9 @@ async function buildJobRows(
 
   if (clusterTag) query = query.eq("cluster_tag", clusterTag);
 
-  const { data, error } = await query;
+  const { data: rawData, error } = await query;
   if (error) throw new Error(error.message);
+  const data = (rawData ?? []) as unknown as Record<string, unknown>[];
 
   // Group by (job_id, model_tag, gpu_name, grid_zone)
   type Key = string;
@@ -75,7 +76,7 @@ async function buildJobRows(
     }
   >();
 
-  for (const r of data ?? []) {
+  for (const r of data) {
     if (!r.job_id) continue;
     const frac = r.gpu_fraction ?? 1;
     const ej = (r.energy_delta_j ?? 0) * frac;
