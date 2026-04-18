@@ -5,7 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-client";
 export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
-  const cookieClient = createSupabaseCookieClient();
+  const cookieClient = await createSupabaseCookieClient();
   const {
     data: { user },
     error: authError,

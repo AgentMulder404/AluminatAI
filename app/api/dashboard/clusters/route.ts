@@ -7,7 +7,7 @@ export const runtime = "edge";
 const ONLINE_THRESHOLD_MIN = 10;
 
 export async function GET(_req: NextRequest) {
-  const cookieClient = createSupabaseCookieClient();
+  const cookieClient = await createSupabaseCookieClient();
   const {
     data: { user },
     error: authError,

@@ -9,7 +9,7 @@ const ONLINE_THRESHOLD_MIN = 10;
 
 export async function GET(req: NextRequest) {
   // Auth via dashboard session
-  const cookieClient = createSupabaseCookieClient();
+  const cookieClient = await createSupabaseCookieClient();
   const {
     data: { user },
     error: authError,
