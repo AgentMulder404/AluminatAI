@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
 
   const points = [...buckets.entries()].map(([period, b]) => {
     const kwh = b.totalJ / 3_600_000;
-    const point: Record<string, unknown> = {
+    const point: { period: string; cost_usd: number; kwh: number; co2e_g: number | null; cloud_equivalent_usd?: number } = {
       period,
       cost_usd: Math.round(kwh * kwhRate * 100) / 100,
       kwh: Math.round(kwh * 1000) / 1000,
@@ -169,7 +169,6 @@ export async function GET(req: NextRequest) {
     };
 
     if (includeCloud && b.cloudRate) {
-      // Estimate GPU-hours from sample count (5s interval)
       const gpuHours = (b.cloudSamples * 5) / 3600;
       point.cloud_equivalent_usd = Math.round(b.cloudRate * gpuHours * 100) / 100;
     }
