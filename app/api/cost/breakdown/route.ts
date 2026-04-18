@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
   let grandTotalJ = 0;
 
   for (const row of data ?? []) {
-    const key = (row as Record<string, unknown>)[col] as string | null;
+    const key = (row as unknown as Record<string, unknown>)[col] as string | null;
     const label = key || "unattributed";
     const frac = (row.gpu_fraction as number) ?? 1;
     const energyJ = ((row.energy_delta_j as number) ?? 0) * frac;
