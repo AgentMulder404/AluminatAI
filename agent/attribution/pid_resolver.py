@@ -190,11 +190,14 @@ class PidResolver:
             return None
 
         # Match "pod<uuid>" pattern (RFC 4122 UUID)
-        match = re.search(
-            r"pod([0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12})",
-            content,
-            re.IGNORECASE,
-        )
+        try:
+            match = re.search(
+                r"pod([0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12})",
+                content,
+                re.IGNORECASE,
+            )
+        except (TypeError, re.error):
+            return None
         if match:
             # Normalise underscores → hyphens (cgroup v2 sometimes uses underscores)
             return match.group(1).replace("_", "-")

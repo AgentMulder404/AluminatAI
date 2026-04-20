@@ -156,6 +156,7 @@ UPLOAD_BATCH_SIZE = int(os.getenv("UPLOAD_BATCH_SIZE", "100"))   # metrics per H
 # Exponential backoff
 UPLOAD_MAX_RETRIES = int(os.getenv("UPLOAD_MAX_RETRIES", "5"))
 UPLOAD_MAX_RETRY_DELAY = int(os.getenv("UPLOAD_MAX_RETRY_DELAY", "60"))  # seconds cap
+UPLOAD_TIMEOUT = int(os.getenv("UPLOAD_TIMEOUT", "30"))                 # HTTP request timeout
 
 # ── WAL (Write-Ahead Log) ─────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ ENABLE_LOCAL_BACKUP = True  # WAL is always active when DATA_DIR is writable
 # ── Sampling ──────────────────────────────────────────────────────────────────
 
 SAMPLE_INTERVAL = float(os.getenv("SAMPLE_INTERVAL", "5.0"))     # seconds between NVML reads
+NVML_TIMEOUT = float(os.getenv("NVML_TIMEOUT", "2.0"))          # per-GPU collection timeout
 
 # ── PID Temporal Smoothing ────────────────────────────────────────────────────
 
@@ -207,6 +209,17 @@ WARMUP_DISCARD_SECONDS = int(os.getenv("WARMUP_DISCARD_SECONDS", "45"))
 # ── Scheduler Integration ─────────────────────────────────────────────────────
 
 SCHEDULER_POLL_INTERVAL = int(os.getenv("SCHEDULER_POLL_INTERVAL", "30"))
+
+# ── Auto-Tuning ──────────────────────────────────────────────────────────────
+
+AUTO_TUNE_ENABLED = os.getenv("AUTO_TUNE_ENABLED", "").lower() in ("1", "true", "yes")
+AUTO_TUNE_INTERVAL = int(os.getenv("AUTO_TUNE_INTERVAL", "300"))     # seconds between analysis
+AUTO_TUNE_MIN_SAVINGS_PCT = float(os.getenv("AUTO_TUNE_MIN_SAVINGS_PCT", "10"))
+
+# ── Power Budget Enforcement ─────────────────────────────────────────────────
+
+POWER_BUDGET_ENABLED = os.getenv("POWER_BUDGET_ENABLED", "").lower() in ("1", "true", "yes")
+POWER_BUDGET_WATTS = int(os.getenv("POWER_BUDGET_WATTS", "0"))     # per-GPU cap, 0 = disabled
 
 # ── Cluster Identity ───────────────────────────────────────────────────────────
 
@@ -276,6 +289,61 @@ def _parse_trusted_uids() -> set:
 
 
 TRUSTED_UIDS: set[int] = _parse_trusted_uids()
+
+
+# ── Config Validation ────────────────────────────────────────────────────────
+
+def _clamp(name: str, value, lo, hi):
+    """Clamp a numeric value to [lo, hi], warn if adjusted."""
+    if value < lo or value > hi:
+        clamped = max(lo, min(hi, value))
+        logging.getLogger(__name__).warning(
+            "Config %s=%r out of range [%s, %s] — clamped to %s",
+            name, value, lo, hi, clamped,
+        )
+        return clamped
+    return value
+
+
+def _validate_config() -> None:
+    """Validate all config constants and clamp to safe ranges."""
+    global SAMPLE_INTERVAL, NVML_TIMEOUT, UPLOAD_BATCH_SIZE, UPLOAD_INTERVAL
+    global UPLOAD_MAX_RETRIES, UPLOAD_MAX_RETRY_DELAY, UPLOAD_TIMEOUT
+    global WAL_MAX_AGE_HOURS, WAL_MAX_MB
+    global METRICS_PORT, SCHEDULER_POLL_INTERVAL, TAG_POLL_INTERVAL
+    global HEARTBEAT_INTERVAL, PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD
+    global IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS
+
+    SAMPLE_INTERVAL       = _clamp("SAMPLE_INTERVAL",       SAMPLE_INTERVAL,       0.1, 300)
+    NVML_TIMEOUT          = _clamp("NVML_TIMEOUT",          NVML_TIMEOUT,          0.5, 30.0)
+    UPLOAD_BATCH_SIZE     = int(_clamp("UPLOAD_BATCH_SIZE",  UPLOAD_BATCH_SIZE,     1,   10000))
+    UPLOAD_INTERVAL       = int(_clamp("UPLOAD_INTERVAL",    UPLOAD_INTERVAL,       1,   3600))
+    UPLOAD_MAX_RETRIES    = int(_clamp("UPLOAD_MAX_RETRIES", UPLOAD_MAX_RETRIES,    0,   20))
+    UPLOAD_MAX_RETRY_DELAY = int(_clamp("UPLOAD_MAX_RETRY_DELAY", UPLOAD_MAX_RETRY_DELAY, 1, 600))
+    UPLOAD_TIMEOUT        = int(_clamp("UPLOAD_TIMEOUT",        UPLOAD_TIMEOUT,        5,   120))
+    WAL_MAX_AGE_HOURS     = int(_clamp("WAL_MAX_AGE_HOURS",  WAL_MAX_AGE_HOURS,    1,   720))
+    WAL_MAX_MB            = int(_clamp("WAL_MAX_MB",          WAL_MAX_MB,           1,   10240))
+    METRICS_PORT          = int(_clamp("METRICS_PORT",        METRICS_PORT,         0,   65535))
+    SCHEDULER_POLL_INTERVAL = int(_clamp("SCHEDULER_POLL_INTERVAL", SCHEDULER_POLL_INTERVAL, 5, 600))
+    TAG_POLL_INTERVAL     = int(_clamp("TAG_POLL_INTERVAL",   TAG_POLL_INTERVAL,    5,   600))
+    HEARTBEAT_INTERVAL    = int(_clamp("HEARTBEAT_INTERVAL",  HEARTBEAT_INTERVAL,   30,  3600))
+    PID_SMOOTH_WINDOW     = _clamp("PID_SMOOTH_WINDOW",       PID_SMOOTH_WINDOW,    1.0, 300.0)
+    PID_STABLE_THRESHOLD  = _clamp("PID_STABLE_THRESHOLD",    PID_STABLE_THRESHOLD, 0.0, 1.0)
+    IDLE_BASELINE_WINDOW  = int(_clamp("IDLE_BASELINE_WINDOW", IDLE_BASELINE_WINDOW, 0, 300))
+    WARMUP_DISCARD_SECONDS = int(_clamp("WARMUP_DISCARD_SECONDS", WARMUP_DISCARD_SECONDS, 0, 600))
+
+    if WARMUP_DISCARD_SECONDS > 0 and IDLE_BASELINE_WINDOW > 0:
+        if WARMUP_DISCARD_SECONDS <= IDLE_BASELINE_WINDOW:
+            logging.getLogger(__name__).warning(
+                "WARMUP_DISCARD_SECONDS (%d) should be > IDLE_BASELINE_WINDOW (%d) "
+                "— adjusting warmup to %d",
+                WARMUP_DISCARD_SECONDS, IDLE_BASELINE_WINDOW,
+                IDLE_BASELINE_WINDOW + 15,
+            )
+            WARMUP_DISCARD_SECONDS = IDLE_BASELINE_WINDOW + 15
+
+
+_validate_config()
 
 # ── Ensure directories exist ──────────────────────────────────────────────────
 

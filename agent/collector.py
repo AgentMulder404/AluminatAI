@@ -124,10 +124,14 @@ class GPUCollector:
         self.gpu_count = 0
         self.gpu_handles = []
         self.gpu_info = []
+        self.gpu_uuids: list[str] = []
 
         # Track last sample for energy calculation
         self.last_sample_time = {}
         self.last_power_draw = {}
+
+        # Per-GPU consecutive timeout counter
+        self._timeout_count: dict[int, int] = {}
 
         self._initialize()
 
@@ -158,6 +162,7 @@ class GPUCollector:
                     'name': gpu_name
                 })
 
+            self.gpu_uuids = [g['uuid'] for g in self.gpu_info]
             self.initialized = True
 
         except pynvml.NVMLError as e:
@@ -177,16 +182,30 @@ class GPUCollector:
         timestamp = datetime.now(timezone.utc).isoformat()
         current_time = time.time()
 
+        try:
+            from config import NVML_TIMEOUT
+            _timeout = NVML_TIMEOUT
+        except (ImportError, AttributeError):
+            _timeout = 2.0
+
         for i, handle in enumerate(self.gpu_handles):
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(
                         self._collect_single_gpu, handle, i, timestamp, current_time
                     )
-                    gpu_metrics = future.result(timeout=2.0)
+                    gpu_metrics = future.result(timeout=_timeout)
                 metrics.append(gpu_metrics)
+                self._timeout_count[i] = 0
             except concurrent.futures.TimeoutError:
-                logger.warning("GPU %d collection timed out after 2s — skipping", i)
+                self._timeout_count[i] = self._timeout_count.get(i, 0) + 1
+                consec = self._timeout_count[i]
+                if consec >= 5:
+                    logger.error(
+                        "GPU %d timed out %d consecutive times — NVML may be hung", i, consec,
+                    )
+                else:
+                    logger.warning("GPU %d collection timed out after %.1fs — skipping", i, _timeout)
                 continue
             except pynvml.NVMLError as e:
                 logger.warning("Failed to collect metrics for GPU %d: %s", i, e)

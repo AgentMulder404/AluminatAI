@@ -141,12 +141,20 @@ class TagClient:
     # ── Internal polling ───────────────────────────────────────────────────────
 
     def _poll_loop(self) -> None:
+        _consecutive_failures = 0
+        _current_interval = self._poll_interval
         while not self._stop_event.is_set():
             try:
                 self._fetch()
+                _consecutive_failures = 0
+                _current_interval = self._poll_interval
             except Exception as exc:
-                logger.warning("TagClient poll error: %s", exc)
-            self._stop_event.wait(self._poll_interval)
+                _consecutive_failures += 1
+                logger.warning("TagClient poll error (%d consecutive): %s",
+                               _consecutive_failures, exc)
+                if _consecutive_failures >= 3:
+                    _current_interval = min(_current_interval * 2, 300)
+            self._stop_event.wait(_current_interval)
 
     def _fetch(self) -> None:
         # Ask for tags from the last 25 hours (slightly more than a day to catch

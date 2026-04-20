@@ -599,6 +599,37 @@ class Agent:
             manifest = ManifestWriter(Path(self.output_csv))
             manifest.open()
 
+        # Auto-tuner (opt-in)
+        _auto_tuner = None
+        try:
+            from config import AUTO_TUNE_ENABLED, AUTO_TUNE_INTERVAL, AUTO_TUNE_MIN_SAVINGS_PCT
+            if AUTO_TUNE_ENABLED:
+                from efficiency.auto_tuner import AutoTuner
+                _auto_tuner = AutoTuner(
+                    interval_s=AUTO_TUNE_INTERVAL,
+                    min_savings_pct=AUTO_TUNE_MIN_SAVINGS_PCT,
+                    dry_run=self.dry_run,
+                )
+                log.info("AutoTuner enabled (interval=%ds, min_savings=%.0f%%)",
+                         AUTO_TUNE_INTERVAL, AUTO_TUNE_MIN_SAVINGS_PCT)
+        except (ImportError, AttributeError):
+            pass
+
+        # Carbon tracking (if grid zone is configured)
+        _carbon_client = None
+        _last_carbon_fetch: float = 0.0
+        _carbon_intensity: float = 0.0
+        _carbon_renewable: float = 0.0
+        _carbon_zone: str = ""
+        if GRID_ZONE:
+            try:
+                from efficiency.carbon import ElectricityMapsClient
+                _carbon_client = ElectricityMapsClient(zone=GRID_ZONE)
+                _carbon_zone = GRID_ZONE
+                log.info("Carbon tracking enabled for zone: %s", GRID_ZONE)
+            except ImportError:
+                log.debug("Carbon tracking unavailable — efficiency.carbon module not found")
+
         if not self.quiet:
             self._print_banner(gpu_count, scheduler_name)
 
@@ -646,15 +677,32 @@ class Agent:
 
                 # Scheduler poll — runs in a thread with 10s timeout to prevent
                 # a hung scheduler adapter from blocking the entire collection loop.
-                if self.scheduler and (now - self.last_scheduler_poll >= SCHEDULER_POLL_INTERVAL):
+                _sched_interval = getattr(self, '_sched_backoff_interval', SCHEDULER_POLL_INTERVAL)
+                if self.scheduler and (now - self.last_scheduler_poll >= _sched_interval):
                     try:
                         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                             future = pool.submit(self.scheduler.discover_jobs)
                             future.result(timeout=10)
+                        self._sched_fail_count = 0
+                        self._sched_backoff_interval = SCHEDULER_POLL_INTERVAL
                     except concurrent.futures.TimeoutError:
-                        log.warning("Scheduler poll timed out after 10s — skipping this cycle")
+                        self._sched_fail_count = getattr(self, '_sched_fail_count', 0) + 1
+                        if self._sched_fail_count >= 5:
+                            log.warning("Scheduler poll failed %d times — cached job data may be stale",
+                                        self._sched_fail_count)
+                        else:
+                            log.warning("Scheduler poll timed out after 10s — skipping this cycle")
+                        if self._sched_fail_count >= 3:
+                            self._sched_backoff_interval = min(
+                                self._sched_backoff_interval * 2, 300
+                            )
                     except Exception as exc:
+                        self._sched_fail_count = getattr(self, '_sched_fail_count', 0) + 1
                         log.warning("Scheduler poll failed: %s", exc)
+                        if self._sched_fail_count >= 3:
+                            self._sched_backoff_interval = min(
+                                self._sched_backoff_interval * 2, 300
+                            )
                     finally:
                         self.last_scheduler_poll = now
 
@@ -663,6 +711,8 @@ class Agent:
                     metrics = collector.collect()
                 except Exception as exc:
                     log.warning("Collection error: %s", exc)
+                    if self.metrics_server and hasattr(collector, "gpu_uuids"):
+                        self.metrics_server.mark_collection_failed(collector.gpu_uuids)
                     time.sleep(self.interval)
                     continue
 
@@ -822,6 +872,75 @@ class Agent:
                     for m in metrics:
                         if m.energy_delta_j:
                             self.total_energy[m.gpu_index] += m.energy_delta_j / 3_600_000
+
+                # Power budget enforcement — cap GPUs exceeding budget for 3+ consecutive samples
+                try:
+                    from config import POWER_BUDGET_ENABLED, POWER_BUDGET_WATTS
+                    if POWER_BUDGET_ENABLED and POWER_BUDGET_WATTS > 0 and not _in_warmup:
+                        if not hasattr(self, '_power_budget_violations'):
+                            self._power_budget_violations: dict[int, int] = {}
+                        for m in metrics:
+                            if m.power_draw_w > POWER_BUDGET_WATTS:
+                                self._power_budget_violations[m.gpu_index] = \
+                                    self._power_budget_violations.get(m.gpu_index, 0) + 1
+                                if self._power_budget_violations[m.gpu_index] >= 3:
+                                    if not self.dry_run:
+                                        try:
+                                            from efficiency.power_control import set_power_limit
+                                            set_power_limit(m.gpu_index, POWER_BUDGET_WATTS)
+                                            log.warning(
+                                                "Power budget enforced: GPU %d capped to %dW (was %.0fW)",
+                                                m.gpu_index, POWER_BUDGET_WATTS, m.power_draw_w,
+                                            )
+                                        except Exception as exc:
+                                            log.warning("Power budget enforcement failed GPU %d: %s",
+                                                        m.gpu_index, exc)
+                                    else:
+                                        log.info(
+                                            "Power budget: GPU %d exceeds %dW (%.0fW, %d consecutive) — dry run",
+                                            m.gpu_index, POWER_BUDGET_WATTS, m.power_draw_w,
+                                            self._power_budget_violations[m.gpu_index],
+                                        )
+                            else:
+                                self._power_budget_violations[m.gpu_index] = 0
+                except (ImportError, AttributeError):
+                    pass
+
+                # Auto-tuner — periodic roofline analysis + optional power cap
+                if _auto_tuner and not _in_warmup and _auto_tuner.should_run():
+                    try:
+                        tune_results = _auto_tuner.analyze_and_tune(metrics)
+                        for tr in tune_results:
+                            if tr.recommended_cap_w:
+                                log.info(
+                                    "AutoTune: GPU %d %s cap=%dW savings=%.0f%% applied=%s",
+                                    tr.gpu_index, tr.gpu_name,
+                                    int(tr.recommended_cap_w), tr.estimated_savings_pct, tr.applied,
+                                )
+                    except Exception as exc:
+                        log.warning("AutoTuner error: %s", exc)
+
+                # Carbon tracking — fetch intensity every 5 minutes, update CO2 counter
+                if _carbon_client and self.metrics_server and not _in_warmup:
+                    _now_carbon = time.time()
+                    if _now_carbon - _last_carbon_fetch >= 300:
+                        try:
+                            _ci = _carbon_client.get_current()
+                            _carbon_intensity = _ci.carbon_intensity_gco2e
+                            _carbon_renewable = _ci.renewable_pct
+                            _last_carbon_fetch = _now_carbon
+                        except Exception as exc:
+                            log.debug("Carbon fetch failed: %s", exc)
+                    if _carbon_intensity > 0:
+                        _cycle_energy_kwh = sum(
+                            (m.energy_delta_j or 0) / 3_600_000 for m in metrics
+                        )
+                        self.metrics_server.update_carbon(
+                            zone=_carbon_zone,
+                            carbon_intensity_gco2e=_carbon_intensity,
+                            renewable_pct=_carbon_renewable,
+                            energy_delta_kwh=_cycle_energy_kwh,
+                        )
 
                 # Periodic upload flush
                 if self.uploader and (time.time() - self.last_upload_time >= UPLOAD_INTERVAL):
@@ -1288,6 +1407,8 @@ Examples:
                         help="Log output format: 'text' (default) or 'json' for ELK/Loki")
     parser.add_argument("--log-level", default=None,
                         help="Logging verbosity: DEBUG, INFO, WARNING, ERROR (default: LOG_LEVEL or INFO)")
+    parser.add_argument("--integrations", default="",
+                        help="Comma-separated ML integrations to auto-register: mlflow,wandb")
     parser.add_argument("--version", action="version", version=f"aluminatai-agent {AGENT_VERSION}")
 
     subparsers = parser.add_subparsers(dest="command")
@@ -1356,6 +1477,24 @@ Examples:
     if interval < 0.1:
         log.error("Interval must be >= 0.1s")
         return 2
+
+    # Auto-register ML integrations
+    _integrations = [s.strip() for s in (args.integrations or "").split(",") if s.strip()]
+    for _integ in _integrations:
+        if _integ == "mlflow":
+            try:
+                from integrations.mlflow_callback import AluminatAIMLflowCallback
+                log.info("MLflow integration enabled")
+            except ImportError:
+                log.warning("MLflow integration requested but mlflow package not installed")
+        elif _integ == "wandb":
+            try:
+                from integrations.wandb_callback import AluminatAIWandbCallback
+                log.info("W&B integration enabled")
+            except ImportError:
+                log.warning("W&B integration requested but wandb package not installed")
+        else:
+            log.warning("Unknown integration: %s (available: mlflow, wandb)", _integ)
 
     agent = Agent(
         interval=interval,

@@ -9,27 +9,28 @@ on:
 jobs:
   # ── Agent ─────────────────────────────────────────────────────────────────────
   agent:
-    name: Agent (install · test)
+    name: Agent (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Install agent with optional extras
-        # nvidia-ml-py3 installs fine without a GPU — NVML is loaded lazily at runtime.
-        # Tests mock pynvml so they run correctly without hardware.
         run: pip install -e ".[prometheus,otel]"
 
       - name: Install test dependencies
         run: pip install pytest pytest-cov
 
-      - name: Run tests
-        run: pytest agent/tests/ -v --tb=short --ignore=agent/tests/powercap_ab_test.py --ignore=agent/tests/test_collector.py
+      - name: Run tests with coverage
+        run: pytest agent/tests/ -v --tb=short --cov=agent --cov-report=xml --ignore=agent/tests/powercap_ab_test.py --ignore=agent/tests/test_collector.py
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
   frontend:

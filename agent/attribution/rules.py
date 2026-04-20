@@ -105,8 +105,11 @@ class AttributionRules:
         if not cmdline:
             return None
         for compiled_pattern, rule in self._rules:
-            if compiled_pattern.search(cmdline):
-                return rule
+            try:
+                if compiled_pattern.search(cmdline):
+                    return rule
+            except (TypeError, re.error):
+                continue
         return None
 
     def _find_config_file(self) -> Optional[str]:

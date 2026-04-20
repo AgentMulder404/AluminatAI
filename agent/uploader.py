@@ -44,7 +44,7 @@ import requests
 from config import (
     API_ENDPOINT, API_KEY, UPLOAD_BATCH_SIZE,
     WAL_DIR, WAL_MAX_AGE_HOURS, WAL_MAX_MB,
-    UPLOAD_MAX_RETRIES, UPLOAD_MAX_RETRY_DELAY,
+    UPLOAD_MAX_RETRIES, UPLOAD_MAX_RETRY_DELAY, UPLOAD_TIMEOUT,
     HTTPS_PROXY, CA_BUNDLE, CLIENT_CERT, CLIENT_KEY,
     OFFLINE_MODE, DRY_RUN,
 )
@@ -275,6 +275,9 @@ def _build_session(api_key: str) -> requests.Session:
 class MetricsUploader:
     """Upload GPU metrics to the AluminatAI API with backoff + WAL durability."""
 
+    CIRCUIT_OPEN_THRESHOLD = 5
+    CIRCUIT_COOLDOWN_SECONDS = 300
+
     def __init__(self, api_endpoint: str = API_ENDPOINT, api_key: str = API_KEY):
         self.api_endpoint = api_endpoint
         self.api_key = api_key
@@ -284,6 +287,8 @@ class MetricsUploader:
         self._upload_failure = 0
         self._wal_replay_uploaded = 0
         self._wal_replay_failed = 0
+        self._consecutive_failures = 0
+        self._circuit_open_since: float = 0.0
         if OFFLINE_MODE:
             logger.info("OFFLINE_MODE=1 — all metrics written to WAL; no HTTP uploads")
         else:
@@ -314,14 +319,25 @@ class MetricsUploader:
                 "DRY RUN — would upload %d metrics to %s (skipped)",
                 len(metrics), self.api_endpoint,
             )
-            return True  # treat as success so WAL doesn't accumulate
+            return True
         if OFFLINE_MODE:
             _wal_append(metrics)
             return False
+
+        # Circuit breaker: skip HTTP when API has been failing persistently
+        if self._circuit_open_since > 0:
+            elapsed = time.time() - self._circuit_open_since
+            if elapsed < self.CIRCUIT_COOLDOWN_SECONDS:
+                _wal_append(metrics)
+                return False
+            # Half-open: try one probe request
+            logger.info("Circuit breaker half-open — probing API")
+            self._circuit_open_since = 0.0
+
         delay = 1.0
         for attempt in range(1, UPLOAD_MAX_RETRIES + 1):
             try:
-                resp = self.session.post(self.api_endpoint, json=metrics, timeout=30)
+                resp = self.session.post(self.api_endpoint, json=metrics, timeout=UPLOAD_TIMEOUT)
             except requests.Timeout:
                 logger.warning(
                     "Upload timeout (attempt %d/%d)", attempt, UPLOAD_MAX_RETRIES,
@@ -353,6 +369,7 @@ class MetricsUploader:
 
             if resp.status_code == 200:
                 self._upload_success += len(metrics)
+                self._consecutive_failures = 0
                 return True
 
             if resp.status_code in (401, 403):
@@ -394,6 +411,13 @@ class MetricsUploader:
         )
         _wal_append(metrics)
         self._upload_failure += 1
+        self._consecutive_failures += 1
+        if self._consecutive_failures >= self.CIRCUIT_OPEN_THRESHOLD:
+            self._circuit_open_since = time.time()
+            logger.error(
+                "Circuit breaker OPEN — %d consecutive failures, skipping HTTP for %ds",
+                self._consecutive_failures, self.CIRCUIT_COOLDOWN_SECONDS,
+            )
         return False
 
     @staticmethod
@@ -481,4 +505,6 @@ class MetricsUploader:
             "wal_replay_failed_total": self._wal_replay_failed,
             "api_endpoint": self.api_endpoint,
             "has_api_key": bool(self.api_key),
+            "circuit_breaker": "open" if self._circuit_open_since > 0 else "closed",
+            "consecutive_failures": self._consecutive_failures,
         }

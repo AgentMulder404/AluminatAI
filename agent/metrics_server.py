@@ -215,6 +215,22 @@ class MetricsServer:
             labels,
         )
 
+        # Carbon tracking gauges
+        self._carbon_intensity = Gauge(
+            "aluminatai_carbon_intensity_gco2e",
+            "Current grid carbon intensity in gCO2e/kWh",
+            ["zone"],
+        )
+        self._carbon_renewable_pct = Gauge(
+            "aluminatai_carbon_renewable_pct",
+            "Percentage of grid power from renewable sources",
+            ["zone"],
+        )
+        self._co2_grams = Counter(
+            "aluminatai_co2_grams_total",
+            "Cumulative CO2 emissions in grams",
+        )
+
         self._agent_uptime = Gauge(
             "aluminatai_agent_uptime_seconds",
             "Seconds since the agent process started",
@@ -267,27 +283,49 @@ class MetricsServer:
     def start(self) -> None:
         if not _PROM or self._port == 0 or self._started:
             return
-        try:
-            app = make_wsgi_app()
-            app = self._health_middleware(app)
-            if self._basic_auth:
-                app = _basic_auth_middleware(app, self._basic_auth)
-                logger.warning(
-                    "Prometheus Basic Auth active — use a TLS proxy in production"
-                )
-            bind = self._bind_host or "0.0.0.0"
-            srv = make_server(bind, self._port, app, WSGIServer, _QuietHandler)
-            self._srv = srv
-            threading.Thread(target=srv.serve_forever, daemon=True).start()
-            self._started = True
-            logger.info("Prometheus metrics server on %s:%d/metrics", bind, self._port)
-            logger.info("Health endpoint on %s:%d/health", bind, self._port)
-        except OSError as exc:
-            logger.warning("Could not start metrics server on :%d: %s", self._port, exc)
+        app = make_wsgi_app()
+        app = self._health_middleware(app)
+        if self._basic_auth:
+            app = _basic_auth_middleware(app, self._basic_auth)
+            logger.warning(
+                "Prometheus Basic Auth active — use a TLS proxy in production"
+            )
+        bind = self._bind_host or "0.0.0.0"
+        for offset in range(5):
+            port = self._port + offset
+            try:
+                srv = make_server(bind, port, app, WSGIServer, _QuietHandler)
+                self._srv = srv
+                self._port = port
+                threading.Thread(target=srv.serve_forever, daemon=True).start()
+                self._started = True
+                if offset > 0:
+                    logger.info("Port %d in use — bound to %d instead", self._port - offset, port)
+                logger.info("Prometheus metrics server on %s:%d/metrics", bind, port)
+                logger.info("Health endpoint on %s:%d/health", bind, port)
+                return
+            except OSError as exc:
+                if offset < 4:
+                    logger.debug("Port %d unavailable: %s — trying %d", port, exc, port + 1)
+                else:
+                    logger.error(
+                        "Could not start metrics server on ports %d–%d: %s",
+                        self._port - 4, port, exc,
+                    )
 
     def stop(self) -> None:
         if self._srv is not None:
             self._srv.shutdown()
+
+    def mark_collection_failed(self, gpu_uuids: List[str]) -> None:
+        """Reset GPU gauges to NaN so Prometheus sees absent data, not stale values."""
+        if not _PROM or not self._started:
+            return
+        for i, uuid in enumerate(gpu_uuids):
+            idx = str(i)
+            self._power.labels(gpu_uuid=uuid, gpu_index=idx).set(float("nan"))
+            self._util.labels(gpu_uuid=uuid, gpu_index=idx).set(float("nan"))
+            self._temp.labels(gpu_uuid=uuid, gpu_index=idx).set(float("nan"))
 
     def update(self, metrics: List[Any], attributed_rows: List[dict]) -> None:
         """Called from the main loop after each collection cycle."""
@@ -374,6 +412,22 @@ class MetricsServer:
         if not _PROM or not self._started or count <= 0:
             return
         self._attribution_unresolved.inc(count)
+
+    def update_carbon(
+        self,
+        zone: str,
+        carbon_intensity_gco2e: float,
+        renewable_pct: float,
+        energy_delta_kwh: float,
+    ) -> None:
+        """Update carbon tracking metrics."""
+        if not _PROM or not self._started:
+            return
+        self._carbon_intensity.labels(zone=zone).set(carbon_intensity_gco2e)
+        self._carbon_renewable_pct.labels(zone=zone).set(renewable_pct)
+        if energy_delta_kwh > 0:
+            co2_grams = energy_delta_kwh * carbon_intensity_gco2e
+            self._co2_grams.inc(co2_grams)
 
     def update_dcgm(
         self,

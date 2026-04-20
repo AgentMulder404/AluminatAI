@@ -186,15 +186,29 @@ class AttributionEngine:
                     )
 
                 if api_tag is not None:
-                    # API tag overrides resolver result (confidence 0.95)
                     key = f"tag:{api_tag.id}"
                     _, mem, _src = by_key.get(key, (None, 0, "api_tag"))
-                    # Store a synthetic job-like tuple: (tag_record, mem_bytes, confidence)
                     by_key[key] = (api_tag, mem + proc.gpu_memory_bytes, "api_tag")  # type: ignore[assignment]
+                    logger.debug(
+                        "GPU %d PID %d → api_tag (id=%s, team=%s)",
+                        gpu_index, proc.pid, api_tag.id, getattr(api_tag, 'team_id', '?'),
+                    )
                 else:
                     key = job.job_id if job else f"pid:{proc.pid}"
                     _, mem, _src = by_key.get(key, (job, 0, ""))
                     by_key[key] = (job, mem + proc.gpu_memory_bytes, "")  # type: ignore[assignment]
+                    if job:
+                        logger.debug(
+                            "GPU %d PID %d → %s (job=%s, team=%s, source=%s)",
+                            gpu_index, proc.pid,
+                            _SOURCE_CONFIDENCE.get(job.scheduler_source, "unknown"),
+                            job.job_id, job.team_id, job.scheduler_source,
+                        )
+                    else:
+                        logger.debug(
+                            "GPU %d PID %d → unresolved (memory_split fallback)",
+                            gpu_index, proc.pid,
+                        )
 
             total_mem = sum(m for _, m, _ in by_key.values()) or 1
             results: list[AttributionResult] = []
@@ -250,8 +264,10 @@ class AttributionEngine:
             return results
 
         # Fallback: scheduler poll (current/old behaviour)
+        logger.debug("GPU %d → no processes found, trying scheduler poll fallback", gpu_index)
         job = self._scheduler.gpu_to_job(gpu_index)
         if job:
+            logger.debug("GPU %d → scheduler_poll (job=%s, team=%s)", gpu_index, job.job_id, job.team_id)
             return [AttributionResult(
                 team_id=job.team_id,
                 model_tag=job.model_tag,
@@ -268,6 +284,7 @@ class AttributionEngine:
         # Fallback: idle
         idle_team = os.getenv("ALUMINATAI_IDLE_TEAM")
         if idle_team:
+            logger.debug("GPU %d → idle fallback (team=%s)", gpu_index, idle_team)
             return [AttributionResult(
                 team_id=idle_team,
                 model_tag="idle",
@@ -282,4 +299,5 @@ class AttributionEngine:
             )]
 
         # No attribution configured — emit raw (backward compat)
+        logger.debug("GPU %d → no attribution (no processes, no scheduler, no idle team)", gpu_index)
         return []

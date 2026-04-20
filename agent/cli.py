@@ -44,7 +44,7 @@ def main() -> None:
     # the full agent stack.  Unknown args are forwarded to the sub-handler.
     _pre = argparse.ArgumentParser(add_help=False)
     _pre.add_argument("subcommand", nargs="?", default="run",
-                      choices=["run", "benchmark", "optimize", "ab", "demo"])
+                      choices=["run", "benchmark", "optimize", "ab", "demo", "report"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
     _known, _rest = _pre.parse_known_args()
