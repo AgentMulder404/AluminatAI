@@ -221,6 +221,20 @@ AUTO_TUNE_MIN_SAVINGS_PCT = float(os.getenv("AUTO_TUNE_MIN_SAVINGS_PCT", "10"))
 POWER_BUDGET_ENABLED = os.getenv("POWER_BUDGET_ENABLED", "").lower() in ("1", "true", "yes")
 POWER_BUDGET_WATTS = int(os.getenv("POWER_BUDGET_WATTS", "0"))     # per-GPU cap, 0 = disabled
 
+# ── Fleet Aggregation ────────────────────────────────────────────────────────
+
+FLEET_AGGREGATOR_ENABLED = os.getenv("FLEET_AGGREGATOR_ENABLED", "").lower() in ("1", "true", "yes")
+FLEET_AGGREGATOR_PORT = int(os.getenv("FLEET_AGGREGATOR_PORT", "9101"))
+FLEET_AGGREGATOR_PEERS = os.getenv("FLEET_AGGREGATOR_PEERS", "")  # comma-separated URLs
+
+# ── RAPL (CPU + RAM Energy) ──────────────────────────────────────────────────
+
+RAPL_ENABLED = os.getenv("RAPL_ENABLED", "1").lower() not in ("0", "false", "no")
+
+# ── Cloud Cost Detection ─────────────────────────────────────────────────────
+
+CLOUD_COST_ENABLED = os.getenv("CLOUD_COST_ENABLED", "1").lower() not in ("0", "false", "no")
+
 # ── Cluster Identity ───────────────────────────────────────────────────────────
 
 CLUSTER_TAG   = os.getenv("ALUMINATAI_CLUSTER_TAG", "")    # e.g. "aws-us-west-2"

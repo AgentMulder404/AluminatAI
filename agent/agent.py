@@ -599,6 +599,20 @@ class Agent:
             manifest = ManifestWriter(Path(self.output_csv))
             manifest.open()
 
+        # Local TSDB (opt-in)
+        _tsdb = None
+        try:
+            from config import DATA_DIR
+            _tsdb_enabled = os.getenv("LOCAL_TSDB_ENABLED", "0").lower() in ("1", "true", "yes")
+            if _tsdb_enabled:
+                _tsdb_retention = int(os.getenv("LOCAL_TSDB_RETENTION_DAYS", "7"))
+                _tsdb_path = os.getenv("LOCAL_TSDB_PATH", str(DATA_DIR / "metrics.db"))
+                from storage.tsdb import LocalTSDB
+                _tsdb = LocalTSDB(db_path=_tsdb_path, retention_days=_tsdb_retention)
+                log.info("Local TSDB enabled: %s (retention=%dd)", _tsdb_path, _tsdb_retention)
+        except (ImportError, Exception) as exc:
+            log.debug("Local TSDB unavailable: %s", exc)
+
         # Auto-tuner (opt-in)
         _auto_tuner = None
         try:
@@ -872,6 +886,13 @@ class Agent:
                     for m in metrics:
                         if m.energy_delta_j:
                             self.total_energy[m.gpu_index] += m.energy_delta_j / 3_600_000
+
+                # TSDB insert (if enabled)
+                if _tsdb and not _in_warmup:
+                    try:
+                        _tsdb.insert_batch(metrics)
+                    except Exception as exc:
+                        log.debug("TSDB insert failed: %s", exc)
 
                 # Power budget enforcement — cap GPUs exceeding budget for 3+ consecutive samples
                 try:

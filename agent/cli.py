@@ -44,7 +44,8 @@ def main() -> None:
     # the full agent stack.  Unknown args are forwarded to the sub-handler.
     _pre = argparse.ArgumentParser(add_help=False)
     _pre.add_argument("subcommand", nargs="?", default="run",
-                      choices=["run", "benchmark", "optimize", "ab", "demo", "report"])
+                      choices=["run", "benchmark", "optimize", "ab", "demo", "report",
+                               "carbon-schedule", "query"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
     _known, _rest = _pre.parse_known_args()
@@ -67,6 +68,18 @@ def main() -> None:
     if _known.subcommand == "demo":
         from demos.investor_demo import make_parser as demo_parser, run_demo  # noqa: PLC0415
         sys.exit(run_demo(demo_parser().parse_args(_rest)))
+
+    if _known.subcommand == "report":
+        from reports.chargeback import make_parser as rpt_parser, run_report  # noqa: PLC0415
+        sys.exit(run_report(rpt_parser().parse_args(_rest)))
+
+    if _known.subcommand == "carbon-schedule":
+        from efficiency.carbon_scheduler import make_parser as cs_parser, run_carbon_schedule  # noqa: PLC0415
+        sys.exit(run_carbon_schedule(cs_parser().parse_args(_rest)))
+
+    if _known.subcommand == "query":
+        from storage.tsdb import make_parser as q_parser, run_query  # noqa: PLC0415
+        sys.exit(run_query(q_parser().parse_args(_rest)))
 
     # Default: delegate to agent.main() — it owns the full argparse + run loop.
     from agent import main as _main  # noqa: PLC0415
