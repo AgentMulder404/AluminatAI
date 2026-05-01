@@ -17,7 +17,7 @@ export const metadata: Metadata = {
       "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
     images: [
       {
-        url: "/opengraph-image",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "AluminatAI — GPU Cost Intelligence",
@@ -27,7 +27,16 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "AluminatAI — GPU Cost Intelligence",
-    images: ["/twitter-image"],
+    description:
+      "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "AluminatAI — GPU Cost Intelligence",
+      },
+    ],
   },
 };
 
