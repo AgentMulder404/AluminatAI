@@ -173,6 +173,11 @@ ENABLE_LOCAL_BACKUP = True  # WAL is always active when DATA_DIR is writable
 SAMPLE_INTERVAL = float(os.getenv("SAMPLE_INTERVAL", "5.0"))     # seconds between NVML reads
 NVML_TIMEOUT = float(os.getenv("NVML_TIMEOUT", "2.0"))          # per-GPU collection timeout
 
+# ── Multi-Agent High-Frequency Sampling ──────────────────────────────────────
+MULTI_AGENT_ENABLED = os.getenv("MULTI_AGENT_ENABLED", "").lower() in ("1", "true", "yes")
+FAST_SAMPLE_INTERVAL = float(os.getenv("FAST_SAMPLE_INTERVAL", "0.2"))
+FAST_SAMPLE_BUFFER_SIZE = int(os.getenv("FAST_SAMPLE_BUFFER_SIZE", "100"))
+
 # ── PID Temporal Smoothing ────────────────────────────────────────────────────
 
 # Width (seconds) of the sliding window used to determine PID stability.
@@ -283,6 +288,11 @@ LOG_FORMAT = os.getenv("LOG_FORMAT", "text").lower()
 
 LOG_DIR = Path(os.getenv("LOG_DIR", "./logs"))
 
+# ── Memory Leak Detection ────────────────────────────────────────────────────
+
+MEM_LEAK_DETECTION = os.getenv("MEM_LEAK_DETECTION", "1").lower() not in ("0", "false", "no")
+MEM_LEAK_WINDOW = int(os.getenv("MEM_LEAK_WINDOW", "60"))
+
 # ── Attribution ───────────────────────────────────────────────────────────────
 
 ATTRIBUTION_CONFIG = os.getenv("ALUMINATAI_ATTRIBUTION_CONFIG", "")
@@ -327,6 +337,8 @@ def _validate_config() -> None:
     global METRICS_PORT, SCHEDULER_POLL_INTERVAL, TAG_POLL_INTERVAL
     global HEARTBEAT_INTERVAL, PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD
     global IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS
+    global MEM_LEAK_WINDOW
+    global FAST_SAMPLE_INTERVAL, FAST_SAMPLE_BUFFER_SIZE
 
     SAMPLE_INTERVAL       = _clamp("SAMPLE_INTERVAL",       SAMPLE_INTERVAL,       0.1, 300)
     NVML_TIMEOUT          = _clamp("NVML_TIMEOUT",          NVML_TIMEOUT,          0.5, 30.0)
@@ -345,6 +357,9 @@ def _validate_config() -> None:
     PID_STABLE_THRESHOLD  = _clamp("PID_STABLE_THRESHOLD",    PID_STABLE_THRESHOLD, 0.0, 1.0)
     IDLE_BASELINE_WINDOW  = int(_clamp("IDLE_BASELINE_WINDOW", IDLE_BASELINE_WINDOW, 0, 300))
     WARMUP_DISCARD_SECONDS = int(_clamp("WARMUP_DISCARD_SECONDS", WARMUP_DISCARD_SECONDS, 0, 600))
+    MEM_LEAK_WINDOW       = int(_clamp("MEM_LEAK_WINDOW",        MEM_LEAK_WINDOW,       10, 600))
+    FAST_SAMPLE_INTERVAL  = _clamp("FAST_SAMPLE_INTERVAL",      FAST_SAMPLE_INTERVAL,  0.05, 2.0)
+    FAST_SAMPLE_BUFFER_SIZE = int(_clamp("FAST_SAMPLE_BUFFER_SIZE", FAST_SAMPLE_BUFFER_SIZE, 10, 1000))
 
     if WARMUP_DISCARD_SECONDS > 0 and IDLE_BASELINE_WINDOW > 0:
         if WARMUP_DISCARD_SECONDS <= IDLE_BASELINE_WINDOW:

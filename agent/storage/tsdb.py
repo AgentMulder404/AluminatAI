@@ -182,10 +182,10 @@ def run_query(args: argparse.Namespace) -> int:
         to_ts=to_ts,
         limit=args.limit,
     )
-    db.close()
 
     if not results:
         print(f"No data found for metric={args.metric} gpu={args.gpu}")
+        db.close()
         return 0
 
     if args.fmt == "csv":
@@ -196,9 +196,10 @@ def run_query(args: argparse.Namespace) -> int:
         data = [{"timestamp": ts, "value": val} for ts, val in results]
         print(json.dumps(data, indent=2))
 
-    stats = db.stats() if hasattr(db, 'stats') else {}
+    stats = db.stats()
     if stats:
         import sys
         print(f"\n# DB: {stats.get('rows', 0)} rows, {stats.get('size_mb', 0)} MB", file=sys.stderr)
 
+    db.close()
     return 0

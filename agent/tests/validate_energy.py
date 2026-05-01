@@ -55,20 +55,17 @@ class EnergyValidator:
         Args:
             interval: Sampling interval in seconds
         """
-        print(f"
-🔬 Energy Validation Test")
+        print(f"\n🔬 Energy Validation Test")
         print("="*70)
         print(f"Duration: {self.duration}s")
         print(f"Sampling interval: {interval}s")
         print(f"Expected samples: ~{int(self.duration / interval)}")
-        print("="*70 + "
-")
+        print("="*70 + "\n")
 
         try:
             with GPUCollector() as collector:
                 gpu_count = collector.get_gpu_count()
-                print(f"📊 Monitoring {gpu_count} GPUs...
-")
+                print(f"📊 Monitoring {gpu_count} GPUs...\n")
 
                 # Initialize tracking
                 for i in range(gpu_count):
@@ -122,16 +119,13 @@ class EnergyValidator:
                         time.sleep(sleep_time)
 
                 actual_duration = time.time() - start_time
-                print(f"
-✅ Collection complete. Actual duration: {actual_duration:.2f}s
-")
+                print(f"\n✅ Collection complete. Actual duration: {actual_duration:.2f}s\n")
 
                 # Validate results
                 self._validate_results(actual_duration)
 
         except Exception as e:
-            print(f"
-❌ Validation failed: {e}")
+            print(f"\n❌ Validation failed: {e}")
             import traceback
             traceback.print_exc()
             return 1
@@ -142,8 +136,7 @@ class EnergyValidator:
         """Analyze and validate collected data"""
         print("="*70)
         print(" VALIDATION RESULTS")
-        print("="*70 + "
-")
+        print("="*70 + "\n")
 
         all_pass = True
 
@@ -180,8 +173,7 @@ class EnergyValidator:
             print(f"{'Estimated cost ($0.12/kWh)':<35} ${energy_kwh * 0.12:>9.6f}")
 
             # Validation checks
-            print("
-Validation Checks:")
+            print("\nValidation Checks:")
 
             # Check 1: Error should be < 5%
             check1 = error_pct < 5.0
@@ -219,8 +211,7 @@ Validation Checks:")
             print("✅ VALIDATION PASSED - Energy calculations are accurate")
         else:
             print("❌ VALIDATION FAILED - Review errors above")
-        print("="*70 + "
-")
+        print("="*70 + "\n")
 
         # Additional notes
         print("📝 Notes:")

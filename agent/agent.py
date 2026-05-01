@@ -205,6 +205,7 @@ try:
         IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS,
         DCGM_ENABLED,
         PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD,
+        GRID_ZONE, MULTI_AGENT_ENABLED,
     )
     _UPLOADER = True
 except ImportError:
@@ -228,6 +229,8 @@ except ImportError:
     DCGM_ENABLED = True
     PID_SMOOTH_WINDOW = 30.0
     PID_STABLE_THRESHOLD = 0.60
+    GRID_ZONE = ""
+    MULTI_AGENT_ENABLED = False
 
 try:
     from baseline import IdleBaseline
@@ -527,6 +530,32 @@ class Agent:
             self.otel_exporter.start()
             log.info("OTel exporter wired → %s", os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 
+        # GPU memory leak detector
+        self._mem_leak_detector = None
+        try:
+            from config import MEM_LEAK_DETECTION, MEM_LEAK_WINDOW
+            if MEM_LEAK_DETECTION:
+                from memory_leak_detector import MemoryLeakDetector
+                self._mem_leak_detector = MemoryLeakDetector(window_size=MEM_LEAK_WINDOW)
+                log.info("Memory leak detection enabled (window=%d samples)", MEM_LEAK_WINDOW)
+        except ImportError:
+            pass
+
+        # Multi-agent fast collector (opt-in)
+        self._fast_collector = None
+        self._ring_buffers: list = []
+        self._multi_agent_ready = False
+        if MULTI_AGENT_ENABLED:
+            try:
+                from ring_buffer import GPURingBuffer  # noqa: PLC0415
+                from fast_collector import FastCollector  # noqa: PLC0415
+                from config import FAST_SAMPLE_INTERVAL, FAST_SAMPLE_BUFFER_SIZE
+                self._multi_agent_ready = True
+                log.info("Multi-agent mode enabled (fast interval=%.0fms, buffer=%d)",
+                         FAST_SAMPLE_INTERVAL * 1000, FAST_SAMPLE_BUFFER_SIZE)
+            except ImportError as exc:
+                log.warning("Multi-agent mode requested but unavailable: %s", exc)
+
         # Rich console
         self.console = Console() if (_RICH and not quiet) else None
 
@@ -571,6 +600,22 @@ class Agent:
 
         for i in range(gpu_count):
             self.total_energy[i] = 0.0
+
+        # Start multi-agent fast collector if enabled
+        if self._multi_agent_ready:
+            from ring_buffer import GPURingBuffer
+            from fast_collector import FastCollector
+            from config import FAST_SAMPLE_INTERVAL, FAST_SAMPLE_BUFFER_SIZE
+            self._ring_buffers = [
+                GPURingBuffer(i, max_samples=FAST_SAMPLE_BUFFER_SIZE)
+                for i in range(gpu_count)
+            ]
+            self._fast_collector = FastCollector(
+                gpu_handles=collector.gpu_handles,
+                ring_buffers=self._ring_buffers,
+                sample_interval=FAST_SAMPLE_INTERVAL,
+            )
+            self._fast_collector.start()
 
         # Load or calibrate idle power baselines (runs before WAL replay so
         # the 30s calibration window doesn't delay the first upload flush).
@@ -732,6 +777,17 @@ class Agent:
 
                 self.sample_count += 1
 
+                # Multi-agent: overlay ring buffer statistical summaries
+                if self._fast_collector and self._ring_buffers:
+                    for m in metrics:
+                        summary = self._ring_buffers[m.gpu_index].summarize(
+                            window_seconds=self.interval,
+                        )
+                        if summary and summary.sample_count >= 3:
+                            m.power_draw_w = summary.power_mean_w
+                            m._power_p95_w = summary.power_p95_w
+                            m._power_p99_w = summary.power_p99_w
+
                 # PID smoother update — feed current NVML PID sets into the
                 # sliding window *before* engine.resolve() consults stable_pids().
                 if self._smoother:
@@ -887,6 +943,24 @@ class Agent:
                         if m.energy_delta_j:
                             self.total_energy[m.gpu_index] += m.energy_delta_j / 3_600_000
 
+                # GPU memory leak detection
+                if self._mem_leak_detector and not _in_warmup:
+                    for m in metrics:
+                        if self._mem_leak_detector.update(m.gpu_index, m.memory_used_mb):
+                            log.warning(
+                                "Potential GPU memory leak on GPU %d: "
+                                "memory_used_mb increasing for %d consecutive samples "
+                                "(current: %.0f MB)",
+                                m.gpu_index,
+                                self._mem_leak_detector._window_size,
+                                m.memory_used_mb,
+                            )
+                        if self.metrics_server:
+                            score = self._mem_leak_detector.get_leak_score(m.gpu_index)
+                            self.metrics_server.update_mem_leak_score(
+                                m.gpu_uuid, str(m.gpu_index), score,
+                            )
+
                 # TSDB insert (if enabled)
                 if _tsdb and not _in_warmup:
                     try:
@@ -1027,6 +1101,10 @@ class Agent:
             # Close CSV manifest (fsync)
             if manifest:
                 manifest.close()
+
+            # Stop fast collector (multi-agent mode)
+            if self._fast_collector:
+                self._fast_collector.stop()
 
             # Shutdown collector
             try:

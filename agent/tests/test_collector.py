@@ -153,8 +153,7 @@ def run_all_tests():
         test_metrics_serialization,
     ]
 
-    print("
-🧪 Running Collector Unit Tests")
+    print("\n🧪 Running Collector Unit Tests")
     print("="*70)
 
     passed = 0
@@ -168,8 +167,7 @@ def run_all_tests():
             failed += 1
 
     print("="*70)
-    print(f"
-✅ Passed: {passed}")
+    print(f"\n✅ Passed: {passed}")
     if failed > 0:
         print(f"❌ Failed: {failed}")
     print()

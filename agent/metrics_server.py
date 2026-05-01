@@ -231,6 +231,12 @@ class MetricsServer:
             "Cumulative CO2 emissions in grams",
         )
 
+        self._mem_leak_score = Gauge(
+            "aluminatai_gpu_memory_leak_score",
+            "Memory leak probability (0.0-1.0) based on monotonic increase detection",
+            labels,
+        )
+
         self._agent_uptime = Gauge(
             "aluminatai_agent_uptime_seconds",
             "Seconds since the agent process started",
@@ -267,13 +273,29 @@ class MetricsServer:
         return status, body
 
     def _health_middleware(self, app):
-        """WSGI middleware that intercepts GET /health."""
+        """WSGI middleware that intercepts GET /health and GET /healthz."""
         def _inner(environ, start_response):
-            if environ.get("PATH_INFO", "") == "/health":
+            path = environ.get("PATH_INFO", "")
+            if path == "/health":
                 status, body = self._health_response()
                 http_status = "200 OK" if status != "unhealthy" else "503 Service Unavailable"
                 start_response(http_status, [
                     ("Content-Type", "application/json"),
+                    ("Content-Length", str(len(body))),
+                ])
+                return [body]
+            if path == "/healthz":
+                status, _ = self._health_response()
+                if status == "unhealthy":
+                    body = b"not ok\n"
+                    start_response("503 Service Unavailable", [
+                        ("Content-Type", "text/plain"),
+                        ("Content-Length", str(len(body))),
+                    ])
+                    return [body]
+                body = b"ok\n"
+                start_response("200 OK", [
+                    ("Content-Type", "text/plain"),
                     ("Content-Length", str(len(body))),
                 ])
                 return [body]
@@ -412,6 +434,14 @@ class MetricsServer:
         if not _PROM or not self._started or count <= 0:
             return
         self._attribution_unresolved.inc(count)
+
+    def update_mem_leak_score(
+        self, gpu_uuid: str, gpu_index: str, score: float,
+    ) -> None:
+        """Update memory leak probability gauge for a GPU."""
+        if not _PROM or not self._started:
+            return
+        self._mem_leak_score.labels(gpu_uuid=gpu_uuid, gpu_index=gpu_index).set(score)
 
     def update_carbon(
         self,

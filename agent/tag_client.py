@@ -28,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import random
 import threading
 import time
 from dataclasses import dataclass
@@ -154,7 +155,8 @@ class TagClient:
                                _consecutive_failures, exc)
                 if _consecutive_failures >= 3:
                     _current_interval = min(_current_interval * 2, 300)
-            self._stop_event.wait(_current_interval)
+            _jitter = random.uniform(-0.2 * _current_interval, 0.2 * _current_interval)
+            self._stop_event.wait(max(1.0, _current_interval + _jitter))
 
     def _fetch(self) -> None:
         # Ask for tags from the last 25 hours (slightly more than a day to catch

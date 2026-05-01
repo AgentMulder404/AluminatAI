@@ -15,10 +15,19 @@ export const metadata: Metadata = {
     title: "AluminatAI — GPU Cost Intelligence",
     description:
       "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "AluminatAI — GPU Cost Intelligence",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "AluminatAI — GPU Cost Intelligence",
+    images: ["/twitter-image"],
   },
 };
 
