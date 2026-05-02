@@ -6,12 +6,15 @@ import Stripe from "stripe";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2024-12-18.acacia",
-});
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+  return new Stripe(key, { apiVersion: "2024-12-18.acacia" });
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const stripe = getStripe();
     const supabaseCookie = await createSupabaseCookieClient();
     const {
       data: { user },

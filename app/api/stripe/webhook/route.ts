@@ -6,18 +6,10 @@ import Stripe from "stripe";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { logAudit } from "@/lib/audit";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? "", {
-  apiVersion: "2024-12-18.acacia",
-});
-
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
-
-async function verifyStripeSignature(
-  body: string,
-  signature: string
-): Promise<Stripe.Event> {
-  // Use Stripe SDK's constructEvent for webhook verification
-  return stripe.webhooks.constructEvent(body, signature, WEBHOOK_SECRET);
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+  return new Stripe(key, { apiVersion: "2024-12-18.acacia" });
 }
 
 export async function POST(req: NextRequest) {
@@ -28,9 +20,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
+  const stripe = getStripe();
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+
   let event: Stripe.Event;
   try {
-    event = await verifyStripeSignature(body, signature);
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
