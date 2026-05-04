@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin/downloads", label: "Downloads" },
   { href: "/admin/security", label: "Security" },
   { href: "/admin/lawyer", label: "Lawyer" },
+  { href: "/admin/financial-advisor", label: "Finance" },
 ];
 
 export default function AdminLayout({
