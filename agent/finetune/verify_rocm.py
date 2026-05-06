@@ -61,7 +61,7 @@ def main() -> int:
     for i in range(torch.cuda.device_count()):
         props = torch.cuda.get_device_properties(i)
         print(f"\nGPU {i}: {props.name}")
-        print(f"  Total memory:    {props.total_mem / 1024**3:.1f} GB")
+        print(f"  Total memory:    {props.total_memory / 1024**3:.1f} GB")
         print(f"  Multi-processor: {props.multi_processor_count}")
         print(f"  GCN arch:        {props.gcnArchName}")
 
@@ -181,7 +181,7 @@ def main() -> int:
 
     props = torch.cuda.get_device_properties(0)
     print("All checks passed. Ready for GreenTune fine-tuning.")
-    print(f"GPU:     {props.name} ({props.total_mem / 1024**3:.0f} GB)")
+    print(f"GPU:     {props.name} ({props.total_memory / 1024**3:.0f} GB)")
     print(f"ROCm:    {torch.version.hip}")
     print(f"PyTorch: {torch.__version__}")
     return 0

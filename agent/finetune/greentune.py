@@ -426,7 +426,7 @@ def main():
     if torch.cuda.is_available():
         props = torch.cuda.get_device_properties(args.gpu_index)
         print(f"\nGPU {args.gpu_index}: {props.name}")
-        print(f"  VRAM:    {props.total_mem / 1024**3:.0f} GB")
+        print(f"  VRAM:    {props.total_memory / 1024**3:.0f} GB")
         print(f"  ROCm:    {torch.version.hip or 'N/A'}")
         print(f"  PyTorch: {torch.__version__}")
     else:
