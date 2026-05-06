@@ -375,6 +375,9 @@ def run_eval(
     print(f"{'='*60}\n")
 
     model.eval()
+    model.config.use_cache = True
+    if hasattr(model, "gradient_checkpointing_disable"):
+        model.gradient_checkpointing_disable()
     results = []
 
     for i, prompt in enumerate(eval_prompts):
@@ -384,7 +387,7 @@ def run_eval(
         )
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
-        with torch.no_grad():
+        with torch.no_grad(), torch.amp.autocast("cuda", dtype=torch.bfloat16):
             output_ids = model.generate(
                 **inputs,
                 max_new_tokens=512,
