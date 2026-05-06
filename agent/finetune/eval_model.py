@@ -61,6 +61,8 @@ def main():
 
     print(f"Loading adapter from {ADAPTER_PATH}...")
     model = PeftModel.from_pretrained(model, ADAPTER_PATH)
+    print("Merging LoRA weights into base model...")
+    model = model.merge_and_unload()
     model.eval()
 
     print(f"\nRunning {len(PROMPTS)} eval prompts...\n")
