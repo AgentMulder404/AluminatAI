@@ -195,6 +195,12 @@ except (ImportError, SyntaxError) as _e:
     log.warning("collector.py unavailable (%s) — NVML collection disabled", type(_e).__name__)
 
 try:
+    from amd_collector import AMDGPUCollector
+    _AMD_COLLECTOR = True
+except (ImportError, SyntaxError) as _e:
+    _AMD_COLLECTOR = False
+
+try:
     from uploader import MetricsUploader
     from config import (
         UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY, API_ENDPOINT,
@@ -583,15 +589,31 @@ class Agent:
     # ── Main run loop ────────────────────────────────────────────────────
 
     def run(self) -> int:
-        if not _COLLECTOR:
-            log.error("GPUCollector unavailable — install nvidia-ml-py3")
+        collector = None
+        gpu_backend = "unknown"
+
+        if _COLLECTOR:
+            try:
+                collector = GPUCollector(collect_clocks=False)
+                gpu_backend = "NVIDIA (NVML)"
+            except Exception as exc:
+                log.warning("NVIDIA collector failed: %s — trying AMD", exc)
+
+        if collector is None and _AMD_COLLECTOR:
+            try:
+                collector = AMDGPUCollector(collect_clocks=False)
+                gpu_backend = "AMD (amdsmi)" if getattr(collector, "_use_amdsmi", False) else "AMD (rocm-smi)"
+            except Exception as exc:
+                log.warning("AMD collector failed: %s", exc)
+
+        if collector is None:
+            log.error(
+                "No GPU collector available — "
+                "install nvidia-ml-py3 (NVIDIA) or amdsmi/rocm-smi (AMD)"
+            )
             return 3
 
-        try:
-            collector = GPUCollector(collect_clocks=False)
-        except Exception as exc:
-            log.error("Failed to initialize GPU collector: %s", exc)
-            return 3
+        log.info("GPU backend: %s", gpu_backend)
 
         gpu_count = collector.get_gpu_count()
         gpu_uuids = [info["uuid"] for info in collector.get_gpu_info()]
@@ -690,7 +712,7 @@ class Agent:
                 log.debug("Carbon tracking unavailable — efficiency.carbon module not found")
 
         if not self.quiet:
-            self._print_banner(gpu_count, scheduler_name)
+            self._print_banner(gpu_count, scheduler_name, gpu_backend)
 
         # SIGHUP hot-reload: re-read mutable config settings without restart.
         # Only available on POSIX (Linux/macOS); silently skipped on Windows.
@@ -1189,11 +1211,11 @@ class Agent:
 
     # ── Display helpers ──────────────────────────────────────────────────
 
-    def _print_banner(self, gpu_count: int, scheduler: str):
+    def _print_banner(self, gpu_count: int, scheduler: str, gpu_backend: str = "NVIDIA"):
         log.info("=" * 60)
         log.info("  AluminatAI GPU Agent v%s", AGENT_VERSION)
         log.info("=" * 60)
-        log.info("  GPUs        : %d", gpu_count)
+        log.info("  GPUs        : %d (%s)", gpu_count, gpu_backend)
         log.info("  Interval    : %.2fs", self.interval)
         log.info("  Scheduler   : %s", scheduler)
         log.info("  Attribution : %s", "process-level" if self.attribution_engine else "scheduler-poll")
