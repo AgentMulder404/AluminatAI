@@ -39,6 +39,20 @@ try:
 except ImportError:
     AMDSMI_AVAILABLE = False
 
+_AMD_DEVICE_NAMES: dict[str, str] = {
+    "0x74a0": "AMD Instinct MI300X",
+    "0x74a1": "AMD Instinct MI300X",
+    "0x74b5": "AMD Instinct MI300X",
+    "0x7408": "AMD Instinct MI300A",
+    "0x740c": "AMD Instinct MI300A",
+    "0x74a5": "AMD Instinct MI325X",
+    "0x7410": "AMD Instinct MI250X",
+    "0x740f": "AMD Instinct MI250",
+    "0x738c": "AMD Instinct MI200",
+    "0x738e": "AMD Instinct MI210",
+    "0x7388": "AMD Instinct MI100",
+}
+
 
 def _rocm_smi_available() -> bool:
     try:
@@ -112,7 +126,11 @@ class AMDGPUCollector:
         for i, h in enumerate(handles):
             uuid = self._amdsmi_uuid(h, i)
             name = self._amdsmi_name(h, i)
-            self.gpu_info.append({"index": i, "uuid": uuid, "name": name})
+            mem_total_mb = self._init_vram_total(i)
+            self.gpu_info.append({
+                "index": i, "uuid": uuid, "name": name,
+                "mem_total_mb": mem_total_mb,
+            })
 
         self.gpu_uuids = [g["uuid"] for g in self.gpu_info]
         self.initialized = True
@@ -127,33 +145,45 @@ class AMDGPUCollector:
 
     @staticmethod
     def _amdsmi_name(handle, idx: int) -> str:
+        device_id = ""
         try:
             info = amdsmi.amdsmi_get_gpu_asic_info(handle)
             name = info.get("market_name", "") or ""
             if name and not name.startswith("0x"):
                 return name
+            device_id = info.get("device_id", "")
         except Exception:
             pass
-        # amdsmi didn't return a human-readable name — try rocm-smi CLI
+        if device_id in _AMD_DEVICE_NAMES:
+            return _AMD_DEVICE_NAMES[device_id]
+        # Try rocm-smi for Card Model / GFX Version
         try:
             out = subprocess.check_output(
                 f"rocm-smi -d {idx} --showproductname",
                 shell=True, text=True, timeout=5,
             )
             for line in out.splitlines():
-                m = re.search(r"Card Model:\s*(.+)", line, re.IGNORECASE)
-                if m:
-                    val = m.group(1).strip()
-                    if val and val != "N/A":
-                        return val
-                m = re.search(r"Card Series:\s*(.+)", line, re.IGNORECASE)
-                if m:
-                    val = m.group(1).strip()
-                    if val and val != "N/A":
-                        return val
+                m = re.search(r"Card Model:\s*(0x\w+)", line)
+                if m and m.group(1) in _AMD_DEVICE_NAMES:
+                    return _AMD_DEVICE_NAMES[m.group(1)]
         except Exception:
             pass
         return f"AMD GPU {idx}"
+
+    @staticmethod
+    def _init_vram_total(idx: int) -> float:
+        try:
+            out = subprocess.check_output(
+                f"rocm-smi -d {idx} --showmeminfo vram",
+                shell=True, text=True, timeout=10,
+            )
+            for line in out.splitlines():
+                m = re.search(r"VRAM Total Memory \(B\):\s*(\d+)", line)
+                if m:
+                    return float(m.group(1)) / (1024 * 1024)
+        except Exception:
+            pass
+        return 0.0
 
     def _collect_amdsmi(
         self, gpu_index: int, timestamp: str, current_time: float
@@ -193,22 +223,19 @@ class AMDGPUCollector:
         except Exception:
             pass
 
-        mem_used_mb, mem_total_mb = 0.0, 0.0
+        mem_total_mb = self.gpu_info[gpu_index].get("mem_total_mb", 0.0)
+        mem_used_mb = 0.0
         try:
             vram = amdsmi.amdsmi_get_gpu_vram_usage(h)
             mem_used_mb = float(vram.get("vram_used", 0)) / (1024 * 1024)
-            mem_total_mb = float(vram.get("vram_total", 0)) / (1024 * 1024)
+            if mem_total_mb == 0.0:
+                mem_total_mb = float(vram.get("vram_total", 0)) / (1024 * 1024)
         except Exception:
             pass
-        if mem_total_mb == 0.0:
-            cli_out = self._cli_run(
-                f"rocm-smi -d {gpu_index} --showmeminfo vram"
-            )
-            vram_total_b = self._find_float(cli_out, r"VRAM Total Memory \(B\):\s*([\d]+)")
-            vram_used_b = self._find_float(cli_out, r"VRAM Total Used Memory \(B\):\s*([\d]+)")
-            if vram_total_b > 0:
-                mem_total_mb = vram_total_b / (1024 * 1024)
-                mem_used_mb = vram_used_b / (1024 * 1024)
+        if mem_used_mb == 0.0:
+            cli_out = self._cli_run(f"rocm-smi -d {gpu_index} --showmeminfo vram")
+            vram_used_b = self._find_float(cli_out, r"VRAM Total Used Memory \(B\):\s*(\d+)")
+            mem_used_mb = vram_used_b / (1024 * 1024) if vram_used_b else 0.0
 
         processes: list[dict] = []
         try:
