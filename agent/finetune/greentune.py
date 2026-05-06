@@ -346,7 +346,7 @@ def build_training_args(args: argparse.Namespace) -> TrainingArguments:
         gradient_checkpointing_kwargs={"use_reentrant": False},
         dataloader_num_workers=4,
         dataloader_pin_memory=True,
-        remove_unused_columns=False,
+        remove_unused_columns=True,
     )
 
 
