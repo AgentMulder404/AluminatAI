@@ -23,7 +23,7 @@ from pathlib import Path
 
 import torch
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
 ADAPTER_PATH = "output/greentune-run/adapter"
@@ -41,26 +41,19 @@ PROMPTS = [
 
 
 def main():
-    print("Loading base model...")
+    print("Loading base model in bf16 (192GB VRAM — no quantization needed for eval)...")
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
-
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-    )
 
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_ID,
-        quantization_config=bnb_config,
+        torch_dtype=torch.bfloat16,
         device_map={"": 0},
         attn_implementation="sdpa",
         trust_remote_code=True,
     )
 
     print(f"Loading adapter from {ADAPTER_PATH}...")
-    model = PeftModel.from_pretrained(model, ADAPTER_PATH)
+    model = PeftModel.from_pretrained(model, ADAPTER_PATH, torch_dtype=torch.bfloat16)
     print("Merging LoRA weights into base model...")
     model = model.merge_and_unload()
     model.eval()
@@ -75,7 +68,7 @@ def main():
         )
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
-        with torch.no_grad(), torch.amp.autocast("cuda", dtype=torch.bfloat16):
+        with torch.no_grad():
             output_ids = model.generate(
                 **inputs,
                 max_new_tokens=512,
