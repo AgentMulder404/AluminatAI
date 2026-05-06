@@ -129,13 +129,31 @@ class AMDGPUCollector:
     def _amdsmi_name(handle, idx: int) -> str:
         try:
             info = amdsmi.amdsmi_get_gpu_asic_info(handle)
-            return (
-                info.get("market_name", "")
-                or info.get("device_id", "")
-                or f"AMD GPU {idx}"
-            )
+            name = info.get("market_name", "") or ""
+            if name and not name.startswith("0x"):
+                return name
         except Exception:
-            return f"AMD GPU {idx}"
+            pass
+        # amdsmi didn't return a human-readable name — try rocm-smi CLI
+        try:
+            out = subprocess.check_output(
+                f"rocm-smi -d {idx} --showproductname",
+                shell=True, text=True, timeout=5,
+            )
+            for line in out.splitlines():
+                m = re.search(r"Card Model:\s*(.+)", line, re.IGNORECASE)
+                if m:
+                    val = m.group(1).strip()
+                    if val and val != "N/A":
+                        return val
+                m = re.search(r"Card Series:\s*(.+)", line, re.IGNORECASE)
+                if m:
+                    val = m.group(1).strip()
+                    if val and val != "N/A":
+                        return val
+        except Exception:
+            pass
+        return f"AMD GPU {idx}"
 
     def _collect_amdsmi(
         self, gpu_index: int, timestamp: str, current_time: float
@@ -182,6 +200,15 @@ class AMDGPUCollector:
             mem_total_mb = float(vram.get("vram_total", 0)) / (1024 * 1024)
         except Exception:
             pass
+        if mem_total_mb == 0.0:
+            cli_out = self._cli_run(
+                f"rocm-smi -d {gpu_index} --showmeminfo vram"
+            )
+            vram_total_b = self._find_float(cli_out, r"VRAM Total Memory \(B\):\s*([\d]+)")
+            vram_used_b = self._find_float(cli_out, r"VRAM Total Used Memory \(B\):\s*([\d]+)")
+            if vram_total_b > 0:
+                mem_total_mb = vram_total_b / (1024 * 1024)
+                mem_used_mb = vram_used_b / (1024 * 1024)
 
         processes: list[dict] = []
         try:
