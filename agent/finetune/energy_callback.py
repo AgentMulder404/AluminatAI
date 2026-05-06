@@ -30,7 +30,7 @@ from typing import Optional
 
 from transformers import TrainerCallback, TrainerControl, TrainerState, TrainingArguments
 
-from .rocm_power import PowerSamplerThread
+from rocm_power import PowerSamplerThread
 
 
 # US average grid carbon intensity (gCO2/kWh) — conservative default
