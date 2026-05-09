@@ -28,6 +28,7 @@ Roofline Model:
   Compute-bound workloads (high I): limited by TFLOPS, bandwidth sufficient
 """
 
+import re
 from dataclasses import dataclass
 
 
@@ -157,6 +158,40 @@ GPU_ARCHITECTURES: dict[str, ArchSpec] = {
         # Volta
         ArchSpec('V100-SXM2-32GB',  'Volta',        300,  125,  15.7,    0,  32,  900, False),
         ArchSpec('V100-SXM2-16GB',  'Volta',        300,  125,  15.7,    0,  16,  900, False),
+        # Apple Silicon (unified memory — memory_gb is total system RAM share)
+        ArchSpec('Apple M1 GPU',        'Apple Silicon',  10,   2.6,  1.3,  2.6,   8, 68,  False),
+        ArchSpec('Apple M1 Pro GPU',    'Apple Silicon',  20,   5.2,  2.6,  5.2,  16, 200, False),
+        ArchSpec('Apple M1 Max GPU',    'Apple Silicon',  40,  10.4,  5.2, 10.4,  32, 400, False),
+        ArchSpec('Apple M1 Ultra GPU',  'Apple Silicon',  60,  20.8, 10.4, 20.8,  64, 800, False),
+        ArchSpec('Apple M2 GPU',        'Apple Silicon',  12,   3.6,  1.8,  3.6,   8, 100, False),
+        ArchSpec('Apple M2 Pro GPU',    'Apple Silicon',  22,   6.8,  3.4,  6.8,  16, 200, False),
+        ArchSpec('Apple M2 Max GPU',    'Apple Silicon',  45,  13.6,  6.8, 13.6,  48, 400, False),
+        ArchSpec('Apple M2 Ultra GPU',  'Apple Silicon',  75,  27.2, 13.6, 27.2, 192, 800, False),
+        ArchSpec('Apple M3 GPU',        'Apple Silicon',  12,   4.1,  2.1,  4.1,   8, 100, False),
+        ArchSpec('Apple M3 Pro GPU',    'Apple Silicon',  22,   7.0,  3.5,  7.0,  18, 150, False),
+        ArchSpec('Apple M3 Max GPU',    'Apple Silicon',  45,  14.2,  7.1, 14.2,  48, 400, False),
+        ArchSpec('Apple M3 Ultra GPU',  'Apple Silicon',  75,  28.4, 14.2, 28.4, 192, 800, False),
+        ArchSpec('Apple M4 GPU',        'Apple Silicon',  14,   4.6,  2.3,  4.6,  16, 120, False),
+        ArchSpec('Apple M4 Pro GPU',    'Apple Silicon',  25,   8.4,  4.2,  8.4,  24, 273, False),
+        ArchSpec('Apple M4 Max GPU',    'Apple Silicon',  50,  16.7,  8.4, 16.7,  64, 546, False),
+        ArchSpec('Apple M4 Ultra GPU',  'Apple Silicon',  80,  33.5, 16.7, 33.5, 256, 819, False),
+        ArchSpec('Apple M5 GPU',        'Apple Silicon',  15,   5.0,  2.5,  5.0,  16, 120, False),
+        ArchSpec('Apple M5 Pro GPU',    'Apple Silicon',  28,   9.5,  4.8,  9.5,  24, 273, False),
+        ArchSpec('Apple M5 Max GPU',    'Apple Silicon',  55,  18.0,  9.0, 18.0,  64, 546, False),
+        ArchSpec('Apple M5 Ultra GPU',  'Apple Silicon',  85,  36.0, 18.0, 36.0, 256, 819, False),
+        # Intel Gaudi AI Accelerators
+        ArchSpec('Intel Gaudi',   'Gaudi',  300,  140,  17.5,  140,  32, 1000, False),
+        ArchSpec('Intel Gaudi2',  'Gaudi',  600,  420,  52.5,  420,  96, 2460, True),
+        ArchSpec('Intel Gaudi3',  'Gaudi',  900,  900, 112.5,  900, 128, 3700, True),
+        # Intel Arc / Data Center GPUs (Alchemist / Battlemage / Ponte Vecchio)
+        ArchSpec('Intel Arc A770',  'Arc',  225,  39.3, 19.7, 39.3, 16, 560, False),
+        ArchSpec('Intel Arc A750',  'Arc',  225,  34.4, 17.2, 34.4,  8, 512, False),
+        ArchSpec('Intel Arc A580',  'Arc',  185,  24.6, 12.3, 24.6,  8, 512, False),
+        ArchSpec('Intel Arc B580',  'Arc',  190,  27.3, 13.7, 27.3, 12, 456, False),
+        ArchSpec('Intel Data Center GPU Flex 170',   'Arc',  150,  24.0, 12.0, 24.0, 16, 560, False),
+        ArchSpec('Intel Data Center GPU Flex 140',   'Arc',   75,  12.0,  6.0, 12.0,  8, 280, False),
+        ArchSpec('Intel Data Center GPU Max 1550',   'Ponte Vecchio', 600, 419.4, 52.4, 419.4, 128, 3276, True),
+        ArchSpec('Intel Data Center GPU Max 1100',   'Ponte Vecchio', 300, 209.7, 26.2, 209.7,  48, 1228, True),
     ]
 }
 
@@ -189,10 +224,10 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
 
 def resolve_arch(gpu_name: str) -> ArchSpec | None:
     """
-    Match a gpu_name string (from NVML) to a known architecture.
+    Match a gpu_name string to a known architecture.
 
-    NVML returns names like "NVIDIA A100-SXM4-80GB" or "Tesla T4".
-    We strip the vendor prefix and try exact match, then substring match.
+    Handles NVML names ("NVIDIA A100-SXM4-80GB", "Tesla T4") and Apple
+    Silicon names ("Apple M5 GPU", "Apple M4 Max GPU (40-core)").
     """
     # Exact match
     if gpu_name in GPU_ARCHITECTURES:
@@ -203,6 +238,27 @@ def resolve_arch(gpu_name: str) -> ArchSpec | None:
     if cleaned in GPU_ARCHITECTURES:
         return GPU_ARCHITECTURES[cleaned]
 
+    # Apple Silicon: strip core count suffix, e.g. "Apple M5 GPU (10-core)" -> "Apple M5 GPU"
+    if "Apple M" in gpu_name:
+        apple_clean = re.sub(r'\s*\(\d+-core\)', '', gpu_name)
+        if apple_clean in GPU_ARCHITECTURES:
+            return GPU_ARCHITECTURES[apple_clean]
+        for arch_name, spec in GPU_ARCHITECTURES.items():
+            if spec.family == 'Apple Silicon' and arch_name in apple_clean:
+                return spec
+
+    # Intel Gaudi: match "Intel Gaudi2", "Intel Gaudi3", etc.
+    if "Gaudi" in gpu_name:
+        for arch_name, spec in GPU_ARCHITECTURES.items():
+            if spec.family == 'Gaudi' and arch_name in gpu_name:
+                return spec
+
+    # Intel Arc / Data Center GPU: match "Intel Arc A770", "Intel Data Center GPU Max 1550", etc.
+    if "Intel" in gpu_name and ("Arc" in gpu_name or "Data Center" in gpu_name):
+        for arch_name, spec in GPU_ARCHITECTURES.items():
+            if spec.family in ('Arc', 'Ponte Vecchio') and arch_name in gpu_name:
+                return spec
+
     # Substring match (e.g., "A100" matches "A100-SXM4-80GB")
     for arch_name, spec in GPU_ARCHITECTURES.items():
         if arch_name in cleaned or cleaned in arch_name:
@@ -210,7 +266,6 @@ def resolve_arch(gpu_name: str) -> ArchSpec | None:
 
     # Family match (e.g., "A100" anywhere in the string)
     for arch_name, spec in GPU_ARCHITECTURES.items():
-        # Extract the base model (e.g., "A100" from "A100-SXM4-80GB")
         base = arch_name.split('-')[0]
         if base in gpu_name:
             return spec

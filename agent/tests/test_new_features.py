@@ -229,10 +229,8 @@ class TestRaplReader(unittest.TestCase):
 
     def test_overflow_handling(self):
         from efficiency.rapl import RaplReader
-        reader = RaplReader()
-        reader._max_energy_uj = 1000
-        self.assertEqual(reader._delta_with_overflow(900, 100), 200)
-        self.assertEqual(reader._delta_with_overflow(100, 500), 400)
+        self.assertEqual(RaplReader._delta_with_overflow(900, 100, 1000), 200)
+        self.assertEqual(RaplReader._delta_with_overflow(100, 500, 1000), 400)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

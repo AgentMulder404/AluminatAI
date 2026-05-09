@@ -201,6 +201,30 @@ except (ImportError, SyntaxError) as _e:
     _AMD_COLLECTOR = False
 
 try:
+    from gaudi_collector import GaudiCollector
+    _GAUDI_COLLECTOR = True
+except (ImportError, SyntaxError) as _e:
+    _GAUDI_COLLECTOR = False
+
+try:
+    from intel_arc_collector import IntelArcCollector
+    _INTEL_ARC_COLLECTOR = True
+except (ImportError, SyntaxError) as _e:
+    _INTEL_ARC_COLLECTOR = False
+
+try:
+    from apple_collector import AppleSiliconCollector
+    _APPLE_COLLECTOR = True
+except (ImportError, SyntaxError) as _e:
+    _APPLE_COLLECTOR = False
+
+try:
+    from rapl_collector import RAPLCollector
+    _RAPL_COLLECTOR = True
+except (ImportError, SyntaxError) as _e:
+    _RAPL_COLLECTOR = False
+
+try:
     from uploader import MetricsUploader
     from config import (
         UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY, API_ENDPOINT,
@@ -592,24 +616,57 @@ class Agent:
         collector = None
         gpu_backend = "unknown"
 
-        if _COLLECTOR:
+        # CPU_ONLY_MODE skips GPU detection and goes straight to RAPL
+        cpu_only = os.getenv("CPU_ONLY_MODE", "").lower() in ("1", "true", "yes")
+
+        if not cpu_only and _COLLECTOR:
             try:
                 collector = GPUCollector(collect_clocks=False)
                 gpu_backend = "NVIDIA (NVML)"
             except Exception as exc:
                 log.warning("NVIDIA collector failed: %s — trying AMD", exc)
 
-        if collector is None and _AMD_COLLECTOR:
+        if not cpu_only and collector is None and _AMD_COLLECTOR:
             try:
                 collector = AMDGPUCollector(collect_clocks=False)
                 gpu_backend = "AMD (amdsmi)" if getattr(collector, "_use_amdsmi", False) else "AMD (rocm-smi)"
             except Exception as exc:
                 log.warning("AMD collector failed: %s", exc)
 
+        if not cpu_only and collector is None and _GAUDI_COLLECTOR:
+            try:
+                collector = GaudiCollector(collect_clocks=False)
+                gpu_backend = "Intel Gaudi (pyhlml)" if getattr(collector, "_use_pyhlml", False) else "Intel Gaudi (hl-smi)"
+            except Exception as exc:
+                log.warning("Gaudi collector failed: %s", exc)
+
+        if not cpu_only and collector is None and _INTEL_ARC_COLLECTOR:
+            try:
+                collector = IntelArcCollector(collect_clocks=False)
+                gpu_backend = f"Intel Arc ({collector.backend})"
+            except Exception as exc:
+                log.warning("Intel Arc collector failed: %s", exc)
+
+        if not cpu_only and collector is None and _APPLE_COLLECTOR:
+            try:
+                collector = AppleSiliconCollector(collect_clocks=False)
+                gpu_backend = f"Apple Silicon ({collector.backend})"
+            except Exception as exc:
+                log.warning("Apple Silicon collector failed: %s", exc)
+
+        if collector is None and _RAPL_COLLECTOR:
+            try:
+                collector = RAPLCollector(collect_clocks=False)
+                gpu_backend = "CPU (RAPL)"
+            except Exception as exc:
+                log.warning("RAPL collector failed: %s", exc)
+
         if collector is None:
             log.error(
-                "No GPU collector available — "
-                "install nvidia-ml-py3 (NVIDIA) or amdsmi/rocm-smi (AMD)"
+                "No collector available — install nvidia-ml-py3 (NVIDIA), "
+                "amdsmi/rocm-smi (AMD), xpu-smi (Intel Arc), "
+                "run on macOS Apple Silicon, "
+                "or run on Linux with RAPL sysfs access (CPU-only)"
             )
             return 3
 

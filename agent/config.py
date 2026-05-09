@@ -236,6 +236,39 @@ FLEET_AGGREGATOR_PEERS = os.getenv("FLEET_AGGREGATOR_PEERS", "")  # comma-separa
 
 RAPL_ENABLED = os.getenv("RAPL_ENABLED", "1").lower() not in ("0", "false", "no")
 
+# Explicit opt-in for CPU-only monitoring when no GPU is present.
+CPU_ONLY_MODE = os.getenv("CPU_ONLY_MODE", "").lower() in ("1", "true", "yes")
+
+# Override the auto-detected CPU model name (useful for heterogeneous clusters).
+RAPL_CPU_MODEL_OVERRIDE = os.getenv("RAPL_CPU_MODEL_OVERRIDE", "")
+
+# ── Intel Gaudi ──────────────────────────────────────────────────────────────
+
+# Enable/disable Gaudi collector (auto-detects pyhlml or hl-smi).
+GAUDI_ENABLED = os.getenv("GAUDI_ENABLED", "1").lower() not in ("0", "false", "no")
+
+# Custom path to hl-smi binary (if not in PATH).
+HL_SMI_PATH = os.getenv("HL_SMI_PATH", "hl-smi")
+
+# ── Intel Arc / Data Center GPU ──────────────────────────────────────────────
+
+# Enable/disable Intel Arc collector (auto-detects xpu-smi or hwmon sysfs).
+INTEL_ARC_ENABLED = os.getenv("INTEL_ARC_ENABLED", "1").lower() not in ("0", "false", "no")
+
+# Custom path to xpu-smi binary (if not in PATH).
+XPU_SMI_PATH = os.getenv("XPU_SMI_PATH", "xpu-smi")
+
+# ── Apple Silicon ────────────────────────────────────────────────────────────
+
+# Enable/disable powermetrics backend (requires sudo -n for NOPASSWD).
+APPLE_POWERMETRICS_ENABLED = os.getenv("APPLE_POWERMETRICS_ENABLED", "1").lower() not in ("0", "false", "no")
+
+# Sampling interval for powermetrics subprocess (milliseconds).
+APPLE_POWERMETRICS_INTERVAL_MS = int(os.getenv("APPLE_POWERMETRICS_INTERVAL_MS", "1000"))
+
+# Override GPU TDP estimate for unknown Apple chips (watts).
+APPLE_CHIP_TDP_OVERRIDE = os.getenv("APPLE_CHIP_TDP_OVERRIDE", "")
+
 # ── Cloud Cost Detection ─────────────────────────────────────────────────────
 
 CLOUD_COST_ENABLED = os.getenv("CLOUD_COST_ENABLED", "1").lower() not in ("0", "false", "no")
