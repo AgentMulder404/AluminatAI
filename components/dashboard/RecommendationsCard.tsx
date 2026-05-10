@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface Recommendation {
   id: string;
@@ -89,6 +90,9 @@ export default function RecommendationsCard({ clusterParam }: RecommendationsCar
     <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-neutral-200">Recommendations</h3>
+        <Link href="/dashboard/advisor" className="text-xs text-green-400 hover:text-green-300">
+          Energy Advisor →
+        </Link>
         </div>
 
       {/* Recommendations */}

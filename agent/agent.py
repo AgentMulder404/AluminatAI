@@ -231,6 +231,24 @@ except ImportError:
     _ERROR_TRACKER = False
 
 try:
+    from recommendation_reporter import RecommendationReporter
+    _REC_REPORTER = True
+except ImportError:
+    _REC_REPORTER = False
+
+try:
+    from command_receiver import CommandReceiver
+    _CMD_RECEIVER = True
+except ImportError:
+    _CMD_RECEIVER = False
+
+try:
+    from swarm.policy_engine import SwarmPolicyEngine
+    _SWARM_ENGINE = True
+except ImportError:
+    _SWARM_ENGINE = False
+
+try:
     from uploader import MetricsUploader
     from config import (
         UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY, API_ENDPOINT,
@@ -243,6 +261,8 @@ try:
         PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD,
         GRID_ZONE, MULTI_AGENT_ENABLED,
         ERROR_UPLOAD_INTERVAL,
+        COMMAND_POLL_ENABLED, COMMAND_POLL_INTERVAL,
+        SWARM_ENABLED, SWARM_EVAL_INTERVAL, SWARM_MAX_RECS,
     )
     _UPLOADER = True
 except ImportError:
@@ -269,6 +289,11 @@ except ImportError:
     GRID_ZONE = ""
     MULTI_AGENT_ENABLED = False
     ERROR_UPLOAD_INTERVAL = 300
+    COMMAND_POLL_ENABLED = False
+    COMMAND_POLL_INTERVAL = 60
+    SWARM_ENABLED = False
+    SWARM_EVAL_INTERVAL = 300
+    SWARM_MAX_RECS = 20
 
 try:
     from baseline import IdleBaseline
@@ -635,6 +660,48 @@ class Agent:
                          FAST_SAMPLE_INTERVAL * 1000, FAST_SAMPLE_BUFFER_SIZE)
             except ImportError as exc:
                 log.warning("Multi-agent mode requested but unavailable: %s", exc)
+
+        # Recommendation reporter (uploads optimization recs to cloud)
+        self.rec_reporter = None
+        if _REC_REPORTER and UPLOAD_ENABLED and API_KEY and not self.prometheus_only:
+            self.rec_reporter = RecommendationReporter(
+                endpoint=API_ENDPOINT,
+                api_key=API_KEY,
+                machine_id=get_machine_id(),
+            )
+            log.info("RecommendationReporter: enabled")
+
+        # Command receiver (polls cloud for pending commands)
+        self.cmd_receiver = None
+        self._last_cmd_poll: float = 0.0
+        if (_CMD_RECEIVER and COMMAND_POLL_ENABLED
+                and UPLOAD_ENABLED and API_KEY
+                and not self.prometheus_only):
+            self.cmd_receiver = CommandReceiver(
+                endpoint=API_ENDPOINT,
+                api_key=API_KEY,
+                machine_id=get_machine_id(),
+                dry_run=self.dry_run,
+            )
+            log.info("CommandReceiver: polling every %ds", COMMAND_POLL_INTERVAL)
+
+        # Swarm policy engine (fleet-wide optimization — leader mode)
+        self.swarm_engine = None
+        self._last_swarm_eval: float = 0.0
+        if (_SWARM_ENGINE and SWARM_ENABLED
+                and self.rec_reporter
+                and UPLOAD_ENABLED and API_KEY
+                and not self.prometheus_only):
+            self.swarm_engine = SwarmPolicyEngine(
+                endpoint=API_ENDPOINT,
+                api_key=API_KEY,
+                machine_id=get_machine_id(),
+                reporter=self.rec_reporter,
+                cluster_tag=CLUSTER_TAG,
+                max_recs_per_eval=SWARM_MAX_RECS,
+                cooldown_s=SWARM_EVAL_INTERVAL,
+            )
+            log.info("SwarmPolicyEngine: leader mode, eval every %ds", SWARM_EVAL_INTERVAL)
 
         # Rich console
         self.console = Console() if (_RICH and not quiet) else None
@@ -1149,6 +1216,11 @@ class Agent:
                                     tr.gpu_index, tr.gpu_name,
                                     int(tr.recommended_cap_w), tr.estimated_savings_pct, tr.applied,
                                 )
+                        if self.rec_reporter and tune_results:
+                            try:
+                                self.rec_reporter.report_from_auto_tuner(tune_results)
+                            except Exception as _rec_exc:
+                                log.debug("Recommendation upload failed: %s", _rec_exc)
                     except Exception as exc:
                         log.warning("AutoTuner error: %s", exc)
                         if self.error_tracker:
@@ -1163,6 +1235,20 @@ class Agent:
                             _carbon_intensity = _ci.carbon_intensity_gco2e
                             _carbon_renewable = _ci.renewable_pct
                             _last_carbon_fetch = _now_carbon
+
+                            # Carbon schedule recommendation (every fetch cycle)
+                            if self.rec_reporter and _carbon_intensity > 0:
+                                try:
+                                    from efficiency.carbon_scheduler import find_optimal_window
+                                    schedule_rec = find_optimal_window(
+                                        zone=_carbon_zone, duration_hours=4.0,
+                                    )
+                                    if schedule_rec:
+                                        self.rec_reporter.report_from_carbon_scheduler(schedule_rec)
+                                except ImportError:
+                                    pass
+                                except Exception as _cs_exc:
+                                    log.debug("Carbon schedule rec failed: %s", _cs_exc)
                         except Exception as exc:
                             log.debug("Carbon fetch failed: %s", exc)
                     if _carbon_intensity > 0:
@@ -1225,6 +1311,34 @@ class Agent:
                             [e.to_dict() for e in unsent],
                         )
                     self._last_error_upload = time.time()
+
+                # Command polling (Advisor / Swarm) — adaptive interval
+                _cmd_interval = (
+                    self.cmd_receiver.poll_interval
+                    if self.cmd_receiver else COMMAND_POLL_INTERVAL
+                )
+                if (self.cmd_receiver
+                        and time.time() - self._last_cmd_poll >= _cmd_interval):
+                    try:
+                        n = self.cmd_receiver.poll_and_execute()
+                        if n:
+                            log.info("Executed %d remote commands", n)
+                    except Exception as exc:
+                        log.debug("Command poll error: %s", exc)
+                        if self.error_tracker:
+                            self.error_tracker.record("command_receiver", str(exc), exc=exc)
+                    self._last_cmd_poll = time.time()
+
+                # Swarm policy engine (fleet-wide optimization)
+                if self.swarm_engine and self.swarm_engine.should_evaluate():
+                    try:
+                        n = self.swarm_engine.evaluate()
+                        if n:
+                            log.info("Swarm: dispatched %d fleet recommendations", n)
+                    except Exception as exc:
+                        log.debug("Swarm eval error: %s", exc)
+                        if self.error_tracker:
+                            self.error_tracker.record("swarm_engine", str(exc), exc=exc)
 
                 # Console display
                 if not self.quiet and self.sample_count % 1 == 0:

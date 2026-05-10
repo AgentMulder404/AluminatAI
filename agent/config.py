@@ -299,6 +299,8 @@ COMMAND_POLL_INTERVAL = int(os.getenv("COMMAND_POLL_INTERVAL", "60"))
 # ── Swarm ────────────────────────────────────────────────────────────────────
 
 SWARM_ENABLED = os.getenv("SWARM_ENABLED", "").lower() in ("1", "true", "yes")
+SWARM_EVAL_INTERVAL = int(os.getenv("SWARM_EVAL_INTERVAL", "300"))  # 5 min between policy evals
+SWARM_MAX_RECS = int(os.getenv("SWARM_MAX_RECS", "20"))
 
 # ── TLS / Proxy ───────────────────────────────────────────────────────────────
 
