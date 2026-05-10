@@ -287,6 +287,19 @@ TAG_POLL_INTERVAL = int(os.getenv("TAG_POLL_INTERVAL", str(SCHEDULER_POLL_INTERV
 
 HEARTBEAT_INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL", "300"))  # 5 min
 
+# ── Error Upload ─────────────────────────────────────────────────────────────
+
+ERROR_UPLOAD_INTERVAL = int(os.getenv("ERROR_UPLOAD_INTERVAL", "300"))  # 5 min
+
+# ── Command Polling (Advisor / Swarm) ────────────────────────────────────────
+
+COMMAND_POLL_ENABLED = os.getenv("COMMAND_POLL_ENABLED", "").lower() in ("1", "true", "yes")
+COMMAND_POLL_INTERVAL = int(os.getenv("COMMAND_POLL_INTERVAL", "60"))
+
+# ── Swarm ────────────────────────────────────────────────────────────────────
+
+SWARM_ENABLED = os.getenv("SWARM_ENABLED", "").lower() in ("1", "true", "yes")
+
 # ── TLS / Proxy ───────────────────────────────────────────────────────────────
 
 HTTPS_PROXY = os.getenv("HTTPS_PROXY", "")

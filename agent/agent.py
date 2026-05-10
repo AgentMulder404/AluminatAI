@@ -225,6 +225,12 @@ except (ImportError, SyntaxError) as _e:
     _RAPL_COLLECTOR = False
 
 try:
+    from error_tracker import ErrorTracker
+    _ERROR_TRACKER = True
+except ImportError:
+    _ERROR_TRACKER = False
+
+try:
     from uploader import MetricsUploader
     from config import (
         UPLOAD_ENABLED, UPLOAD_INTERVAL, API_KEY, API_ENDPOINT,
@@ -236,6 +242,7 @@ try:
         DCGM_ENABLED,
         PID_SMOOTH_WINDOW, PID_STABLE_THRESHOLD,
         GRID_ZONE, MULTI_AGENT_ENABLED,
+        ERROR_UPLOAD_INTERVAL,
     )
     _UPLOADER = True
 except ImportError:
@@ -261,6 +268,7 @@ except ImportError:
     PID_STABLE_THRESHOLD = 0.60
     GRID_ZONE = ""
     MULTI_AGENT_ENABLED = False
+    ERROR_UPLOAD_INTERVAL = 300
 
 try:
     from baseline import IdleBaseline
@@ -412,6 +420,9 @@ def send_heartbeat(
     cluster_tag: str = "",
     location_hint: str = "",
     gpu_names: Optional[List[str]] = None,
+    error_stats: Optional[dict] = None,
+    gpu_backend: str = "",
+    agent_mode: str = "normal",
 ) -> None:
     from urllib.parse import urlparse
     parsed = urlparse(endpoint)
@@ -429,7 +440,13 @@ def send_heartbeat(
         "cluster_tag": cluster_tag,
         "location_hint": location_hint,
         "gpu_names": list(dict.fromkeys(gpu_names)) if gpu_names else [],
+        "os_info": f"{sys.platform} {os.uname().release}" if hasattr(os, "uname") else sys.platform,
+        "python_version": sys.version.split()[0],
+        "gpu_backend": gpu_backend,
+        "agent_mode": agent_mode,
     }
+    if error_stats:
+        payload.update(error_stats)
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
         url, data=data,
@@ -441,6 +458,35 @@ def send_heartbeat(
             pass
     except Exception as exc:
         log.debug("Heartbeat failed (non-fatal): %s", exc)
+
+
+def _upload_errors(
+    endpoint: str,
+    api_key: str,
+    machine_id: str,
+    errors: list[dict],
+) -> bool:
+    from urllib.parse import urlparse
+    parsed = urlparse(endpoint)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    url = base + "/api/agent/errors"
+    payload = {
+        "machine_id": machine_id,
+        "hostname": socket.gethostname(),
+        "errors": errors,
+    }
+    data = json.dumps(payload, default=str).encode()
+    req = urllib.request.Request(
+        url, data=data,
+        headers={"Content-Type": "application/json", "X-API-Key": api_key},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            return True
+    except Exception as exc:
+        log.debug("Error upload failed (non-fatal): %s", exc)
+        return False
 
 
 # ── Unified Agent ─────────────────────────────────────────────────────────────
@@ -483,6 +529,10 @@ class Agent:
         self.total_energy: dict[int, float] = {}
         self._start_time = time.monotonic()
         self._config_hash = _compute_config_hash()
+
+        # Error tracker
+        self.error_tracker = ErrorTracker() if _ERROR_TRACKER else None
+        self._last_error_upload = 0.0
 
         if self.dry_run:
             log.warning("DRY RUN — collecting and attributing, but no data will be uploaded or written to WAL")
@@ -801,6 +851,8 @@ class Agent:
                 cluster_tag=CLUSTER_TAG,
                 location_hint=LOCATION_HINT,
                 gpu_names=self._last_gpu_names,
+                gpu_backend=gpu_backend,
+                agent_mode=_mode,
             )
             self.last_heartbeat = time.time()
 
@@ -830,6 +882,8 @@ class Agent:
                                         self._sched_fail_count)
                         else:
                             log.warning("Scheduler poll timed out after 10s — skipping this cycle")
+                        if self.error_tracker:
+                            self.error_tracker.record("scheduler", "Scheduler poll timed out after 10s")
                         if self._sched_fail_count >= 3:
                             self._sched_backoff_interval = min(
                                 self._sched_backoff_interval * 2, 300
@@ -837,6 +891,8 @@ class Agent:
                     except Exception as exc:
                         self._sched_fail_count = getattr(self, '_sched_fail_count', 0) + 1
                         log.warning("Scheduler poll failed: %s", exc)
+                        if self.error_tracker:
+                            self.error_tracker.record("scheduler", str(exc), exc=exc)
                         if self._sched_fail_count >= 3:
                             self._sched_backoff_interval = min(
                                 self._sched_backoff_interval * 2, 300
@@ -849,6 +905,8 @@ class Agent:
                     metrics = collector.collect()
                 except Exception as exc:
                     log.warning("Collection error: %s", exc)
+                    if self.error_tracker:
+                        self.error_tracker.record("collection", str(exc), exc=exc)
                     if self.metrics_server and hasattr(collector, "gpu_uuids"):
                         self.metrics_server.mark_collection_failed(collector.gpu_uuids)
                     time.sleep(self.interval)
@@ -1093,6 +1151,8 @@ class Agent:
                                 )
                     except Exception as exc:
                         log.warning("AutoTuner error: %s", exc)
+                        if self.error_tracker:
+                            self.error_tracker.record("auto_tuner", str(exc), exc=exc)
 
                 # Carbon tracking — fetch intensity every 5 minutes, update CO2 counter
                 if _carbon_client and self.metrics_server and not _in_warmup:
@@ -1139,6 +1199,7 @@ class Agent:
                 if (self.uploader and API_KEY
                         and not self.dry_run and not self.prometheus_only
                         and time.time() - self.last_heartbeat >= HEARTBEAT_INTERVAL):
+                    _err_stats = self.error_tracker.get_stats() if self.error_tracker else None
                     send_heartbeat(
                         API_ENDPOINT, API_KEY, gpu_count, gpu_uuids, scheduler_name,
                         uptime_sec=time.monotonic() - self._start_time,
@@ -1147,8 +1208,23 @@ class Agent:
                         cluster_tag=CLUSTER_TAG,
                         location_hint=LOCATION_HINT,
                         gpu_names=self._last_gpu_names,
+                        error_stats=_err_stats,
+                        gpu_backend=gpu_backend,
+                        agent_mode=_mode,
                     )
                     self.last_heartbeat = time.time()
+
+                # Periodic error upload
+                if (self.error_tracker and self.uploader and API_KEY
+                        and not self.dry_run and not self.prometheus_only
+                        and time.time() - self._last_error_upload >= ERROR_UPLOAD_INTERVAL):
+                    unsent = self.error_tracker.get_unsent(self._last_error_upload)
+                    if unsent:
+                        _upload_errors(
+                            API_ENDPOINT, API_KEY, self.machine_id,
+                            [e.to_dict() for e in unsent],
+                        )
+                    self._last_error_upload = time.time()
 
                 # Console display
                 if not self.quiet and self.sample_count % 1 == 0:
@@ -1167,6 +1243,8 @@ class Agent:
 
         except Exception as exc:
             log.exception("Unhandled error in agent loop: %s", exc)
+            if self.error_tracker:
+                self.error_tracker.record("unhandled", str(exc), exc=exc)
             return 1
 
         finally:

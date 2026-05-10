@@ -30,6 +30,14 @@ export async function POST(req: NextRequest) {
     cluster_tag,
     location_hint,
     gpu_names,
+    error_count_total,
+    error_count_last_hour,
+    last_error_message,
+    last_error_at,
+    os_info,
+    python_version,
+    gpu_backend,
+    agent_mode,
   } = body as {
     agent_version?: string;
     hostname?: string;
@@ -42,6 +50,14 @@ export async function POST(req: NextRequest) {
     cluster_tag?: string;
     location_hint?: string;
     gpu_names?: string[];
+    error_count_total?: number;
+    error_count_last_hour?: number;
+    last_error_message?: string;
+    last_error_at?: number;
+    os_info?: string;
+    python_version?: string;
+    gpu_backend?: string;
+    agent_mode?: string;
   };
 
   const supabase = createSupabaseServerClient();
@@ -60,6 +76,16 @@ export async function POST(req: NextRequest) {
       location_hint: location_hint ?? "",
       gpu_names: gpu_names ?? [],
       last_seen: new Date().toISOString(),
+      ...(error_count_total !== undefined && { error_count_total }),
+      ...(error_count_last_hour !== undefined && { error_count_last_hour }),
+      ...(last_error_message !== undefined && { last_error_message }),
+      ...(last_error_at !== undefined && {
+        last_error_at: new Date(last_error_at * 1000).toISOString(),
+      }),
+      ...(os_info !== undefined && { os_info }),
+      ...(python_version !== undefined && { python_version }),
+      ...(gpu_backend !== undefined && { gpu_backend }),
+      ...(agent_mode !== undefined && { agent_mode }),
     },
     { onConflict: "user_id,hostname" }
   );
