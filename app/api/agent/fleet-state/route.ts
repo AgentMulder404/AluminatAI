@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateApiKey } from "@/lib/api-auth";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 export const runtime = "edge";
 
@@ -27,6 +28,14 @@ export async function GET(req: NextRequest) {
   const auth = await validateApiKey(apiKey);
   if (!auth.valid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`fleet-state:${auth.userId}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const supabase = createSupabaseServerClient();

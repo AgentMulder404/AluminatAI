@@ -7,7 +7,9 @@ import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getTeamScope } from "@/lib/rbac";
 import { checkCountLimit } from "@/lib/plans";
 import { logAudit } from "@/lib/audit";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 async function authenticate() {
@@ -26,6 +28,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`teams:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const { teams } = await getTeamScope(user.id);
   return NextResponse.json({ teams });
 }
@@ -34,6 +44,14 @@ export async function POST(req: NextRequest) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`teams:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const body = await req.json();
@@ -88,7 +106,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   void logAudit({

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase.rpc("benchmark_leaderboard_stats");
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json(data ?? [], {

@@ -8,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { sendEmail } from "@/lib/notifications";
 import { verifyCronSecret } from "@/lib/auth-helpers";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 // Map drip index (0-4) to minimum days since signup
@@ -132,7 +133,7 @@ export async function GET(req: NextRequest) {
     .limit(500);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   let usersProcessed = 0;

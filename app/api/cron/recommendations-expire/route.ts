@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
     .select("id, user_id");
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   const expiredList = expired ?? [];

@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export async function POST(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieClient = await createSupabaseCookieClient();
-  const {
-    data: { user },
-  } = await cookieClient.auth.getUser();
-
   const body = await req.json().catch(() => ({}));
-  const userId = (body as Record<string, string>).user_id ?? user?.id;
+  const userId = (body as Record<string, string>).user_id;
   if (!userId) {
     return NextResponse.json(
-      { error: "user_id required (body or cookie auth)" },
+      { error: "user_id required in request body" },
       { status: 400 }
     );
   }

@@ -7,7 +7,9 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requireRole, type TeamRole } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 async function authenticate() {
@@ -30,6 +32,14 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`team-members:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const { teamId } = await params;
   const { allowed } = await requireRole(user.id, teamId, "viewer");
   if (!allowed) {
@@ -45,7 +55,7 @@ export async function GET(
     .order("created_at", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ members: data ?? [] });
@@ -59,6 +69,14 @@ export async function POST(
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`team-members:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const { teamId } = await params;
@@ -152,7 +170,7 @@ export async function POST(
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   void logAudit({
@@ -174,6 +192,14 @@ export async function DELETE(
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`team-members:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const { teamId } = await params;
@@ -220,7 +246,7 @@ export async function DELETE(
     .eq("user_id", user_id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   void logAudit({

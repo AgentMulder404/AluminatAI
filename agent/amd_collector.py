@@ -159,8 +159,8 @@ class AMDGPUCollector:
         # Try rocm-smi for Card Model / GFX Version
         try:
             out = subprocess.check_output(
-                f"rocm-smi -d {idx} --showproductname",
-                shell=True, text=True, timeout=5,
+                ["rocm-smi", "-d", str(idx), "--showproductname"],
+                text=True, timeout=5,
             )
             for line in out.splitlines():
                 m = re.search(r"Card Model:\s*(0x\w+)", line)
@@ -174,8 +174,8 @@ class AMDGPUCollector:
     def _init_vram_total(idx: int) -> float:
         try:
             out = subprocess.check_output(
-                f"rocm-smi -d {idx} --showmeminfo vram",
-                shell=True, text=True, timeout=10,
+                ["rocm-smi", "-d", str(idx), "--showmeminfo", "vram"],
+                text=True, timeout=10,
             )
             for line in out.splitlines():
                 m = re.search(r"VRAM Total Memory \(B\):\s*(\d+)", line)
@@ -233,7 +233,7 @@ class AMDGPUCollector:
         except Exception:
             pass
         if mem_used_mb == 0.0:
-            cli_out = self._cli_run(f"rocm-smi -d {gpu_index} --showmeminfo vram")
+            cli_out = self._cli_run(["rocm-smi", "-d", str(gpu_index), "--showmeminfo", "vram"])
             vram_used_b = self._find_float(cli_out, r"VRAM Total Used Memory \(B\):\s*(\d+)")
             mem_used_mb = vram_used_b / (1024 * 1024) if vram_used_b else 0.0
 
@@ -268,13 +268,13 @@ class AMDGPUCollector:
     # ── rocm-smi CLI backend ────────────────────────────────────────────
 
     def _init_cli(self):
-        out = self._cli_run("rocm-smi --showid")
+        out = self._cli_run(["rocm-smi", "--showid"])
         gpu_lines = re.findall(r"GPU\[(\d+)\]", out)
         self.gpu_count = max(len(set(gpu_lines)), 1)
 
         for i in range(self.gpu_count):
             init_out = self._cli_run(
-                f"rocm-smi -d {i} --showuniqueid --showproductname --showmaxpower"
+                ["rocm-smi", "-d", str(i), "--showuniqueid", "--showproductname", "--showmaxpower"]
             )
             uuid = self._find_str(init_out, r"Unique ID:\s*(\S+)") or f"AMD-CLI-{i}"
             name = self._find_str(init_out, r"Card Series:\s*(.+)") or f"AMD GPU {i}"
@@ -292,10 +292,10 @@ class AMDGPUCollector:
     def _collect_cli(
         self, gpu_index: int, timestamp: str, current_time: float
     ) -> GPUMetrics:
-        out = self._cli_run(
-            f"rocm-smi -d {gpu_index} "
-            f"--showpower --showmaxpower --showtemp --showuse --showmeminfo vram"
-        )
+        out = self._cli_run([
+            "rocm-smi", "-d", str(gpu_index),
+            "--showpower", "--showmaxpower", "--showtemp", "--showuse", "--showmeminfo", "vram",
+        ])
 
         power_w = self._find_float(out, r"Average Graphics Package Power \(W\):\s*([\d.]+)")
         if power_w == 0.0:
@@ -370,10 +370,10 @@ class AMDGPUCollector:
         return energy_delta
 
     @staticmethod
-    def _cli_run(cmd: str) -> str:
+    def _cli_run(cmd: list[str]) -> str:
         try:
             return subprocess.check_output(
-                cmd, shell=True, text=True, timeout=10,
+                cmd, text=True, timeout=10, stderr=subprocess.DEVNULL,
             )
         except Exception:
             return ""

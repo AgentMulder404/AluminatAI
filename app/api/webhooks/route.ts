@@ -6,7 +6,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { checkCountLimit } from "@/lib/plans";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 const VALID_EVENT_TYPES = [
@@ -43,6 +45,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`webhooks:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const supabase = createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -54,7 +64,7 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ webhooks: data ?? [] });
@@ -65,6 +75,14 @@ export async function POST(req: NextRequest) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`webhooks:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const body = await req.json();
@@ -85,15 +103,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: limitCheck.reason, limit: limitCheck.limit }, { status: 403 });
   }
 
-  // Validate URL
+  // Validate URL — HTTPS only, no private/internal addresses
   try {
     const parsed = new URL(url);
-    if (!["https:", "http:"].includes(parsed.protocol)) {
-      throw new Error("Invalid protocol");
+    if (parsed.protocol !== "https:") {
+      throw new Error("Only HTTPS URLs are allowed");
     }
-  } catch {
+    const hostname = parsed.hostname;
+    const blocked = ["127.0.0.1", "::1", "localhost", "169.254.169.254", "metadata.google.internal"];
+    if (blocked.includes(hostname)) {
+      throw new Error("Internal addresses are not allowed");
+    }
+    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname)) {
+      throw new Error("Private IP addresses are not allowed");
+    }
+  } catch (e) {
     return NextResponse.json(
-      { error: "url must be a valid HTTP(S) URL" },
+      { error: e instanceof Error ? e.message : "url must be a valid HTTPS URL" },
       { status: 400 }
     );
   }
@@ -128,7 +154,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   // Return secret only on creation — never returned again
@@ -140,6 +166,14 @@ export async function PATCH(req: NextRequest) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`webhooks:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const body = await req.json();
@@ -170,7 +204,7 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json(data);
@@ -181,6 +215,14 @@ export async function DELETE(req: NextRequest) {
   const user = await authenticate();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`webhooks:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const { id } = await req.json();
@@ -198,7 +240,7 @@ export async function DELETE(req: NextRequest) {
     .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ deleted: true });

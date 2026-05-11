@@ -27,8 +27,6 @@ export async function constantTimeEqual(
   a: string,
   b: string
 ): Promise<boolean> {
-  if (a.length !== b.length) return false;
-
   const key = await getHmacKey();
   const enc = new TextEncoder();
 

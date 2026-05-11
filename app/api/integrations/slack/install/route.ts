@@ -7,6 +7,7 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requirePlan } from "@/lib/plans";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID ?? "";
@@ -15,12 +16,16 @@ const SLACK_REDIRECT_URI = process.env.SLACK_REDIRECT_URI ?? "";
 const SLACK_SCOPES = "chat:write,commands,channels:read";
 
 // CSRF state token helpers — HMAC-SHA256 signed, 10-minute expiry
-const STATE_SECRET = process.env.SLACK_CLIENT_SECRET ?? "fallback-oauth-state-key";
+function getStateSecret(): string {
+  const secret = process.env.SLACK_CLIENT_SECRET;
+  if (!secret) throw new Error("SLACK_CLIENT_SECRET is required");
+  return secret;
+}
 
 async function signState(userId: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
-    "raw", enc.encode(STATE_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    "raw", enc.encode(getStateSecret()), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
   const nonce = crypto.getRandomValues(new Uint8Array(16));
   const nonceHex = Array.from(nonce).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -40,7 +45,7 @@ async function verifyState(state: string): Promise<string | null> {
 
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
-    "raw", enc.encode(STATE_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    "raw", enc.encode(getStateSecret()), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
   );
   const payload = parts.slice(0, 3).join(".");
   const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
@@ -150,7 +155,7 @@ export async function GET(req: NextRequest) {
     );
 
   if (upsertErr) {
-    return NextResponse.json({ error: upsertErr.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(upsertErr) }, { status: 500 });
   }
 
   // Redirect back to dashboard settings
@@ -202,7 +207,7 @@ export async function DELETE(req: NextRequest) {
     .eq("slack_team_id", slack_team_id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ revoked: true });

@@ -1,10 +1,11 @@
 // GET /api/dashboard/stream — Server-Sent Events for real-time dashboard updates
 // Pushes live GPU metrics summary, notification count, and agent status.
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getUserKwhRate } from "@/lib/cost";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 export const runtime = "edge";
 
@@ -17,6 +18,14 @@ export async function GET(req: NextRequest) {
 
   if (authError || !user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  const rl = await rateLimit(`dash-stream:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const userId = user.id;

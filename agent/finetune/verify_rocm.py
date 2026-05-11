@@ -16,6 +16,7 @@
 # AluminatiAI — https://github.com/AgentMulder404/AluminatAI
 """Verify ROCm + PyTorch + QLoRA stack is functional on MI300X."""
 
+import shlex
 import subprocess
 import sys
 import time
@@ -29,7 +30,18 @@ def section(title: str):
 
 def run_cmd(cmd: str) -> str:
     try:
-        return subprocess.check_output(cmd, shell=True, text=True).strip()
+        return subprocess.check_output(shlex.split(cmd), text=True).strip()
+    except Exception as e:
+        return f"FAILED: {e}"
+
+
+def run_pipe(cmd1: str, cmd2: str) -> str:
+    try:
+        p1 = subprocess.Popen(shlex.split(cmd1), stdout=subprocess.PIPE, text=True)
+        p2 = subprocess.Popen(shlex.split(cmd2), stdin=p1.stdout, stdout=subprocess.PIPE, text=True)
+        p1.stdout.close()
+        out, _ = p2.communicate()
+        return out.strip()
     except Exception as e:
         return f"FAILED: {e}"
 
@@ -40,7 +52,7 @@ def main() -> int:
     # ── 1. ROCm driver ──
     section("1. ROCm Driver & GPU Detection")
     print(f"rocm-smi:\n{run_cmd('rocm-smi --showproductname')}")
-    gpu_count_str = run_cmd("rocm-smi --showid | grep -c GPU")
+    gpu_count_str = run_pipe("rocm-smi --showid", "grep -c GPU")
     print(f"GPU count: {gpu_count_str}")
 
     # ── 2. PyTorch + HIP ──

@@ -6,7 +6,9 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requireOrgRole } from "@/lib/org-auth";
 import { logAudit } from "@/lib/audit";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 interface RouteParams {
@@ -25,6 +27,14 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`org-members:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const { allowed } = await requireOrgRole(user.id, orgId, "member");
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -38,7 +48,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     .order("joined_at", { ascending: true });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ members: members ?? [] });
@@ -54,6 +64,14 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`org-members:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const { allowed } = await requireOrgRole(user.id, orgId, "admin");
@@ -85,7 +103,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     if (error.message.includes("duplicate")) {
       return NextResponse.json({ error: "User already a member" }, { status: 409 });
     }
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   void logAudit({

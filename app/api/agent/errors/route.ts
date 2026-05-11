@@ -3,6 +3,7 @@ import { validateApiKey } from "@/lib/api-auth";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { rateLimit } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from("agent_error_log").insert(rows);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, inserted: rows.length });

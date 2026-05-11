@@ -3,6 +3,7 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 const ONLINE_THRESHOLD_MIN = 10;
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
     .order("last_seen", { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_MIN * 60 * 1000);

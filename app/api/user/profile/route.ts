@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { logAudit } from "@/lib/audit";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 // PATCH /api/user/profile
@@ -16,6 +18,14 @@ export async function PATCH(req: NextRequest) {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`user-profile:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   let body: Record<string, unknown>;
@@ -42,7 +52,7 @@ export async function PATCH(req: NextRequest) {
     .eq("id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
@@ -61,6 +71,14 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`user-profile:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("users")
@@ -69,7 +87,7 @@ export async function GET(_req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   // Mask the API key — never return full key in GET
@@ -98,6 +116,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`user-profile:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -106,6 +132,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.action === "reveal_key") {
+    const rlReveal = await rateLimit(`reveal-key:${user.id}`, 5, 3_600_000);
+    if (!rlReveal.success) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        { status: 429, headers: getRateLimitHeaders(rlReveal) }
+      );
+    }
+
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from("users")
@@ -114,7 +148,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: safeError(error) }, { status: 500 });
     }
 
     void logAudit({

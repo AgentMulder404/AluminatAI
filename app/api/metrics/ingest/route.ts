@@ -3,6 +3,7 @@ import { validateApiKey } from "@/lib/api-auth";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 // Field length limits for new identity fields
@@ -139,6 +140,13 @@ export async function POST(req: NextRequest) {
       )
         return null;
 
+      // Reject timestamps more than 5 minutes from server time
+      if (m.timestamp) {
+        const metricTime = new Date(m.timestamp).getTime();
+        if (isNaN(metricTime) || Math.abs(Date.now() - metricTime) > 5 * 60 * 1000)
+          return null;
+      }
+
       return {
         user_id: auth.userId,
         timestamp: m.timestamp,
@@ -181,7 +189,7 @@ export async function POST(req: NextRequest) {
   const { error } = await supabase.from("gpu_metrics").insert(rows);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   return NextResponse.json(

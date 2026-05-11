@@ -204,12 +204,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Verify Slack signature
-  if (SLACK_SIGNING_SECRET) {
-    const valid = await verifySlackSignature(req, rawBody);
-    if (!valid) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
+  // Verify Slack signature — fail closed if secret is not configured
+  if (!SLACK_SIGNING_SECRET) {
+    return NextResponse.json(
+      { error: "Slack integration not configured" },
+      { status: 503 }
+    );
+  }
+  const valid = await verifySlackSignature(req, rawBody);
+  if (!valid) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   const command = params.get("command") ?? "";

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -21,6 +22,14 @@ export async function POST(req: NextRequest) {
     } = await supabaseCookie.auth.getUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rl = await rateLimit(`stripe-portal:${user.id}`, 10);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        { status: 429, headers: getRateLimitHeaders(rl) }
+      );
     }
 
     const supabase = createSupabaseServerClient();

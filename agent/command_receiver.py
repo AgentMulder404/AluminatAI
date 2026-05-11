@@ -116,6 +116,9 @@ class CommandReceiver:
         if gpu_index is None or watts is None:
             return False, "Missing gpu_index or watts"
 
+        if not isinstance(gpu_index, int) or gpu_index < 0 or gpu_index > 31:
+            return False, f"Invalid gpu_index: {gpu_index}"
+
         if not isinstance(watts, (int, float)) or watts < 100 or watts > 1200:
             return False, f"Power cap {watts}W out of safe range (100-1200W)"
 
@@ -138,6 +141,9 @@ class CommandReceiver:
     def _rollback_power_cap(self, params: dict) -> tuple[bool, str]:
         gpu_index = params.get("gpu_index", 0)
 
+        if not isinstance(gpu_index, int) or gpu_index < 0 or gpu_index > 31:
+            return False, f"Invalid gpu_index: {gpu_index}"
+
         if self._dry_run:
             return True, f"Dry run: would reset GPU {gpu_index} to default"
 
@@ -155,6 +161,9 @@ class CommandReceiver:
     def _set_precision(self, params: dict) -> tuple[bool, str]:
         gpu_index = params.get("gpu_index", 0)
         precision = params.get("precision", "")
+
+        if not isinstance(gpu_index, int) or gpu_index < 0 or gpu_index > 31:
+            return False, f"Invalid gpu_index: {gpu_index}"
 
         if precision not in ("fp16", "bf16", "fp32", "tf32"):
             return False, f"Unsupported precision: {precision}"

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import Anthropic from "@anthropic-ai/sdk";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 export const maxDuration = 60;
 
-const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "")
+const ADMIN_EMAILS = (process.env.ADMIN_EMAIL ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
@@ -100,6 +101,14 @@ export async function POST(req: NextRequest) {
 
     if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? "")) {
       return NextResponse.json({ error: "Admin only" }, { status: 403 });
+    }
+
+    const rl = await rateLimit(`admin:${user.id}`, 30);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        { status: 429, headers: getRateLimitHeaders(rl) }
+      );
     }
 
     const body = (await req.json()) as Record<string, unknown>;

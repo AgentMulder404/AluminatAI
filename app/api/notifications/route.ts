@@ -4,7 +4,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
@@ -16,6 +18,14 @@ export async function GET(req: NextRequest) {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`notif:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const params = req.nextUrl.searchParams;
@@ -41,7 +51,7 @@ export async function GET(req: NextRequest) {
   const { data: notifications, count, error } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   // Also get unread count
@@ -69,6 +79,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`notif:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
+  }
+
   let body: { ids?: string[]; all?: boolean };
   try {
     body = await req.json();
@@ -86,7 +104,7 @@ export async function PATCH(req: NextRequest) {
       .eq("read", false);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: safeError(error) }, { status: 500 });
     }
     return NextResponse.json({ updated: count ?? 0 });
   }
@@ -99,7 +117,7 @@ export async function PATCH(req: NextRequest) {
       .in("id", body.ids);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: safeError(error) }, { status: 500 });
     }
     return NextResponse.json({ updated: count ?? 0 });
   }

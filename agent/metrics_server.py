@@ -312,7 +312,7 @@ class MetricsServer:
             logger.warning(
                 "Prometheus Basic Auth active — use a TLS proxy in production"
             )
-        bind = self._bind_host or "0.0.0.0"
+        bind = self._bind_host or "127.0.0.1"
         for offset in range(5):
             port = self._port + offset
             try:

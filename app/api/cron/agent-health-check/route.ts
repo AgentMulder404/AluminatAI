@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { dispatchNotification } from "@/lib/notifications";
+import { verifyCronSecret } from "@/lib/auth-helpers";
 
 export const runtime = "edge";
 
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const isAuthed = await verifyCronSecret(req.headers.get("authorization"));
+  if (!isAuthed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

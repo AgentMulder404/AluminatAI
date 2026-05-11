@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAIL ?? "").split(",").map((e) => e.trim().toLowerCase());
+import { safeError } from "@/lib/safe-error";
+const ADMIN_EMAILS = (process.env.ADMIN_EMAIL ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 export async function GET(req: NextRequest) {
   const cookieClient = await createSupabaseCookieClient();
   const { data: { user } } = await cookieClient.auth.getUser();
   if (!user || !ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const rl = await rateLimit(`admin:${user.id}`, 30);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const status = req.nextUrl.searchParams.get("status");
@@ -27,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const { data: agents, error } = await query;
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   const now = Date.now();

@@ -1,15 +1,16 @@
 // GET /api/admin/sla
 // SLA dashboard: uptime percentage, heartbeat gaps, ingestion latency.
-// Cookie auth — admin only (NEXT_PUBLIC_ADMIN_EMAIL).
+// Cookie auth — admin only (ADMIN_EMAIL).
 
 import { NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requirePlan } from "@/lib/plans";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
 export const runtime = "edge";
 
-const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAIL ?? "")
+const ADMIN_EMAILS = (process.env.ADMIN_EMAIL ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
@@ -26,6 +27,14 @@ export async function GET() {
   }
   if (!ADMIN_EMAILS.includes(user.email?.toLowerCase() ?? "")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const rl = await rateLimit(`admin:${user.id}`, 30);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   // SLA dashboard requires Enterprise plan

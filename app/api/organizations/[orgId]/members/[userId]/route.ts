@@ -5,7 +5,9 @@ import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requireOrgRole } from "@/lib/org-auth";
 import { logAudit } from "@/lib/audit";
+import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limiter";
 
+import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
 
 interface RouteParams {
@@ -22,6 +24,14 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`org-member:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const { allowed } = await requireOrgRole(user.id, orgId, "admin");
@@ -60,7 +70,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     .eq("user_id", targetUserId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   void logAudit({
@@ -84,6 +94,14 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
 
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rl = await rateLimit(`org-member:${user.id}`, 60);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded" },
+      { status: 429, headers: getRateLimitHeaders(rl) }
+    );
   }
 
   const { allowed } = await requireOrgRole(user.id, orgId, "admin");
@@ -111,7 +129,7 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
     .eq("user_id", targetUserId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: safeError(error) }, { status: 500 });
   }
 
   void logAudit({

@@ -38,6 +38,7 @@ import concurrent.futures
 import csv
 import hashlib
 import shutil
+import subprocess
 import io
 import json
 import logging
@@ -1593,20 +1594,20 @@ def _cmd_service(args) -> int:
     action = args.service_action
 
     if action == "status":
-        ret = os.system("systemctl status aluminatai-agent")
+        ret = subprocess.run(["systemctl", "status", "aluminatai-agent"]).returncode
         return 0 if ret == 0 else 1
 
     if action == "uninstall":
         if os.geteuid() != 0:
             print("error: 'service uninstall' must be run as root (try: sudo aluminatiai service uninstall)")
             return 1
-        os.system("systemctl stop aluminatai-agent 2>/dev/null")
-        os.system("systemctl disable aluminatai-agent 2>/dev/null")
+        subprocess.run(["systemctl", "stop", "aluminatai-agent"], stderr=subprocess.DEVNULL)
+        subprocess.run(["systemctl", "disable", "aluminatai-agent"], stderr=subprocess.DEVNULL)
         for path in [_UNIT_PATH]:
             if path.exists():
                 path.unlink()
                 print(f"Removed {path}")
-        os.system("systemctl daemon-reload")
+        subprocess.run(["systemctl", "daemon-reload"])
         print("Service uninstalled.  Config and data directories were NOT removed.")
         print(f"  Config: {_ENV_PATH}  (remove manually if desired)")
         return 0
@@ -1645,9 +1646,12 @@ def _cmd_service(args) -> int:
     bin_path = shutil.which("aluminatiai") or bin_path
 
     # Create user if missing
-    if os.system("id aluminatai &>/dev/null") != 0:
-        os.system("useradd --system --no-create-home --shell /usr/sbin/nologin "
-                  "--comment 'AluminatAI GPU agent' aluminatai")
+    if subprocess.run(["id", "aluminatai"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+        subprocess.run([
+            "useradd", "--system", "--no-create-home",
+            "--shell", "/usr/sbin/nologin",
+            "--comment", "AluminatAI GPU agent", "aluminatai",
+        ])
         print("Created system user 'aluminatai'")
 
     # Directories
@@ -1671,14 +1675,14 @@ def _cmd_service(args) -> int:
     _UNIT_PATH.chmod(0o644)
     print(f"Wrote {_UNIT_PATH}")
 
-    os.system("systemctl daemon-reload")
-    os.system("systemctl enable aluminatai-agent")
-    os.system("systemctl restart aluminatai-agent")
+    subprocess.run(["systemctl", "daemon-reload"])
+    subprocess.run(["systemctl", "enable", "aluminatai-agent"])
+    subprocess.run(["systemctl", "restart", "aluminatai-agent"])
 
     import time as _t
     _t.sleep(3)
 
-    active = os.system("systemctl is-active --quiet aluminatai-agent") == 0
+    active = subprocess.run(["systemctl", "is-active", "--quiet", "aluminatai-agent"]).returncode == 0
     if active:
         print("\nAluminatAI Agent is running!")
         print("  Status:    sudo systemctl status aluminatai-agent")
