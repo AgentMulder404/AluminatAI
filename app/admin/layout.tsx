@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/admin/financial-advisor", label: "Finance" },
   { href: "/admin/fine-tuning", label: "Fine-Tuning" },
   { href: "/admin/agent-health", label: "Agent Health" },
+  { href: "/admin/swarm", label: "Swarm" },
 ];
 
 export default function AdminLayout({
