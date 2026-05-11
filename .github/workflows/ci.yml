@@ -34,7 +34,7 @@ jobs:
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
   frontend:
-    name: Frontend (install · test)
+    name: Frontend (lint · typecheck · test)
     runs-on: ubuntu-latest
 
     steps:
@@ -48,5 +48,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm run test
+      - name: Lint
+        run: |
+          ERRORS=$(npx eslint . 2>&1 | grep -c "error" || true)
+          echo "ESLint errors: $ERRORS (baseline: 33)"
+          if [ "$ERRORS" -gt 33 ]; then
+            echo "::error::New ESLint errors detected ($ERRORS > 33 baseline)"
+            npx eslint . 2>&1
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: |
+          ERRORS=$(npx tsc --noEmit -p tsconfig.ci.json 2>&1 | grep "error TS" | wc -l)
+          echo "TypeScript errors: $ERRORS (baseline: 12)"
+          if [ "$ERRORS" -gt 12 ]; then
+            echo "::error::New TypeScript errors detected ($ERRORS > 12 baseline)"
+            npx tsc --noEmit -p tsconfig.ci.json 2>&1 | grep "error TS"
+            exit 1
+          fi
+
+      - name: Run tests with coverage
+        run: npm run test -- --coverage

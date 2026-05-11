@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
+import { dispatchNotification } from "@/lib/notifications";
 
 export const runtime = "edge";
 
@@ -95,6 +96,91 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Swarm leader health ─────────────────────────────────────────────────────
+  const { data: leases } = await supabase
+    .from("swarm_leader_leases")
+    .select("user_id, cluster_tag, machine_id, expires_at");
+
+  const graceMs = 5 * 60 * 1000;
+  for (const lease of leases ?? []) {
+    const expiresAt = new Date(lease.expires_at).getTime();
+    if (expiresAt + graceMs < now.getTime()) {
+      alerts.push({
+        user_id: lease.user_id,
+        machine_id: lease.machine_id,
+        hostname: `cluster:${lease.cluster_tag || "(default)"}`,
+        alert_type: "leader_lease_expired",
+        severity: "critical",
+        message: `Swarm leader lease for cluster "${lease.cluster_tag || "(default)"}" expired at ${lease.expires_at}. No agent has taken over.`,
+      });
+    }
+  }
+
+  // ── Command queue health ───────────────────────────────────────────────────
+  const stuckThresholdMs = 30 * 60 * 1000;
+  const stuckCutoff = new Date(now.getTime() - stuckThresholdMs).toISOString();
+
+  const { data: stuckCommands } = await supabase
+    .from("agent_commands")
+    .select("user_id, machine_id, status, created_at")
+    .in("status", ["pending", "dispatched"])
+    .lt("created_at", stuckCutoff);
+
+  const stuckByMachine = new Map<string, { user_id: string; machine_id: string; count: number }>();
+  for (const cmd of stuckCommands ?? []) {
+    const key = `${cmd.user_id}:${cmd.machine_id}`;
+    const existing = stuckByMachine.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      stuckByMachine.set(key, { user_id: cmd.user_id, machine_id: cmd.machine_id, count: 1 });
+    }
+  }
+
+  for (const { user_id, machine_id, count } of stuckByMachine.values()) {
+    alerts.push({
+      user_id,
+      machine_id,
+      hostname: machine_id,
+      alert_type: "command_queue_stuck",
+      severity: count >= 5 ? "critical" : "warning",
+      message: `${count} command(s) stuck in pending/dispatched for >30 min on ${machine_id}`,
+    });
+  }
+
+  // ── Recommendation backlog ─────────────────────────────────────────────────
+  const oneDayAgo = new Date(now.getTime() - 86_400_000).toISOString();
+
+  const { data: pendingRecs } = await supabase
+    .from("optimization_recommendations")
+    .select("user_id, machine_id, created_at")
+    .eq("status", "pending")
+    .lt("created_at", oneDayAgo);
+
+  const backlogByUser = new Map<string, { user_id: string; count: number; oldest: string }>();
+  for (const rec of pendingRecs ?? []) {
+    const entry = backlogByUser.get(rec.user_id);
+    if (entry) {
+      entry.count++;
+      if (rec.created_at < entry.oldest) entry.oldest = rec.created_at;
+    } else {
+      backlogByUser.set(rec.user_id, { user_id: rec.user_id, count: 1, oldest: rec.created_at });
+    }
+  }
+
+  for (const { user_id, count, oldest } of backlogByUser.values()) {
+    if (count >= 10) {
+      alerts.push({
+        user_id,
+        machine_id: "all",
+        hostname: "recommendation-backlog",
+        alert_type: "recommendation_backlog",
+        severity: count >= 25 ? "critical" : "warning",
+        message: `${count} recommendations pending for >24h (oldest: ${oldest}). Review or auto-expire them.`,
+      });
+    }
+  }
+
   // Auto-resolve alerts where the condition has cleared
   const { data: activeAlerts } = await supabase
     .from("agent_health_alerts")
@@ -133,8 +219,22 @@ export async function GET(req: NextRequest) {
       .limit(1);
 
     if (!existing || existing.length === 0) {
-      await supabase.from("agent_health_alerts").insert(alert);
-      insertedCount++;
+      const { error: insertErr } = await supabase.from("agent_health_alerts").insert(alert);
+      if (!insertErr) {
+        insertedCount++;
+        if (alert.severity === "critical") {
+          const notifType = (alert.alert_type === "agent_offline" || alert.alert_type === "high_error_rate")
+            ? "agent_offline" as const
+            : "system" as const;
+          void dispatchNotification(
+            alert.user_id as string,
+            notifType,
+            alert.alert_type as string,
+            alert.message as string,
+            { metadata: { machine_id: alert.machine_id, alert_type: alert.alert_type } }
+          );
+        }
+      }
     }
   }
 

@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": false,
+    "plugins": [{ "name": "next" }],
+    "paths": { "@/*": ["./*"] }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "agent",
+    ".next",
+    "app/admin/outreach",
+    "app/api/cron/export",
+    "app/api/cron/waste-detect",
+    "app/api/dashboard/jobs",
+    "app/api/reports/carbon",
+    "app/api/stripe",
+    "app/api/teams",
+    "components/dashboard/CostTrendChart.tsx",
+    "components/dashboard/JobDetailDrawer.tsx",
+    "lib/rate-limiter.ts"
+  ]
+}
