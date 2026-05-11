@@ -82,7 +82,7 @@ function createChain(table: string) {
     ...chain,
     select: vi.fn().mockReturnValue({
       single: vi.fn().mockReturnValue({
-        data: null,
+        data: _insertError ? null : { id: "mock-inserted-id" },
         error: _insertError,
       }),
     }),

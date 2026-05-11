@@ -64,28 +64,36 @@ export async function POST(req: NextRequest) {
 
     if (existing && existing.length > 0) continue;
 
-    const { error } = await supabase.from("optimization_recommendations").insert({
-      user_id: auth.userId,
-      machine_id: rec.machine_id,
-      hostname: rec.hostname ?? "",
-      gpu_index: rec.gpu_index ?? null,
-      gpu_name: rec.gpu_name ?? null,
-      source: rec.source,
-      category: rec.category,
-      priority: rec.priority ?? "P2",
-      title: (rec.title ?? "").slice(0, 200),
-      description: (rec.description ?? "").slice(0, 2000),
-      action: (rec.action ?? "").slice(0, 500),
-      estimated_savings_pct: rec.estimated_savings_pct ?? 0,
-      effort_score: Math.min(5, Math.max(1, rec.effort_score ?? 3)),
-      action_payload: rec.action_payload ?? {},
-      expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
-    });
+    const { data: newRec, error } = await supabase
+      .from("optimization_recommendations")
+      .insert({
+        user_id: auth.userId,
+        machine_id: rec.machine_id,
+        hostname: rec.hostname ?? "",
+        gpu_index: rec.gpu_index ?? null,
+        gpu_name: rec.gpu_name ?? null,
+        source: rec.source,
+        category: rec.category,
+        priority: rec.priority ?? "P2",
+        title: (rec.title ?? "").slice(0, 200),
+        description: (rec.description ?? "").slice(0, 2000),
+        action: (rec.action ?? "").slice(0, 500),
+        estimated_savings_pct: rec.estimated_savings_pct ?? 0,
+        effort_score: Math.min(5, Math.max(1, rec.effort_score ?? 3)),
+        action_payload: rec.action_payload ?? {},
+        expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
+      })
+      .select("id")
+      .single();
 
-    if (!error) {
+    if (!error && newRec) {
       inserted++;
-      // Audit trail
-      // (recommendation_actions insert omitted for edge runtime perf — done on approve/reject)
+      void supabase.from("recommendation_actions").insert({
+        recommendation_id: newRec.id,
+        user_id: auth.userId,
+        action: "created",
+        metadata: { source: rec.source, category: rec.category },
+      });
     }
   }
 

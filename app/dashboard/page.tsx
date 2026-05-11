@@ -17,6 +17,7 @@ import JobDetailDrawer from "@/components/dashboard/JobDetailDrawer";
 import AgentsPanel from "@/components/dashboard/AgentsPanel";
 import BenchmarkPercentileCard from "@/components/dashboard/BenchmarkPercentileCard";
 import NotificationBell from "@/components/dashboard/NotificationBell";
+import ActivityFeedCard from "@/components/dashboard/ActivityFeedCard";
 
 function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
@@ -119,9 +120,10 @@ function DashboardInner() {
         onJobClick={(jobId: string) => setSelectedJobId(jobId)}
       />
 
-      {/* Agents + Benchmark (2-column) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Agents + Activity + Benchmark (3-column) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <AgentsPanel />
+        <ActivityFeedCard />
         <BenchmarkPercentileCard />
       </div>
 
