@@ -149,8 +149,7 @@ class AMDPowerMonitor:
     ) -> float:
         try:
             out = subprocess.check_output(
-                f"rocm-smi -d {self.gpu_index} {flag}",
-                shell=True,
+                ["rocm-smi", "-d", str(self.gpu_index), flag],
                 text=True,
                 timeout=5,
             )

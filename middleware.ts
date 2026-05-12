@@ -13,18 +13,18 @@ export function middleware(_req: NextRequest) {
   );
   res.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), clipboard-read=(), fullscreen=(self), sync-xhr=()"
   );
   res.headers.set(
-    "Content-Security-Policy-Report-Only",
+    "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://app.cal.com",
+      "script-src 'self' 'unsafe-inline' https://app.cal.com https://cal.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
-      "frame-src https://app.cal.com",
+      "frame-src https://app.cal.com https://cal.com",
     ].join("; ")
   );
 

@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { getUserKwhRate } from "@/lib/cost";
 import { verifyCronSecret } from "@/lib/auth-helpers";
+import { decrypt } from "@/lib/crypto";
 
 export const runtime = "edge";
 
@@ -98,10 +99,11 @@ export async function GET(req: NextRequest) {
 
     // Send via Slack API
     try {
+      const token = await decrypt(install.bot_token);
       const res = await fetch("https://slack.com/api/chat.postMessage", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${install.bot_token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({

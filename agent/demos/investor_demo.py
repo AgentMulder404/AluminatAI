@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -232,7 +233,7 @@ def demo_3_idle_waste(gpu: int, sample_duration: int = 15) -> dict | None:
     )
     print("  Launching idle workload (model loaded, no work)...")
     proc = subprocess.Popen(
-        idle_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        shlex.split(idle_cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
     time.sleep(5)  # Let model load
 

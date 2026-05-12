@@ -31,6 +31,7 @@ import csv
 import io
 import json
 import re
+import shlex
 import subprocess
 import sys
 import threading
@@ -311,7 +312,7 @@ class ABExperimentRunner:
     def _run_command_timed(self, cmd: str, duration_s: int) -> None:
         """Run a command for a fixed duration, then kill it."""
         proc = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         try:
             proc.wait(timeout=duration_s)
@@ -344,7 +345,7 @@ class ABExperimentRunner:
 
             t0 = time.monotonic()
             proc = subprocess.Popen(
-                cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
             try:
                 stdout_bytes, _ = proc.communicate(timeout=duration_s)

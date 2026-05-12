@@ -97,6 +97,8 @@ export default function EnterprisePage() {
               frameBorder="0"
               className="rounded-lg"
               title="Schedule a demo with AluminatAI"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+              loading="lazy"
             />
           </div>
         </div>

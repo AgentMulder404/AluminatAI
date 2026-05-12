@@ -111,7 +111,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const db = createSupabaseServerClient();
-  const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "200");
+  const limit = Math.min(parseInt(req.nextUrl.searchParams.get("limit") ?? "200") || 200, 500);
   const offset = parseInt(req.nextUrl.searchParams.get("offset") ?? "0");
   const status = req.nextUrl.searchParams.get("status");
 
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error: dbError, count } = await query;
 
-  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+  if (dbError) return NextResponse.json({ error: "Failed to load prospects" }, { status: 500 });
 
   return NextResponse.json({ prospects: data, count });
 }

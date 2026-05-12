@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseCookieClient } from "@/lib/supabase-server";
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 import { requirePlan } from "@/lib/plans";
+import { encrypt, decrypt } from "@/lib/crypto";
 
 import { safeError } from "@/lib/safe-error";
 export const runtime = "edge";
@@ -138,6 +139,8 @@ export async function GET(req: NextRequest) {
 
   const supabase = createSupabaseServerClient();
 
+  const encryptedToken = await encrypt(tokenData.access_token);
+
   const { error: upsertErr } = await supabase
     .from("slack_installations")
     .upsert(
@@ -145,7 +148,7 @@ export async function GET(req: NextRequest) {
         user_id: user.id,
         slack_team_id: tokenData.team?.id ?? "",
         slack_team_name: tokenData.team?.name ?? "",
-        bot_token: tokenData.access_token,
+        bot_token: encryptedToken,
         bot_user_id: tokenData.bot_user_id ?? "",
         scope: tokenData.scope ?? "",
         installed_at: new Date().toISOString(),
@@ -191,13 +194,18 @@ export async function DELETE(req: NextRequest) {
     .maybeSingle();
 
   if (install?.bot_token) {
-    await fetch("https://slack.com/api/auth.revoke", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${install.bot_token}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    }).catch(() => {}); // best-effort revocation
+    try {
+      const token = await decrypt(install.bot_token);
+      await fetch("https://slack.com/api/auth.revoke", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }).catch(() => {});
+    } catch {
+      // best-effort revocation — token may use old encryption key
+    }
   }
 
   const { error } = await supabase
