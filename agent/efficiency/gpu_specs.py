@@ -192,6 +192,13 @@ GPU_ARCHITECTURES: dict[str, ArchSpec] = {
         ArchSpec('Intel Data Center GPU Flex 140',   'Arc',   75,  12.0,  6.0, 12.0,  8, 280, False),
         ArchSpec('Intel Data Center GPU Max 1550',   'Ponte Vecchio', 600, 419.4, 52.4, 419.4, 128, 3276, True),
         ArchSpec('Intel Data Center GPU Max 1100',   'Ponte Vecchio', 300, 209.7, 26.2, 209.7,  48, 1228, True),
+        # AMD Instinct (CDNA)
+        ArchSpec('AMD MI210',   'CDNA2', 300,  181,  22.6,  181,   64, 1638, False),
+        ArchSpec('AMD MI250X',  'CDNA2', 500,  383,  47.9,  383,  128, 3277, False),
+        ArchSpec('AMD MI300X',  'CDNA3', 750, 1307, 163.4, 1307,  192, 5300, True),
+        ArchSpec('AMD MI325X',  'CDNA3', 750, 1307, 163.4, 1307,  256, 6000, True),
+        # AMD Radeon (RDNA3)
+        ArchSpec('AMD RX 7900 XTX',  'RDNA3', 355, 61.4, 30.7, 61.4, 24, 960, False),
     ]
 }
 
@@ -218,6 +225,17 @@ MODEL_PROFILES: dict[str, ModelProfile] = {
         ModelProfile('t5-xxl',          'T5',         100,  'bf16',  False, 55, 85),
         ModelProfile('falcon-40b',      'Falcon',     140,  'bf16',  False, 65, 90),
         ModelProfile('deepseek-v3',     'DeepSeek',   200,  'bf16',  False, 75, 95),
+    ]
+}
+
+
+WORKLOAD_ARCHETYPES: dict[str, ModelProfile] = {
+    p.tag: p for p in [
+        ModelProfile('llm-inference',   'LLM',        120, 'bf16', False, 30, 60),
+        ModelProfile('llm-training',    'LLM',        200, 'bf16', False, 75, 95),
+        ModelProfile('vision-training', 'Vision',      40, 'fp16', True,  50, 80),
+        ModelProfile('rendering',       'Rendering',   25, 'fp32', True,  60, 90),
+        ModelProfile('batch-inference', 'Inference',    60, 'fp16', False, 40, 70),
     ]
 }
 
@@ -257,6 +275,13 @@ def resolve_arch(gpu_name: str) -> ArchSpec | None:
     if "Intel" in gpu_name and ("Arc" in gpu_name or "Data Center" in gpu_name):
         for arch_name, spec in GPU_ARCHITECTURES.items():
             if spec.family in ('Arc', 'Ponte Vecchio') and arch_name in gpu_name:
+                return spec
+
+    # AMD Instinct / Radeon: match "AMD MI300X", "AMD RX 7900 XTX", etc.
+    if "AMD" in gpu_name or "MI2" in gpu_name or "MI3" in gpu_name or "Radeon" in gpu_name:
+        amd_clean = gpu_name.replace('AMD Instinct ', 'AMD ').replace('Radeon ', 'AMD RX ')
+        for arch_name, spec in GPU_ARCHITECTURES.items():
+            if spec.family in ('CDNA2', 'CDNA3', 'RDNA3') and arch_name in amd_clean:
                 return spec
 
     # Substring match (e.g., "A100" matches "A100-SXM4-80GB")

@@ -39,6 +39,33 @@ GPU_COST_TABLE: dict[str, float] = {
 }
 
 
+GPU_HOURLY_RATES: dict[str, float] = {
+    "H100-SXM5-80GB": 3.99,
+    "H100-PCIe-80GB": 2.49,
+    "H200-SXM-141GB": 4.99,
+    "A100-SXM4-80GB": 1.89,
+    "A100-SXM4-40GB": 1.49,
+    "A100-PCIe-80GB": 1.59,
+    "A100-PCIe-40GB": 1.29,
+    "RTX 4090": 0.59,
+    "L40S": 1.29,
+    "L40": 0.99,
+    "A10G": 0.50,
+    "T4": 0.37,
+    "V100-SXM2-32GB": 0.80,
+    "V100-SXM2-16GB": 0.70,
+    "AMD MI210": 1.10,
+    "AMD MI250X": 2.50,
+    "AMD MI300X": 3.50,
+    "AMD MI325X": 4.20,
+    "AMD RX 7900 XTX": 0.44,
+    "Intel Gaudi2": 1.80,
+    "Intel Gaudi3": 3.40,
+    "Intel Data Center GPU Max 1550": 3.20,
+    "Intel Data Center GPU Max 1100": 1.60,
+}
+
+
 @dataclass
 class CloudInfo:
     provider: str          # "aws", "gcp", "azure", "unknown"

@@ -45,7 +45,7 @@ def main() -> None:
     _pre = argparse.ArgumentParser(add_help=False)
     _pre.add_argument("subcommand", nargs="?", default="run",
                       choices=["run", "benchmark", "optimize", "ab", "demo", "report",
-                               "carbon-schedule", "query"])
+                               "carbon-schedule", "query", "recommend"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
     _known, _rest = _pre.parse_known_args()
@@ -80,6 +80,10 @@ def main() -> None:
     if _known.subcommand == "query":
         from storage.tsdb import make_parser as q_parser, run_query  # noqa: PLC0415
         sys.exit(run_query(q_parser().parse_args(_rest)))
+
+    if _known.subcommand == "recommend":
+        from recommend import make_parser as rec_parser, run_recommend  # noqa: PLC0415
+        sys.exit(run_recommend(rec_parser().parse_args(_rest)))
 
     # Default: delegate to agent.main() — it owns the full argparse + run loop.
     from agent import main as _main  # noqa: PLC0415
