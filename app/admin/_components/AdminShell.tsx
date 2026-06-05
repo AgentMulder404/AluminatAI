@@ -36,7 +36,7 @@ export default function AdminShell({
           href="/admin"
           className="text-lg font-bold text-white mb-4 px-3"
         >
-          AluminatAI
+          NemulAI
         </Link>
 
         {NAV_ITEMS.map((item) => {

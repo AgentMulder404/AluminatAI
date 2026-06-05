@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-Configuration for AluminatAI GPU Agent v0.2.2
+Configuration for NemulAI GPU Agent v0.2.2
 
 Priority (highest to lowest):
   1. Environment variables (ALUMINATAI_*, SAMPLE_INTERVAL, …)
   2. Config file  (ALUMINATAI_CONFIG=/path/to/file.json|yaml)
   3. Built-in defaults
 
-Config file is JSON or YAML (YAML requires pip install aluminatiai[observability]).
+Config file is JSON or YAML (YAML requires pip install nemulai[observability]).
 Default search order when ALUMINATAI_CONFIG is unset:
-  ./aluminatai.json → ./aluminatai.yaml → ~/.config/aluminatai/config.json
+  ./nemulai.json → ./nemulai.yaml → ~/.config/nemulai/config.json
 """
 import json
 import logging
@@ -87,10 +87,10 @@ def _load_config_file() -> None:
     path = os.getenv("ALUMINATAI_CONFIG", "")
     if not path:
         candidates = [
-            "aluminatai.json",
-            "aluminatai.yaml",
-            "aluminatai.yml",
-            os.path.expanduser("~/.config/aluminatai/config.json"),
+            "nemulai.json",
+            "nemulai.yaml",
+            "nemulai.yml",
+            os.path.expanduser("~/.config/nemulai/config.json"),
         ]
         for c in candidates:
             if os.path.exists(c):
@@ -109,15 +109,15 @@ def _load_config_file() -> None:
                 data = yaml.safe_load(raw) or {}
             except ImportError:
                 print(
-                    "[aluminatai] YAML config requires PyYAML — "
-                    "install with: pip install 'aluminatiai[observability]'",
+                    "[nemulai] YAML config requires PyYAML — "
+                    "install with: pip install 'nemulai[observability]'",
                     file=sys.stderr,
                 )
                 return
         else:
             data = json.loads(raw)
     except Exception as exc:
-        print(f"[aluminatai] Failed to load config file {path!r}: {exc}", file=sys.stderr)
+        print(f"[nemulai] Failed to load config file {path!r}: {exc}", file=sys.stderr)
         return
 
     applied = []
@@ -135,7 +135,7 @@ def _load_config_file() -> None:
         applied.append(f"{key}={value!r}")
 
     if applied:
-        print(f"[aluminatai] Config file {path!r}: applied {', '.join(applied)}", file=sys.stderr)
+        print(f"[nemulai] Config file {path!r}: applied {', '.join(applied)}", file=sys.stderr)
 
 
 # Apply file-based config before any constants are evaluated so that all
@@ -144,7 +144,7 @@ _load_config_file()
 
 # ── API Configuration ─────────────────────────────────────────────────────────
 
-API_ENDPOINT = os.getenv("ALUMINATAI_API_ENDPOINT", "https://www.aluminatiai.com/v1/metrics/ingest")
+API_ENDPOINT = os.getenv("ALUMINATAI_API_ENDPOINT", "https://www.nemulai.com/v1/metrics/ingest")
 API_KEY = os.getenv("ALUMINATAI_API_KEY", "")
 
 # ── Upload Configuration ──────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 AMD GPU Metrics Collector using amdsmi / rocm-smi CLI fallback.
 

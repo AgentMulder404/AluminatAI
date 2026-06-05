@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate origin — only allow configured app URL, never trust request header
-    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.aluminatai.com";
+    const origin = process.env.NEXT_PUBLIC_APP_URL ?? "https://www.nemulai.com";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,

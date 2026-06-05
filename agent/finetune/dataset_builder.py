@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """GreenTune dataset builder — generates synthetic instruction pairs via Claude.
 
 Produces an Alpaca-format JSON dataset for fine-tuning an LLM on GPU
@@ -164,13 +164,13 @@ Topics to cover (vary across pairs):
 Each response should include practical examples and operational procedures.""",
     },
     {
-        "name": "aluminatai_product",
+        "name": "nemulai_product",
         "weight": 5,
-        "system": "You are a technical support engineer for AluminatiAI, a GPU monitoring and energy attribution platform.",
-        "prompt": """Generate {batch} unique instruction/response pairs about using AluminatiAI.
+        "system": "You are a technical support engineer for NemulAI, a GPU monitoring and energy attribution platform.",
+        "prompt": """Generate {batch} unique instruction/response pairs about using NemulAI.
 
 Topics to cover (vary across pairs):
-- Installing and configuring the aluminatai-agent CLI
+- Installing and configuring the nemulai-agent CLI
 - API key setup and rotation
 - Reading the energy dashboard
 - Understanding the Green AI Index / benchmark leaderboard
@@ -179,7 +179,7 @@ Topics to cover (vary across pairs):
 - Chargeback report generation
 - Agent heartbeat and connectivity troubleshooting
 - Integrating with MLflow, W&B, OpenTelemetry
-- Benchmark CLI usage (aluminatiai benchmark --gpu 0 --duration 60 --upload)
+- Benchmark CLI usage (nemulai benchmark --gpu 0 --duration 60 --upload)
 
 Each response should be helpful and product-aware without being salesy.""",
     },

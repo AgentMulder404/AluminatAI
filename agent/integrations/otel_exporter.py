@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-AluminatAI OpenTelemetry exporter.
+NemulAI OpenTelemetry exporter.
 
 Routes GPU telemetry into existing Datadog / Grafana / Jaeger stacks via OTLP.
 Activated by standard OTEL_EXPORTER_OTLP_ENDPOINT env var.
 
-Optional dep: pip install aluminatai-agent[otel]
+Optional dep: pip install nemulai-agent[otel]
 
 Usage — attach to an existing Agent instance:
     from agent.agent import Agent
-    from agent.integrations.otel_exporter import AluminatAIOtelExporter
+    from agent.integrations.otel_exporter import NemulAIOtelExporter
 
-    exporter = AluminatAIOtelExporter()
+    exporter = NemulAIOtelExporter()
     exporter.start()
     # ... agent runs and calls exporter.record(metrics) each tick ...
     exporter.stop()
@@ -52,16 +52,16 @@ except ImportError:
     _OTEL = False
 
 
-class AluminatAIOtelExporter:
+class NemulAIOtelExporter:
     """
     Emits GPU telemetry as OpenTelemetry gauges via OTLP.
 
     Instruments:
-      aluminatai.gpu.power_watts         (gauge)
-      aluminatai.gpu.energy_joules       (counter)
-      aluminatai.gpu.utilization_pct     (gauge)
-      aluminatai.gpu.temperature_c       (gauge)
-      aluminatai.gpu.attribution_fraction (gauge)
+      nemulai.gpu.power_watts         (gauge)
+      nemulai.gpu.energy_joules       (counter)
+      nemulai.gpu.utilization_pct     (gauge)
+      nemulai.gpu.temperature_c       (gauge)
+      nemulai.gpu.attribution_fraction (gauge)
     """
 
     def __init__(
@@ -91,29 +91,29 @@ class AluminatAIOtelExporter:
             )
             self._provider = MeterProvider(metric_readers=[reader])
             otel_metrics.set_meter_provider(self._provider)
-            self._meter = otel_metrics.get_meter("aluminatai.agent")
+            self._meter = otel_metrics.get_meter("nemulai.agent")
 
             self._instruments["power"] = self._meter.create_gauge(
-                "aluminatai.gpu.power_watts",
+                "nemulai.gpu.power_watts",
                 description="GPU power draw in watts",
                 unit="W",
             )
             self._instruments["util"] = self._meter.create_gauge(
-                "aluminatai.gpu.utilization_pct",
+                "nemulai.gpu.utilization_pct",
                 description="GPU compute utilization",
                 unit="%",
             )
             self._instruments["temp"] = self._meter.create_gauge(
-                "aluminatai.gpu.temperature_c",
+                "nemulai.gpu.temperature_c",
                 description="GPU temperature",
                 unit="Cel",
             )
             self._instruments["fraction"] = self._meter.create_gauge(
-                "aluminatai.gpu.attribution_fraction",
+                "nemulai.gpu.attribution_fraction",
                 description="Fractional GPU attribution per job",
             )
             self._instruments["energy"] = self._meter.create_counter(
-                "aluminatai.gpu.energy_joules",
+                "nemulai.gpu.energy_joules",
                 description="Cumulative GPU energy",
                 unit="J",
             )

@@ -11,7 +11,7 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAIL ?? "")
   .filter(Boolean);
 
 const FINANCIAL_ADVISOR_SYSTEM = `
-You are an expert CFO and financial advisor specializing in early-stage SaaS startups. You are advising AluminatAI, a GPU cost intelligence and energy monitoring SaaS platform.
+You are an expert CFO and financial advisor specializing in early-stage SaaS startups. You are advising NemulAI, a GPU cost intelligence and energy monitoring SaaS platform.
 
 Company context:
 - Product: Python agent for GPU monitoring (power, temperature, utilization) + web dashboard for cost attribution, benchmarking, and chargeback
@@ -68,7 +68,7 @@ async function handleAnalyzeRevenue(body: Record<string, unknown>) {
     (r) => `- ${r.date}: ${r.label} (${r.source}) — ${formatCurrency(r.amount as number)}${r.recurring ? " [recurring]" : " [one-time]"}${r.notes ? ` — ${r.notes}` : ""}`
   ).join("\n");
 
-  const userMessage = `Analyze the following revenue data for AluminatAI and provide:
+  const userMessage = `Analyze the following revenue data for NemulAI and provide:
 1. Revenue trend analysis (month-over-month growth, acceleration/deceleration)
 2. Revenue composition and concentration risk
 3. MRR/ARR calculation and trajectory
@@ -100,7 +100,7 @@ async function handleOptimizeCosts(body: Record<string, unknown>) {
     (r) => `- ${r.date}: ${r.label} — ${formatCurrency(r.amount as number)}${r.recurring ? " [recurring]" : ""}`
   ).join("\n");
 
-  const userMessage = `Analyze the following cost structure for AluminatAI and provide:
+  const userMessage = `Analyze the following cost structure for NemulAI and provide:
 1. Monthly burn rate breakdown (payroll vs. operating expenses)
 2. Cost optimization opportunities with estimated savings
 3. Compensation benchmarking against early-stage SaaS startups
@@ -136,7 +136,7 @@ async function handleAssessFundraising(body: Record<string, unknown>) {
     (i) => `- ${i.name} (${i.type}, ${i.round}): ${formatCurrency(i.amount as number)} for ${i.equityPercent}% equity${i.terms ? ` — terms: ${i.terms}` : ""}`
   ).join("\n");
 
-  const userMessage = `Assess AluminatAI's fundraising readiness and cap table health:
+  const userMessage = `Assess NemulAI's fundraising readiness and cap table health:
 
 1. Fundraising readiness score (1-10) with justification
 2. Cap table health analysis (dilution, founder control, option pool)
@@ -199,7 +199,7 @@ async function handleEvaluateDeal(body: Record<string, unknown>) {
 
   const impliedValuation = equityAsk > 0 ? investmentAmount / (equityAsk / 100) : 0;
 
-  const userMessage = `An investor has offered AluminatAI a deal. Evaluate it thoroughly:
+  const userMessage = `An investor has offered NemulAI a deal. Evaluate it thoroughly:
 
 THE OFFER:
 - Investor: ${investorName} (${investorType})
@@ -227,7 +227,7 @@ Please provide:
 1. **Deal Assessment** — Is this a fair deal? Score the offer 1-10. Compare the implied valuation to typical benchmarks for this stage and these metrics.
 2. **Realistic Counter-Offer** — What equity stake should you realistically give for this investment amount? What valuation should you target? Provide a specific counter-proposal.
 3. **Dilution Impact** — Show what the cap table looks like post-deal at both the asked equity AND your recommended equity. How much founder control remains?
-4. **Best Use of Funds** — Given AluminatAI's current stage, metrics, and burn rate, provide a specific allocation plan for how to deploy this capital (e.g., X% engineering hires, Y% marketing, Z% runway buffer). Prioritize by impact.
+4. **Best Use of Funds** — Given NemulAI's current stage, metrics, and burn rate, provide a specific allocation plan for how to deploy this capital (e.g., X% engineering hires, Y% marketing, Z% runway buffer). Prioritize by impact.
 5. **Negotiation Strategy** — Key leverage points, what to push back on, what terms to insist on (pro-rata rights, board seats, liquidation preference, anti-dilution).
 6. **Walk-Away Analysis** — At what point does this deal become bad? What's the minimum acceptable terms?`;
 
@@ -253,7 +253,7 @@ async function handleGenerateValuation(body: Record<string, unknown>) {
   const founderEquity = founders.reduce((s, f) => s + (f.equityPercent as number), 0);
   const investorEquity = investors.reduce((s, i) => s + (i.equityPercent as number), 0);
 
-  const userMessage = `Generate a comprehensive valuation report for AluminatAI using multiple methodologies:
+  const userMessage = `Generate a comprehensive valuation report for NemulAI using multiple methodologies:
 
 Financial Summary:
 - Current MRR: ${formatCurrency(mrr)}
@@ -306,9 +306,9 @@ async function handleAdvisePricing(body: Record<string, unknown>) {
 
   const mrr = revenue.filter((r) => r.recurring).reduce((s, r) => s + (r.amount as number), 0);
 
-  const userMessage = `Analyze AluminatAI's pricing strategy and provide recommendations:
+  const userMessage = `Analyze NemulAI's pricing strategy and provide recommendations:
 
-Current AluminatAI Pricing:
+Current NemulAI Pricing:
 - Free: ${formatCurrency(currentPricing?.free ?? 0)}/mo
 - Pro: ${formatCurrency(currentPricing?.pro_monthly ?? 49)}/mo (${formatCurrency(currentPricing?.pro_yearly ?? 468)}/yr)
 - Enterprise: ${formatCurrency(currentPricing?.enterprise_monthly ?? 199)}/mo (${formatCurrency(currentPricing?.enterprise_yearly ?? 1908)}/yr)
@@ -324,7 +324,7 @@ Financial Context:
 - Growth Target: ${growthTarget ?? "not specified"}%
 
 Please provide:
-1. **Market Positioning Analysis**: Where AluminatAI sits vs. competitors (premium, mid-market, budget)
+1. **Market Positioning Analysis**: Where NemulAI sits vs. competitors (premium, mid-market, budget)
 2. **Price Elasticity Assessment**: Are current prices too high, too low, or right?
 3. **Recommended Pricing Changes**: Specific new prices with justification
 4. **Annual Discount Optimization**: Is the 20% annual discount optimal?
@@ -353,7 +353,7 @@ async function handleGenerateReport(body: Record<string, unknown>) {
   const totalRevenue = revenue.reduce((s, r) => s + (r.amount as number), 0);
 
   const reportPrompts: Record<string, string> = {
-    pnl: `Generate a professional Profit & Loss (Income) Statement for AluminatAI for period: ${period ?? "current"}.
+    pnl: `Generate a professional Profit & Loss (Income) Statement for NemulAI for period: ${period ?? "current"}.
 
 Include:
 - Revenue section broken down by source (subscriptions, consulting, grants, other)
@@ -366,7 +366,7 @@ Include:
 
 Format as a proper financial statement with line items and totals.`,
 
-    cashflow: `Generate a Cash Flow Statement for AluminatAI for period: ${period ?? "current"}.
+    cashflow: `Generate a Cash Flow Statement for NemulAI for period: ${period ?? "current"}.
 
 Include:
 - Cash Flow from Operations (revenue collected minus operating expenses)
@@ -378,7 +378,7 @@ Include:
 
 Format as a proper financial statement.`,
 
-    board: `Generate a Board Report / Executive Financial Summary for AluminatAI for period: ${period ?? "current"}.
+    board: `Generate a Board Report / Executive Financial Summary for NemulAI for period: ${period ?? "current"}.
 
 Include:
 - Executive Summary (3-5 bullet points)
@@ -392,7 +392,7 @@ Include:
 
 Format professionally, suitable for board presentation.`,
 
-    metrics: `Generate a SaaS Metrics Dashboard Report for AluminatAI for period: ${period ?? "current"}.
+    metrics: `Generate a SaaS Metrics Dashboard Report for NemulAI for period: ${period ?? "current"}.
 
 Include:
 - MRR and ARR with trend

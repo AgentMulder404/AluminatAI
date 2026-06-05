@@ -149,7 +149,7 @@ export default function CarbonLeaderboardPage() {
         <p className="mt-6 text-xs text-neutral-600 text-center">
           Groups with fewer than 5 submissions are hidden to protect privacy.
           <br />
-          Energy measured by AluminatiAI agent · Intensity from Electricity Maps (lifecycle factors)
+          Energy measured by NemulAI agent · Intensity from Electricity Maps (lifecycle factors)
         </p>
       </div>
     </div>

@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Stable machine identity for AluminatAI GPU Agent.
+Stable machine identity for NemulAI GPU Agent.
 
 Generates a UUID the first time it runs and persists it to
-~/.config/aluminatai/machine_id so it survives hostname changes and
+~/.config/nemulai/machine_id so it survives hostname changes and
 process restarts.  On I/O failure (read-only FS, permission denied, etc.)
 an ephemeral UUID is returned — the agent never crashes due to identity
 issues.
@@ -25,13 +25,13 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
-_MACHINE_ID_PATH = Path("~/.config/aluminatai/machine_id")
+_MACHINE_ID_PATH = Path("~/.config/nemulai/machine_id")
 
 
 def get_machine_id() -> str:
     """Return a stable UUID string for this machine.
 
-    Reads from ~/.config/aluminatai/machine_id if it exists; generates and
+    Reads from ~/.config/nemulai/machine_id if it exists; generates and
     persists a new UUID on first call.  Returns an ephemeral (non-persisted)
     UUID if any I/O error occurs.
     """

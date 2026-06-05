@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 RunPod end-to-end demo: GPU cost attribution proof of concept.
 
 What this script proves
 ───────────────────────
 1. Idle baseline — the GPU draws non-zero power even when no workload runs.
-   AluminatiAI subtracts this from every sample so you only pay for *useful*
+   NemulAI subtracts this from every sample so you only pay for *useful*
    compute.
 
 2. Workload attribution — when a job starts, the agent detects the process and
@@ -31,7 +31,7 @@ What this script proves
    monthly cost at RunPod A100 spot rates.
 
 4. Green AI Index — if --upload is passed, submits the efficiency result to the
-   public leaderboard at aluminatiai.com/benchmarks.
+   public leaderboard at nemulai.com/benchmarks.
 
 Usage (inside the RunPod pod):
     python3 runpod_demo.py                    # local only
@@ -279,12 +279,12 @@ def _run_workload_with_power(
 
 def _print_banner(gpu_name: str, gpu_index: int):
     if _RICH:
-        console.rule("[bold cyan]AluminatiAI — RunPod Cost Attribution Demo[/]")
+        console.rule("[bold cyan]NemulAI — RunPod Cost Attribution Demo[/]")
         console.print(f"  GPU {gpu_index}: [bold]{gpu_name}[/]")
         console.print(f"  RunPod spot rate: [yellow]${_runpod_rate(gpu_name):.2f}/hr[/]\n")
     else:
         print("=" * 60)
-        print("AluminatiAI — RunPod Cost Attribution Demo")
+        print("NemulAI — RunPod Cost Attribution Demo")
         print(f"  GPU {gpu_index}: {gpu_name}")
         print(f"  RunPod spot rate: ${_runpod_rate(gpu_name):.2f}/hr")
         print("=" * 60)
@@ -405,7 +405,7 @@ def _upload_best(result: WorkloadResult, gpu_index: int, gpu_name: str):
 
 def main():
     p = argparse.ArgumentParser(
-        description="AluminatiAI RunPod cost attribution demo",
+        description="NemulAI RunPod cost attribution demo",
     )
     p.add_argument("--gpu", type=int, default=0, metavar="N",
                    help="GPU index (default: 0)")
@@ -448,7 +448,7 @@ def main():
         console.print(
             f"  Idle power : [yellow]{idle_w:.1f} W[/]\n"
             f"  Idle cost  : [red]${idle_cost_mo:.2f}/month[/] if left running 24/7 — "
-            "[dim]AluminatiAI detects this and bills to ALUMINATAI_IDLE_TEAM[/]"
+            "[dim]NemulAI detects this and bills to ALUMINATAI_IDLE_TEAM[/]"
         )
     else:
         print(f"  Idle power : {idle_w:.1f} W")
@@ -495,7 +495,7 @@ def main():
     if _RICH:
         console.rule("[bold cyan]Attribution[/]")
         console.print(
-            "  In production the AluminatiAI agent runs as a background daemon.\n"
+            "  In production the NemulAI agent runs as a background daemon.\n"
             "  Each workload above would be attributed to the team that owns its\n"
             "  process (via SLURM_JOB_ID, env vars, or cmdline heuristics).\n\n"
             "  [bold]To start the daemon:[/]\n"

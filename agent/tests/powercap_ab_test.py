@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 #!/usr/bin/env python3
 """
-AluminatAI Scientific A/B Power-Cap Experiment
+NemulAI Scientific A/B Power-Cap Experiment
 
 Proves that power-capping an A100-SXM4 from 400W → 250W improves energy
 efficiency (Tasks/Joule) with minimal throughput loss.
@@ -33,7 +33,7 @@ Experiment Protocol
             (Test B)    Record power via pynvml at 10 Hz.
 
   Phase 3   REPORT      Compare throughput loss % vs energy savings %.
-                        Compute Aluminati Efficiency Multiplier:
+                        Compute Nemul Efficiency Multiplier:
                           AEM = % Energy Saved / % Performance Lost
 
 Controls:
@@ -550,7 +550,7 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
     Print the final Scientific A/B Report.
 
     Compares throughput loss vs energy savings and computes the
-    Aluminati Efficiency Multiplier (AEM).
+    Nemul Efficiency Multiplier (AEM).
     """
     # Deltas
     throughput_delta_pct = (
@@ -572,7 +572,7 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
         if baseline.avg_power_w > 0 else 0
     )
 
-    # Aluminati Efficiency Multiplier
+    # Nemul Efficiency Multiplier
     if throughput_loss_pct > 0.01:
         aem = energy_delta_pct / throughput_loss_pct
     else:
@@ -590,7 +590,7 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
     w = 70  # report width
 
     print(f"\n{'━' * w}")
-    print(f"{'ALUMINATAI SCIENTIFIC A/B REPORT':^{w}}")
+    print(f"{'NEMULAI SCIENTIFIC A/B REPORT':^{w}}")
     print(f"{'Power-Cap Efficiency Experiment':^{w}}")
     print(f"{'━' * w}")
     print(f"  Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
@@ -667,10 +667,10 @@ def print_report(baseline: PhaseResult, optimized: PhaseResult):
     print()
 
     if aem == float('inf'):
-        print(f"  Aluminati Efficiency   : ∞  (zero throughput loss!)")
+        print(f"  Nemul Efficiency   : ∞  (zero throughput loss!)")
         print(f"  Multiplier (AEM)")
     else:
-        print(f"  Aluminati Efficiency   : {aem:.1f}x")
+        print(f"  Nemul Efficiency   : {aem:.1f}x")
         print(f"  Multiplier (AEM)")
     print()
     print(f"  Interpretation: For every 1% of performance lost,")
@@ -729,7 +729,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         prog="powercap_ab_test",
         description=(
-            "AluminatAI Scientific A/B Test — "
+            "NemulAI Scientific A/B Test — "
             "Power-cap efficiency experiment for A100/H100 GPUs."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -794,7 +794,7 @@ examples:
 
     # ── Banner ───────────────────────────────────────────────────────────
     print(f"\n{'═' * 70}")
-    print(f"  AluminatAI Scientific A/B Power-Cap Experiment")
+    print(f"  NemulAI Scientific A/B Power-Cap Experiment")
     print(f"{'═' * 70}")
     print(f"  GPU             : {gpu_name}  (index {args.gpu})")
     print(f"  Default PL      : {default_pl}W")

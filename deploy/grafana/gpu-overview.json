@@ -8,7 +8,7 @@
     }
   ],
   "annotations": { "list": [] },
-  "description": "AluminatAI GPU monitoring — power, utilization, temperature, energy, and agent health",
+  "description": "NemulAI GPU monitoring — power, utilization, temperature, energy, and agent health",
   "editable": true,
   "gnetId": null,
   "graphTooltip": 1,
@@ -21,7 +21,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_power_watts",
+          "expr": "nemulai_gpu_power_watts",
           "legendFormat": "GPU {{gpu_index}} ({{gpu_uuid}})",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -36,7 +36,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_utilization_pct",
+          "expr": "nemulai_gpu_utilization_pct",
           "legendFormat": "GPU {{gpu_index}}",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -51,7 +51,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_temperature_c",
+          "expr": "nemulai_gpu_temperature_c",
           "legendFormat": "GPU {{gpu_index}}",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -76,7 +76,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_energy_joules_total",
+          "expr": "nemulai_gpu_energy_joules_total",
           "legendFormat": "GPU {{gpu_uuid}}",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -91,12 +91,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_tensor_power_watts",
+          "expr": "nemulai_gpu_tensor_power_watts",
           "legendFormat": "GPU {{gpu_index}} tensor",
           "datasource": "${DS_PROMETHEUS}"
         },
         {
-          "expr": "aluminatai_gpu_fp16_power_watts",
+          "expr": "nemulai_gpu_fp16_power_watts",
           "legendFormat": "GPU {{gpu_index}} fp16",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -109,12 +109,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_memory_power_watts",
+          "expr": "nemulai_gpu_memory_power_watts",
           "legendFormat": "GPU {{gpu_index}} memory",
           "datasource": "${DS_PROMETHEUS}"
         },
         {
-          "expr": "aluminatai_gpu_idle_power_watts",
+          "expr": "nemulai_gpu_idle_power_watts",
           "legendFormat": "GPU {{gpu_index}} idle",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -127,12 +127,12 @@
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "targets": [
         {
-          "expr": "aluminatai_upload_success_total",
+          "expr": "nemulai_upload_success_total",
           "legendFormat": "Success",
           "datasource": "${DS_PROMETHEUS}"
         },
         {
-          "expr": "aluminatai_upload_failure_total",
+          "expr": "nemulai_upload_failure_total",
           "legendFormat": "Failures",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -144,17 +144,17 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
       "targets": [
         {
-          "expr": "aluminatai_buffer_size",
+          "expr": "nemulai_buffer_size",
           "legendFormat": "Buffer",
           "datasource": "${DS_PROMETHEUS}"
         },
         {
-          "expr": "aluminatai_wal_entries_pending",
+          "expr": "nemulai_wal_entries_pending",
           "legendFormat": "WAL pending",
           "datasource": "${DS_PROMETHEUS}"
         },
         {
-          "expr": "aluminatai_wal_size_bytes",
+          "expr": "nemulai_wal_size_bytes",
           "legendFormat": "WAL bytes",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -166,7 +166,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "targets": [
         {
-          "expr": "aluminatai_attribution_confidence",
+          "expr": "nemulai_attribution_confidence",
           "legendFormat": "GPU {{gpu_index}} / {{job_id}} ({{method}})",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -181,7 +181,7 @@
       "gridPos": { "h": 4, "w": 24, "x": 0, "y": 32 },
       "targets": [
         {
-          "expr": "aluminatai_agent_info",
+          "expr": "nemulai_agent_info",
           "format": "table",
           "instant": true,
           "datasource": "${DS_PROMETHEUS}"
@@ -197,7 +197,7 @@
       "gridPos": { "h": 4, "w": 6, "x": 0, "y": 36 },
       "targets": [
         {
-          "expr": "aluminatai_agent_uptime_seconds",
+          "expr": "nemulai_agent_uptime_seconds",
           "legendFormat": "Uptime",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -206,10 +206,10 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["aluminatai", "gpu", "nvidia"],
+  "tags": ["nemulai", "gpu", "nvidia"],
   "templating": { "list": [] },
   "time": { "from": "now-6h", "to": "now" },
-  "title": "AluminatAI — GPU Overview",
-  "uid": "aluminatai-gpu-overview",
+  "title": "NemulAI — GPU Overview",
+  "uid": "nemulai-gpu-overview",
   "version": 1
 }

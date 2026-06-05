@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,42 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-Prometheus /metrics endpoint for the AluminatAI GPU agent.
+Prometheus /metrics endpoint for the NemulAI GPU agent.
 
 Activated when METRICS_PORT != 0 (default 9100).
-Optional dep: pip install aluminatiai[prometheus]
+Optional dep: pip install nemulai[prometheus]
 
 GPU metrics:
-  aluminatai_gpu_power_watts{gpu_uuid, gpu_index}
-  aluminatai_gpu_energy_joules_total{gpu_uuid}
-  aluminatai_gpu_utilization_pct{gpu_uuid, gpu_index}
-  aluminatai_gpu_temperature_c{gpu_uuid, gpu_index}
+  nemulai_gpu_power_watts{gpu_uuid, gpu_index}
+  nemulai_gpu_energy_joules_total{gpu_uuid}
+  nemulai_gpu_utilization_pct{gpu_uuid, gpu_index}
+  nemulai_gpu_temperature_c{gpu_uuid, gpu_index}
 
 Phase decomposition (requires DCGM or NVML fallback):
-  aluminatai_gpu_tensor_power_watts{gpu_uuid, gpu_index}
-  aluminatai_gpu_fp16_power_watts{gpu_uuid, gpu_index}
-  aluminatai_gpu_memory_power_watts{gpu_uuid, gpu_index}
-  aluminatai_gpu_idle_power_watts{gpu_uuid, gpu_index}
+  nemulai_gpu_tensor_power_watts{gpu_uuid, gpu_index}
+  nemulai_gpu_fp16_power_watts{gpu_uuid, gpu_index}
+  nemulai_gpu_memory_power_watts{gpu_uuid, gpu_index}
+  nemulai_gpu_idle_power_watts{gpu_uuid, gpu_index}
 
 Upload / WAL health:
-  aluminatai_upload_success_total
-  aluminatai_upload_failure_total
-  aluminatai_buffer_size
-  aluminatai_wal_size_bytes
-  aluminatai_wal_entries_pending
-  aluminatai_wal_replay_uploaded_total
-  aluminatai_wal_replay_failed_total
+  nemulai_upload_success_total
+  nemulai_upload_failure_total
+  nemulai_buffer_size
+  nemulai_wal_size_bytes
+  nemulai_wal_entries_pending
+  nemulai_wal_replay_uploaded_total
+  nemulai_wal_replay_failed_total
 
 Attribution:
-  aluminatai_attribution_confidence{gpu_index, job_id, method}
-  aluminatai_attribution_uncertainty_pct{gpu_index, job_id, method}
-  aluminatai_attribution_unresolved_total
+  nemulai_attribution_confidence{gpu_index, job_id, method}
+  nemulai_attribution_uncertainty_pct{gpu_index, job_id, method}
+  nemulai_attribution_unresolved_total
 
 Agent health:
-  aluminatai_agent_uptime_seconds
-  aluminatai_agent_info{version, hostname, mode}
+  nemulai_agent_uptime_seconds
+  nemulai_agent_info{version, hostname, mode}
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def _basic_auth_middleware(app, credentials: str):
         auth = environ.get("HTTP_AUTHORIZATION", "").encode()
         if auth != expected:
             start_response("401 Unauthorized", [
-                ("WWW-Authenticate", 'Basic realm="aluminatai"'),
+                ("WWW-Authenticate", 'Basic realm="nemulai"'),
                 ("Content-Type", "text/plain"),
             ])
             return [b"Unauthorized\n"]
@@ -128,122 +128,122 @@ class MetricsServer:
         labels = ["gpu_uuid", "gpu_index"]
 
         self._power = Gauge(
-            "aluminatai_gpu_power_watts",
+            "nemulai_gpu_power_watts",
             "GPU power draw in watts",
             labels,
         )
         self._energy = Counter(
-            "aluminatai_gpu_energy_joules_total",
+            "nemulai_gpu_energy_joules_total",
             "Cumulative GPU energy in joules",
             ["gpu_uuid"],
         )
         self._util = Gauge(
-            "aluminatai_gpu_utilization_pct",
+            "nemulai_gpu_utilization_pct",
             "GPU compute utilization percent",
             labels,
         )
         self._temp = Gauge(
-            "aluminatai_gpu_temperature_c",
+            "nemulai_gpu_temperature_c",
             "GPU temperature in Celsius",
             labels,
         )
         self._upload_success = Counter(
-            "aluminatai_upload_success_total",
+            "nemulai_upload_success_total",
             "Total metrics successfully uploaded",
         )
         self._upload_failure = Counter(
-            "aluminatai_upload_failure_total",
+            "nemulai_upload_failure_total",
             "Total metric batches that failed upload",
         )
         self._buffer_size = Gauge(
-            "aluminatai_buffer_size",
+            "nemulai_buffer_size",
             "Current in-memory upload buffer size",
         )
         self._wal_size_bytes = Gauge(
-            "aluminatai_wal_size_bytes",
+            "nemulai_wal_size_bytes",
             "WAL file size in bytes",
         )
         self._wal_entries_pending = Gauge(
-            "aluminatai_wal_entries_pending",
+            "nemulai_wal_entries_pending",
             "Approximate number of metric rows waiting in the WAL",
         )
         self._wal_replay_uploaded = Counter(
-            "aluminatai_wal_replay_uploaded_total",
+            "nemulai_wal_replay_uploaded_total",
             "Total WAL rows successfully re-uploaded during replay",
         )
         self._wal_replay_failed = Counter(
-            "aluminatai_wal_replay_failed_total",
+            "nemulai_wal_replay_failed_total",
             "Total WAL rows that failed replay and remain pending",
         )
         self._confidence = Gauge(
-            "aluminatai_attribution_confidence",
+            "nemulai_attribution_confidence",
             "Attribution confidence score (0.0–1.0), labelled by resolution method",
             ["gpu_index", "job_id", "method"],
         )
         self._uncertainty = Gauge(
-            "aluminatai_attribution_uncertainty_pct",
+            "nemulai_attribution_uncertainty_pct",
             "Estimated ± power attribution uncertainty as a percentage of reported power_w; "
             "reflects how much the true attribution could deviate based on resolution method",
             ["gpu_index", "job_id", "method"],
         )
         self._attribution_unresolved = Counter(
-            "aluminatai_attribution_unresolved_total",
+            "nemulai_attribution_unresolved_total",
             "Collection cycles where the attribution engine returned no result for a GPU",
         )
 
         # Phase decomposition gauges (populated by DcgmProbe)
         self._tensor_power = Gauge(
-            "aluminatai_gpu_tensor_power_watts",
+            "nemulai_gpu_tensor_power_watts",
             "Estimated tensor-core power draw in watts (DCGM mode); "
             "0 when DCGM unavailable",
             labels,
         )
         self._fp16_power = Gauge(
-            "aluminatai_gpu_fp16_power_watts",
+            "nemulai_gpu_fp16_power_watts",
             "Estimated FP16 pipeline power draw in watts (DCGM mode); "
             "0 when DCGM unavailable",
             labels,
         )
         self._memory_power = Gauge(
-            "aluminatai_gpu_memory_power_watts",
+            "nemulai_gpu_memory_power_watts",
             "Estimated memory-subsystem power draw in watts",
             labels,
         )
         self._idle_power = Gauge(
-            "aluminatai_gpu_idle_power_watts",
+            "nemulai_gpu_idle_power_watts",
             "Estimated idle / baseline power draw in watts",
             labels,
         )
 
         # Carbon tracking gauges
         self._carbon_intensity = Gauge(
-            "aluminatai_carbon_intensity_gco2e",
+            "nemulai_carbon_intensity_gco2e",
             "Current grid carbon intensity in gCO2e/kWh",
             ["zone"],
         )
         self._carbon_renewable_pct = Gauge(
-            "aluminatai_carbon_renewable_pct",
+            "nemulai_carbon_renewable_pct",
             "Percentage of grid power from renewable sources",
             ["zone"],
         )
         self._co2_grams = Counter(
-            "aluminatai_co2_grams_total",
+            "nemulai_co2_grams_total",
             "Cumulative CO2 emissions in grams",
         )
 
         self._mem_leak_score = Gauge(
-            "aluminatai_gpu_memory_leak_score",
+            "nemulai_gpu_memory_leak_score",
             "Memory leak probability (0.0-1.0) based on monotonic increase detection",
             labels,
         )
 
         self._agent_uptime = Gauge(
-            "aluminatai_agent_uptime_seconds",
+            "nemulai_agent_uptime_seconds",
             "Seconds since the agent process started",
         )
         # Info-pattern gauge: always 1.0, metadata in labels
         self._agent_info = Gauge(
-            "aluminatai_agent_info",
+            "nemulai_agent_info",
             "Agent metadata (version, hostname, run mode); value is always 1",
             ["version", "hostname", "mode"],
         )

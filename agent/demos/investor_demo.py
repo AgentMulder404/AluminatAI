@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-aluminatiai demo — Investor demo suite.
+nemulai demo — Investor demo suite.
 
 Runs 5 compelling GPU energy efficiency demos that prove real savings
 with real numbers. Each demo completes in under 5 minutes.
 
 Usage:
-    aluminatiai demo --demo all --quick
-    aluminatiai demo --demo 1 --gpu 0
-    aluminatiai demo --demo 3 --full
+    nemulai demo --demo all --quick
+    nemulai demo --demo 1 --gpu 0
+    nemulai demo --demo 3 --full
 """
 from __future__ import annotations
 
@@ -394,7 +394,7 @@ def run_demo(args: argparse.Namespace) -> int:
         console = Console()
         console.print()
         console.print(Panel(
-            f"[bold white]AluminatAI Investor Demo Suite[/bold white]\n"
+            f"[bold white]NemulAI Investor Demo Suite[/bold white]\n"
             f"Mode: [bold cyan]{mode}[/bold cyan] | GPU: {gpu} | "
             f"Duration: {duration}s | Iterations: {iterations}",
             border_style="bold cyan",
@@ -403,7 +403,7 @@ def run_demo(args: argparse.Namespace) -> int:
     else:
         print()
         print("=" * 60)
-        print(f"  AluminatAI Investor Demo Suite")
+        print(f"  NemulAI Investor Demo Suite")
         print(f"  Mode: {mode} | GPU: {gpu} | {duration}s x {iterations} iterations")
         print("=" * 60)
 
@@ -458,7 +458,7 @@ def run_demo(args: argparse.Namespace) -> int:
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="aluminatiai demo",
+        prog="nemulai demo",
         description="Investor demo suite — 5 GPU energy efficiency demos.",
     )
     p.add_argument("--demo", type=str, default="all",

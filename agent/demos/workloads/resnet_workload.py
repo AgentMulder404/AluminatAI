@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 ResNet-18 training workload for A/B energy testing.
 
 Trains ResNet-18 on synthetic ImageNet-scale data and prints throughput
-in a format parseable by `aluminatiai ab` (XXX.X samples/s).
+in a format parseable by `nemulai ab` (XXX.X samples/s).
 
 Usage:
     python resnet_workload.py --duration 30 --dtype fp32 --batch-size 128

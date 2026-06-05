@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Scientific Energy Profiler for ML Workloads.
 
@@ -154,7 +154,7 @@ class ProfileResult:
     task_unit: str              # "step", "token", "image", "batch"
     tasks_per_iteration: int
 
-    # Aluminati Efficiency Metrics
+    # NemulAI Efficiency Metrics
     metrics: dict[str, Any] = field(default_factory=dict)
 
     # Optimization plan
@@ -164,7 +164,7 @@ class ProfileResult:
         """Human-readable summary of the profiling session."""
         lines = [
             "=" * 72,
-            "  ALUMINATI ENERGY AUDIT",
+            "  NEMULAI ENERGY AUDIT",
             "=" * 72,
             f"  GPU:              {self.gpu_name}",
             f"  Architecture:     {self.gpu_arch or 'unknown'}",
@@ -187,7 +187,7 @@ class ProfileResult:
         lines = [l.replace("{unit}", self.task_unit.upper()) for l in lines]
 
         if self.metrics:
-            lines.append("  ALUMINATI EFFICIENCY METRICS")
+            lines.append("  NEMULAI EFFICIENCY METRICS")
             for key, value in self.metrics.items():
                 if isinstance(value, float):
                     lines.append(f"  {key:24s} {value:.4f}")
@@ -385,8 +385,8 @@ class ScientificEnergyProfiler:
             tasks_per_iteration=tasks_per_iteration,
         )
 
-        # Compute Aluminati Efficiency Metrics
-        result.metrics = self._compute_aluminati_metrics(
+        # Compute NemulAI Efficiency Metrics
+        result.metrics = self._compute_nemulai_metrics(
             result, iter_results, flop_count, memory_bytes_accessed,
         )
 
@@ -570,10 +570,10 @@ class ScientificEnergyProfiler:
         return flops, mem_bytes
 
     # ═══════════════════════════════════════════════════════════════
-    # Phase 3: Aluminati Efficiency Metrics
+    # Phase 3: NemulAI Efficiency Metrics
     # ═══════════════════════════════════════════════════════════════
 
-    def _compute_aluminati_metrics(
+    def _compute_nemulai_metrics(
         self,
         result: ProfileResult,
         iters: list[IterationResult],
@@ -581,7 +581,7 @@ class ScientificEnergyProfiler:
         memory_bytes: Optional[int],
     ) -> dict[str, Any]:
         """
-        Compute the Aluminati Efficiency Metrics suite.
+        Compute the NemulAI Efficiency Metrics suite.
 
         Metrics:
           - arithmetic_intensity_flop_per_byte

@@ -1,5 +1,5 @@
 // POST /api/admin/prospect-scraper
-// Searches for potential AluminatAI clients using Apify RAG Web Browser.
+// Searches for potential NemulAI clients using Apify RAG Web Browser.
 // Cookie auth — admin only.
 
 import { NextRequest, NextResponse } from "next/server";

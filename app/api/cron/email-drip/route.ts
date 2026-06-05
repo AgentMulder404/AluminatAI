@@ -29,37 +29,37 @@ function getDripEmail(index: number, userEmail: string): DripEmail {
   switch (index) {
     case 0:
       return {
-        subject: "Welcome to AluminatAI — GPU cost intelligence starts here",
+        subject: "Welcome to NemulAI — GPU cost intelligence starts here",
         body: `Hey there!
 
-Welcome to AluminatAI. You've taken the first step toward understanding your GPU energy costs.
+Welcome to NemulAI. You've taken the first step toward understanding your GPU energy costs.
 
 Here's what to do next:
-1. Install the agent on your GPU machine: pip install aluminatai-agent
-2. Run it: aluminatai-agent run --api-key YOUR_KEY
-3. Watch your dashboard light up: https://www.aluminatai.com/dashboard
+1. Install the agent on your GPU machine: pip install nemulai-agent
+2. Run it: nemulai-agent run --api-key YOUR_KEY
+3. Watch your dashboard light up: https://www.nemulai.com/dashboard
 
-If you need help, reply to this email or check the docs: https://www.aluminatai.com/docs/agent
+If you need help, reply to this email or check the docs: https://www.nemulai.com/docs/agent
 
-— The AluminatAI Team`,
+— The NemulAI Team`,
       };
     case 1:
       return {
-        subject: "Step 1: Install the AluminatAI agent on your GPU",
+        subject: "Step 1: Install the NemulAI agent on your GPU",
         body: `Hi again!
 
 Haven't installed the agent yet? It takes under 2 minutes:
 
-  pip install aluminatai-agent
-  aluminatai-agent run --api-key YOUR_KEY
+  pip install nemulai-agent
+  nemulai-agent run --api-key YOUR_KEY
 
 The agent runs as a lightweight daemon, sampling GPU power, utilization, and temperature every 5 seconds. No performance impact — it reads NVML counters only.
 
 Supports: bare metal, Docker, Kubernetes DaemonSet, SLURM prologue/epilogue.
 
-Docs: https://www.aluminatai.com/docs/agent
+Docs: https://www.nemulai.com/docs/agent
 
-— The AluminatAI Team`,
+— The NemulAI Team`,
       };
     case 2:
       return {
@@ -72,11 +72,11 @@ By now your agent should be reporting metrics. Head to your dashboard to see:
 - Energy breakdown (kWh, CO2e)
 - Cloud cost comparison — see how much you're saving vs AWS/GCP on-demand
 
-Dashboard: https://www.aluminatai.com/dashboard
+Dashboard: https://www.nemulai.com/dashboard
 
-Not seeing data? Make sure the agent is running: aluminatai-agent service status
+Not seeing data? Make sure the agent is running: nemulai-agent service status
 
-— The AluminatAI Team`,
+— The NemulAI Team`,
       };
     case 3:
       return {
@@ -91,26 +91,26 @@ Now that you have cost data flowing, set a budget alert to stay on top of spendi
 
 You'll get warned when spend hits your threshold — before it becomes a problem.
 
-Dashboard: https://www.aluminatai.com/dashboard/settings
+Dashboard: https://www.nemulai.com/dashboard/settings
 
-— The AluminatAI Team`,
+— The NemulAI Team`,
       };
     case 4:
       return {
         subject: "Invite your team — GPU cost visibility for everyone",
         body: `Hi!
 
-AluminatAI works best when the whole team can see GPU costs. Invite teammates to:
+NemulAI works best when the whole team can see GPU costs. Invite teammates to:
 
 - View cost breakdowns by team, model, or cluster
 - Get their own budget alerts
 - Track their workloads' energy efficiency
 
-Invite your team: https://www.aluminatai.com/dashboard/settings
+Invite your team: https://www.nemulai.com/dashboard/settings
 
-Running 100+ GPUs? Check out our Enterprise plan with SSO, SLA dashboard, and dedicated support: https://www.aluminatai.com/enterprise
+Running 100+ GPUs? Check out our Enterprise plan with SSO, SLA dashboard, and dedicated support: https://www.nemulai.com/enterprise
 
-— The AluminatAI Team`,
+— The NemulAI Team`,
       };
     default:
       return { subject: "", body: "" };

@@ -587,7 +587,7 @@ function SecurityQuestionnaireTab() {
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-4">
         <h2 className="text-lg font-semibold">Security Questionnaire Auto-Fill</h2>
         <p className="text-sm text-neutral-400">
-          Paste a vendor security questionnaire and AluminatAI&apos;s security posture
+          Paste a vendor security questionnaire and NemulAI&apos;s security posture
           will be used to auto-fill answers.
         </p>
         <textarea
@@ -705,7 +705,7 @@ function ComplianceScannerTab() {
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-4">
         <h2 className="text-lg font-semibold">Compliance Scanner</h2>
         <p className="text-sm text-neutral-400">
-          Evaluate AluminatAI&apos;s compliance posture against selected frameworks.
+          Evaluate NemulAI&apos;s compliance posture against selected frameworks.
         </p>
 
         <div>

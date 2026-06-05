@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 DcgmProbe — Phase-aware GPU power decomposition.
 
@@ -40,7 +40,7 @@ Power model:
     idle_power    = idle_baseline_w
 
   Coefficients (α, β, γ, δ) are relative weights loaded from
-  ~/.config/aluminatai/dcgm_coefficients.json, keyed by GPU arch prefix.
+  ~/.config/nemulai/dcgm_coefficients.json, keyed by GPU arch prefix.
   Built-in defaults are used when the file is absent.
 
 Installing DCGM Python bindings:
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_COEFFICIENTS_PATH = Path.home() / ".config" / "aluminatai" / "dcgm_coefficients.json"
+_COEFFICIENTS_PATH = Path.home() / ".config" / "nemulai" / "dcgm_coefficients.json"
 
 # Default relative weights per GPU architecture prefix.
 # Higher weight = that component receives proportionally more power

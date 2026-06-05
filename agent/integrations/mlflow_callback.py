@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-AluminatAI MLflow integration.
+NemulAI MLflow integration.
 
 Auto-tags MLflow runs with energy consumption and cost.
 
 Usage:
     import mlflow
-    from agent.integrations.mlflow_callback import AluminatAIMLflowCallback
+    from agent.integrations.mlflow_callback import NemulAIMLflowCallback
 
-    callback = AluminatAIMLflowCallback()
+    callback = NemulAIMLflowCallback()
 
     with mlflow.start_run() as run:
         callback.on_run_start(run)
@@ -55,7 +55,7 @@ except ImportError:
     _MLFLOW = False
 
 
-class AluminatAIMLflowCallback:
+class NemulAIMLflowCallback:
     """
     Logs GPU energy and cost to MLflow runs.
 
@@ -64,7 +64,7 @@ class AluminatAIMLflowCallback:
       - Sets ALUMINATAI_TEAM to the experiment name
 
     On run end:
-      - Fetches energy metrics from AluminatAI API (last 24h filtered by job UUID)
+      - Fetches energy metrics from NemulAI API (last 24h filtered by job UUID)
       - Logs energy_kwh, cost_usd, co2_kg as MLflow metrics
     """
 
@@ -75,7 +75,7 @@ class AluminatAIMLflowCallback:
     ):
         self.api_key = api_key or os.getenv("ALUMINATAI_API_KEY", "")
         self.api_endpoint = api_endpoint or os.getenv(
-            "ALUMINATAI_API_ENDPOINT", "https://aluminatiai.com/api/metrics/ingest"
+            "ALUMINATAI_API_ENDPOINT", "https://nemulai.com/api/metrics/ingest"
         )
         self._start_times: dict[str, float] = {}
 
@@ -96,11 +96,11 @@ class AluminatAIMLflowCallback:
             os.environ["ALUMINATAI_MODEL"] = run_name
             os.environ["ALUMINATAI_TEAM"] = experiment.name
             logger.info(
-                "AluminatAI: tracking run '%s' in experiment '%s'",
+                "NemulAI: tracking run '%s' in experiment '%s'",
                 run_name, experiment.name
             )
         except Exception as exc:
-            logger.warning("AluminatAI MLflow on_run_start: %s", exc)
+            logger.warning("NemulAI MLflow on_run_start: %s", exc)
 
     def on_run_end(self, run) -> None:
         """Call at the end of an MLflow run to log energy metrics."""
@@ -116,18 +116,18 @@ class AluminatAIMLflowCallback:
             energy = self._fetch_energy(start_time)
             if energy:
                 mlflow.log_metrics({
-                    "aluminatai_energy_kwh": energy.get("energy_kwh", 0),
-                    "aluminatai_cost_usd": energy.get("cost_usd", 0),
-                    "aluminatai_co2_kg": energy.get("co2_kg", 0),
+                    "nemulai_energy_kwh": energy.get("energy_kwh", 0),
+                    "nemulai_cost_usd": energy.get("cost_usd", 0),
+                    "nemulai_co2_kg": energy.get("co2_kg", 0),
                 })
                 logger.info(
-                    "AluminatAI: logged %.4f kWh / $%.4f to run %s",
+                    "NemulAI: logged %.4f kWh / $%.4f to run %s",
                     energy.get("energy_kwh", 0),
                     energy.get("cost_usd", 0),
                     run_id,
                 )
         except Exception as exc:
-            logger.warning("AluminatAI MLflow on_run_end: %s", exc)
+            logger.warning("NemulAI MLflow on_run_end: %s", exc)
         finally:
             # Clean up env vars
             os.environ.pop("ALUMINATAI_MODEL", None)

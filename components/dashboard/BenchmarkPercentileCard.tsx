@@ -29,7 +29,7 @@ function handleShare(data: PercentileData) {
     data.kwh_per_1m_tokens != null
       ? `${data.kwh_per_1m_tokens.toFixed(4)} kWh/1M tokens`
       : `${kwhPerGpuHr(data.user_value)} kWh/GPU-hr`;
-  const text = `My ${data.model_tag} on ${data.gpu_arch} uses ${metric} — top ${data.top_pct}% on the AluminatiAI Green AI Index 🌱 aluminatiai.com/benchmarks #GreenAI`;
+  const text = `My ${data.model_tag} on ${data.gpu_arch} uses ${metric} — top ${data.top_pct}% on the NemulAI Green AI Index 🌱 nemulai.com/benchmarks #GreenAI`;
   window.open(
     `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`,
     "_blank",

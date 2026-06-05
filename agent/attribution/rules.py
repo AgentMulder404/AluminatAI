@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Custom attribution rules loader.
 
@@ -31,7 +31,7 @@ Config file format:
 Config file search order:
   1. ALUMINATAI_ATTRIBUTION_CONFIG env var (explicit path)
   2. ./attribution_rules.json  (working directory)
-  3. ~/.config/aluminatai/attribution_rules.json
+  3. ~/.config/nemulai/attribution_rules.json
   4. Not found → rules disabled silently (no behaviour change)
 """
 
@@ -125,7 +125,7 @@ class AttributionRules:
             return local
 
         # 3. User config directory
-        user = os.path.expanduser("~/.config/aluminatai/attribution_rules.json")
+        user = os.path.expanduser("~/.config/nemulai/attribution_rules.json")
         if os.path.isfile(user):
             return user
 

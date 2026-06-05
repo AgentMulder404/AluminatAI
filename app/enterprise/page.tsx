@@ -91,12 +91,12 @@ export default function EnterprisePage() {
           </p>
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 max-w-3xl mx-auto">
             <iframe
-              src="https://cal.com/aluminatai/enterprise-demo"
+              src="https://cal.com/nemulai/enterprise-demo"
               width="100%"
               height="600"
               frameBorder="0"
               className="rounded-lg"
-              title="Schedule a demo with AluminatAI"
+              title="Schedule a demo with NemulAI"
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
               loading="lazy"
             />
@@ -108,10 +108,10 @@ export default function EnterprisePage() {
           <p className="text-neutral-500 text-sm">
             Prefer email?{" "}
             <a
-              href="mailto:enterprise@aluminatai.com"
+              href="mailto:enterprise@nemulai.com"
               className="text-indigo-400 hover:text-indigo-300"
             >
-              enterprise@aluminatai.com
+              enterprise@nemulai.com
             </a>
           </p>
         </div>

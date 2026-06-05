@@ -1,6 +1,6 @@
-# AluminatAI Agent
+# NemulAI Agent
 
-The open-source GPU energy monitoring agent for [AluminatAI](https://aluminatiai.com).
+The open-source GPU energy monitoring agent for [NemulAI](https://nemulai.com).
 
 Runs on any GPU machine — NVIDIA, AMD, Intel Gaudi, Intel Arc, Apple Silicon, or CPU-only — samples power every 5 seconds, attributes energy to individual jobs, and streams dollar costs to your dashboard.
 
@@ -33,130 +33,130 @@ All tiers share the same agent binary. Enable higher tiers via environment varia
 
 ```bash
 # Monitor (default — no extra config)
-aluminatiai
+nemulai
 
 # Advisor — agent uploads recommendations, polls for approved commands
-AUTO_TUNE_ENABLED=1 COMMAND_POLL_ENABLED=1 aluminatiai
+AUTO_TUNE_ENABLED=1 COMMAND_POLL_ENABLED=1 nemulai
 
 # Swarm — one agent becomes fleet leader, optimizes across all nodes
-SWARM_ENABLED=1 COMMAND_POLL_ENABLED=1 AUTO_TUNE_ENABLED=1 aluminatiai
+SWARM_ENABLED=1 COMMAND_POLL_ENABLED=1 AUTO_TUNE_ENABLED=1 nemulai
 ```
 
 ## Install
 
 ```bash
-pip install aluminatiai
+pip install nemulai
 ```
 
 Optional extras:
 
 ```bash
-pip install 'aluminatiai[prometheus]'     # Prometheus /metrics endpoint
-pip install 'aluminatiai[secure]'         # Encrypted WAL (AES-128 Fernet)
-pip install 'aluminatiai[observability]'  # YAML config + OTEL exporter
-pip install 'aluminatiai[benchmark]'      # Benchmark CLI dependencies
-pip install 'aluminatiai[dcgm]'           # DCGM phase decomposition
-pip install 'aluminatiai[all]'            # Everything
+pip install 'nemulai[prometheus]'     # Prometheus /metrics endpoint
+pip install 'nemulai[secure]'         # Encrypted WAL (AES-128 Fernet)
+pip install 'nemulai[observability]'  # YAML config + OTEL exporter
+pip install 'nemulai[benchmark]'      # Benchmark CLI dependencies
+pip install 'nemulai[dcgm]'           # DCGM phase decomposition
+pip install 'nemulai[all]'            # Everything
 ```
 
 ## Quick Start
 
 ```bash
 export ALUMINATAI_API_KEY=alum_your_key_here
-aluminatiai
+nemulai
 ```
 
-Get your API key at [aluminatiai.com/dashboard](https://aluminatiai.com/dashboard).
+Get your API key at [nemulai.com/dashboard](https://nemulai.com/dashboard).
 
 The agent will detect your GPU, start sampling, and upload metrics to your dashboard. That's it.
 
 ## CLI Commands
 
-The `aluminatiai` command includes 8 subcommands:
+The `nemulai` command includes 8 subcommands:
 
-### `aluminatiai` / `aluminatiai run`
+### `nemulai` / `nemulai run`
 
 Main daemon. Collects GPU metrics, attributes energy to jobs, uploads to the cloud.
 
 ```bash
-aluminatiai                            # run forever (default)
-aluminatiai --interval 2               # sample every 2 seconds
-aluminatiai --duration 3600            # run for 1 hour then exit
-aluminatiai --output /data/metrics.csv # also write a local CSV manifest
-aluminatiai --dry-run                  # collect + attribute, skip uploads
-aluminatiai --prometheus-only          # local Prometheus only, no cloud
+nemulai                            # run forever (default)
+nemulai --interval 2               # sample every 2 seconds
+nemulai --duration 3600            # run for 1 hour then exit
+nemulai --output /data/metrics.csv # also write a local CSV manifest
+nemulai --dry-run                  # collect + attribute, skip uploads
+nemulai --prometheus-only          # local Prometheus only, no cloud
 ```
 
-### `aluminatiai benchmark`
+### `nemulai benchmark`
 
 Measure GPU power baseline and energy efficiency.
 
 ```bash
-aluminatiai benchmark                              # 60s power baseline
-aluminatiai benchmark --gpu 0 --duration 120       # specific GPU, 2 min
-aluminatiai benchmark --upload                     # submit to Green AI Index
-aluminatiai benchmark --model-tag llama-3-70b      # tag with model profile
+nemulai benchmark                              # 60s power baseline
+nemulai benchmark --gpu 0 --duration 120       # specific GPU, 2 min
+nemulai benchmark --upload                     # submit to Green AI Index
+nemulai benchmark --model-tag llama-3-70b      # tag with model profile
 ```
 
 Output includes average power (W), J/GPU-hr, kWh/GPU-hr, and roofline efficiency rating.
 
-### `aluminatiai optimize`
+### `nemulai optimize`
 
 Real-time efficiency analysis with actionable recommendations.
 
 ```bash
-aluminatiai optimize                    # analyze all GPUs, 60s window
-aluminatiai optimize --gpu 0 --json     # JSON output for automation
-aluminatiai optimize --duration 300     # 5 minute analysis window
+nemulai optimize                    # analyze all GPUs, 60s window
+nemulai optimize --gpu 0 --json     # JSON output for automation
+nemulai optimize --duration 300     # 5 minute analysis window
 ```
 
 Detects compute precision, classifies memory-bound vs. compute-bound workloads, and ranks recommendations (P1/P2/P3) for power caps, precision switches, and GPU right-sizing.
 
-### `aluminatiai ab`
+### `nemulai ab`
 
 A/B testing framework for comparing GPU energy efficiency between configurations.
 
 ```bash
-aluminatiai ab --baseline "power_limit=300" --variant "power_limit=250" --duration 120
+nemulai ab --baseline "power_limit=300" --variant "power_limit=250" --duration 120
 ```
 
 Produces statistical comparison with confidence intervals, energy savings, and throughput impact (AEM — Adjusted Energy Metric).
 
-### `aluminatiai carbon-schedule`
+### `nemulai carbon-schedule`
 
 Recommends the optimal time to start a job based on grid carbon intensity forecasts.
 
 ```bash
-aluminatiai carbon-schedule --duration 4h --zone US-CAL-CISO
+nemulai carbon-schedule --duration 4h --zone US-CAL-CISO
 ```
 
 Uses the [Electricity Maps](https://electricitymaps.com) API to find the lowest-carbon window in the next 24 hours.
 
-### `aluminatiai report`
+### `nemulai report`
 
 Generate chargeback reports for cost attribution.
 
 ```bash
-aluminatiai report --format csv --output chargeback.csv
-aluminatiai report --format html --from 2026-05-01 --to 2026-05-07
-aluminatiai report --format json --with-carbon
+nemulai report --format csv --output chargeback.csv
+nemulai report --format html --from 2026-05-01 --to 2026-05-07
+nemulai report --format json --with-carbon
 ```
 
-### `aluminatiai query`
+### `nemulai query`
 
 Query the local SQLite time-series database.
 
 ```bash
-aluminatiai query --metric power --gpu 0 --from 2026-05-08 --to 2026-05-09
+nemulai query --metric power --gpu 0 --from 2026-05-08 --to 2026-05-09
 ```
 
-### `aluminatiai replay`
+### `nemulai replay`
 
 Export and optionally clear the offline WAL.
 
 ```bash
-aluminatiai replay --output metrics.csv
-aluminatiai replay --output metrics.csv --clear
+nemulai replay --output metrics.csv
+nemulai replay --output metrics.csv --clear
 ```
 
 ## Configuration
@@ -170,17 +170,17 @@ Settings are read in priority order (highest wins):
 ### Config file
 
 ```bash
-aluminatiai --config /etc/aluminatai.json
+nemulai --config /etc/nemulai.json
 # or
-ALUMINATAI_CONFIG=/etc/aluminatai.yaml aluminatiai
+ALUMINATAI_CONFIG=/etc/nemulai.yaml nemulai
 ```
 
 Default search order when `ALUMINATAI_CONFIG` is unset:
-- `./aluminatai.json`
-- `./aluminatai.yaml`
-- `~/.config/aluminatai/config.json`
+- `./nemulai.json`
+- `./nemulai.yaml`
+- `~/.config/nemulai/config.json`
 
-Example `aluminatai.json`:
+Example `nemulai.json`:
 ```json
 {
   "api_key": "alum_your_key_here",
@@ -191,7 +191,7 @@ Example `aluminatai.json`:
 }
 ```
 
-YAML config requires `pip install 'aluminatiai[observability]'`.
+YAML config requires `pip install 'nemulai[observability]'`.
 
 ### Configuration Reference
 
@@ -375,7 +375,7 @@ When enabled, the agent participates in **leader election** — one agent per (u
 ### One-line installer (Linux + systemd)
 
 ```bash
-curl -sSL https://get.aluminatiai.com | bash
+curl -sSL https://get.nemulai.com | bash
 ```
 
 | Flag | Effect |
@@ -386,38 +386,38 @@ curl -sSL https://get.aluminatiai.com | bash
 
 ```bash
 # CI / non-interactive
-ALUMINATAI_API_KEY=alum_xxx curl -sSL https://get.aluminatiai.com | bash -s -- --unattended
+ALUMINATAI_API_KEY=alum_xxx curl -sSL https://get.nemulai.com | bash -s -- --unattended
 
 # Check service health
-sudo systemctl status aluminatai-agent
-sudo journalctl -u aluminatai-agent -f
+sudo systemctl status nemulai-agent
+sudo journalctl -u nemulai-agent -f
 ```
 
 ### Manual systemd setup
 
 ```bash
-pip install aluminatiai
+pip install nemulai
 
 # Create system user and directories
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin aluminatai
-sudo install -d -m 0700 -o aluminatai -g aluminatai /var/lib/aluminatai
-sudo install -d -m 0755 -o aluminatai -g aluminatai /var/log/aluminatai
-sudo install -d -m 0750 /etc/aluminatai
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin nemulai
+sudo install -d -m 0700 -o nemulai -g nemulai /var/lib/nemulai
+sudo install -d -m 0755 -o nemulai -g nemulai /var/log/nemulai
+sudo install -d -m 0750 /etc/nemulai
 
 # Write the env file (mode 600 — contains your API key)
-sudo tee /etc/aluminatai/agent.env > /dev/null <<'EOF'
+sudo tee /etc/nemulai/agent.env > /dev/null <<'EOF'
 ALUMINATAI_API_KEY=alum_your_key_here
 SAMPLE_INTERVAL=5.0
 UPLOAD_INTERVAL=60
 METRICS_PORT=9100
 LOG_LEVEL=INFO
 EOF
-sudo chmod 600 /etc/aluminatai/agent.env
+sudo chmod 600 /etc/nemulai/agent.env
 
 # Install the unit file
-sudo cp deploy/aluminatai-agent.service /etc/systemd/system/
+sudo cp deploy/nemulai-agent.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now aluminatai-agent
+sudo systemctl enable --now nemulai-agent
 ```
 
 The service unit includes systemd security hardening: `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, `MemoryMax=256M`, and system call filtering.
@@ -427,7 +427,7 @@ The service unit includes systemd security hardening: `NoNewPrivileges`, `Protec
 ```bash
 docker run --rm --runtime=nvidia --pid=host \
   -e ALUMINATAI_API_KEY=alum_your_key_here \
-  ghcr.io/agentmulder404/aluminatai-agent:latest
+  ghcr.io/agentmulder404/nemulai-agent:latest
 ```
 
 ### Kubernetes DaemonSet
@@ -443,12 +443,12 @@ The DaemonSet includes RBAC for pod metadata queries (used by the K8s attributio
 Add to your job prolog/epilog scripts:
 
 ```bash
-# /etc/slurm/prolog.d/aluminatiai.sh
-source /etc/aluminatai/agent.env
-aluminatiai &
+# /etc/slurm/prolog.d/nemulai.sh
+source /etc/nemulai/agent.env
+nemulai &
 
-# /etc/slurm/epilog.d/aluminatiai-stop.sh
-pkill -f aluminatiai
+# /etc/slurm/epilog.d/nemulai-stop.sh
+pkill -f nemulai
 ```
 
 ## Attribution
@@ -494,7 +494,7 @@ Create an `attribution_rules.json` file to map command-line patterns to teams:
 Search order for the rules file:
 1. `ALUMINATAI_ATTRIBUTION_CONFIG` env var (explicit path)
 2. `./attribution_rules.json`
-3. `~/.config/aluminatai/attribution_rules.json`
+3. `~/.config/nemulai/attribution_rules.json`
 
 ### Supported schedulers
 
@@ -522,49 +522,49 @@ The agent exposes a `/metrics` endpoint (default port 9100) with these gauges an
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aluminatai_gpu_power_watts` | Gauge | Current power draw per GPU |
-| `aluminatai_gpu_energy_joules_total` | Counter | Cumulative energy per GPU |
-| `aluminatai_gpu_utilization_pct` | Gauge | GPU compute utilization |
-| `aluminatai_gpu_temperature_c` | Gauge | GPU temperature |
+| `nemulai_gpu_power_watts` | Gauge | Current power draw per GPU |
+| `nemulai_gpu_energy_joules_total` | Counter | Cumulative energy per GPU |
+| `nemulai_gpu_utilization_pct` | Gauge | GPU compute utilization |
+| `nemulai_gpu_temperature_c` | Gauge | GPU temperature |
 
 ### Phase decomposition (DCGM)
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aluminatai_gpu_tensor_power_watts` | Gauge | Tensor core power |
-| `aluminatai_gpu_fp16_power_watts` | Gauge | FP16 path power |
-| `aluminatai_gpu_memory_power_watts` | Gauge | Memory subsystem power |
-| `aluminatai_gpu_idle_power_watts` | Gauge | Baseline idle power |
+| `nemulai_gpu_tensor_power_watts` | Gauge | Tensor core power |
+| `nemulai_gpu_fp16_power_watts` | Gauge | FP16 path power |
+| `nemulai_gpu_memory_power_watts` | Gauge | Memory subsystem power |
+| `nemulai_gpu_idle_power_watts` | Gauge | Baseline idle power |
 
 ### Upload health
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aluminatai_upload_success_total` | Counter | Successful uploads |
-| `aluminatai_upload_failure_total` | Counter | Failed uploads |
-| `aluminatai_buffer_size` | Gauge | In-memory buffer entries pending |
-| `aluminatai_wal_size_bytes` | Gauge | WAL file size |
+| `nemulai_upload_success_total` | Counter | Successful uploads |
+| `nemulai_upload_failure_total` | Counter | Failed uploads |
+| `nemulai_buffer_size` | Gauge | In-memory buffer entries pending |
+| `nemulai_wal_size_bytes` | Gauge | WAL file size |
 
 ### Attribution
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `aluminatai_attribution_confidence` | Gauge | gpu_index, job_id, method | Confidence score (0–1) |
-| `aluminatai_attribution_uncertainty_pct` | Gauge | gpu_index, job_id | ± % uncertainty |
-| `aluminatai_attribution_unresolved_total` | Counter | — | Unattributed power |
+| `nemulai_attribution_confidence` | Gauge | gpu_index, job_id, method | Confidence score (0–1) |
+| `nemulai_attribution_uncertainty_pct` | Gauge | gpu_index, job_id | ± % uncertainty |
+| `nemulai_attribution_unresolved_total` | Counter | — | Unattributed power |
 
 ### Agent health
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aluminatai_agent_uptime_seconds` | Gauge | Agent uptime |
-| `aluminatai_agent_info` | Gauge | Version, hostname, mode metadata |
+| `nemulai_agent_uptime_seconds` | Gauge | Agent uptime |
+| `nemulai_agent_info` | Gauge | Version, hostname, mode metadata |
 
 ### Prometheus scrape config
 
 ```yaml
 scrape_configs:
-  - job_name: aluminatiai
+  - job_name: nemulai
     static_configs:
       - targets: ['gpu-host:9100']
 ```
@@ -574,10 +574,10 @@ scrape_configs:
 ### MLflow
 
 ```python
-from aluminatiai.integrations.mlflow_callback import AluminatiMLflowCallback
+from nemulai.integrations.mlflow_callback import NemulMLflowCallback
 
 with mlflow.start_run():
-    trainer.add_callback(AluminatiMLflowCallback())
+    trainer.add_callback(NemulMLflowCallback())
     trainer.train()
     # energy_kwh, cost_usd, co2_kg logged automatically at run end
 ```
@@ -585,10 +585,10 @@ with mlflow.start_run():
 ### Weights & Biases
 
 ```python
-from aluminatiai.integrations.wandb_callback import AluminatiWandbCallback
+from nemulai.integrations.wandb_callback import NemulWandbCallback
 
 wandb.init(project="my-project")
-trainer.add_callback(AluminatiWandbCallback())
+trainer.add_callback(NemulWandbCallback())
 trainer.train()
 # energy metrics logged to wandb.run.summary
 ```
@@ -596,9 +596,9 @@ trainer.train()
 ### OpenTelemetry
 
 ```python
-from aluminatiai.integrations.otel_exporter import AluminatiOtelExporter
+from nemulai.integrations.otel_exporter import NemulOtelExporter
 
-exporter = AluminatiOtelExporter()
+exporter = NemulOtelExporter()
 # GPU metrics exported as OTEL span attributes to Jaeger/Datadog/etc.
 ```
 
@@ -658,7 +658,7 @@ For machines with no discrete GPU. Monitors CPU package power via Intel/AMD RAPL
 
 ```bash
 export CPU_ONLY_MODE=1   # skip GPU detection entirely
-aluminatiai
+nemulai
 ```
 
 Requires read access to `/sys/class/powercap/intel-rapl:*` or `/sys/class/powercap/amd_rapl:*`.
@@ -681,7 +681,7 @@ All other env vars (credentials, tokens, database URLs) are dropped immediately.
 The write-ahead log is encrypted automatically when `ALUMINATAI_API_KEY` is set and the `cryptography` package is installed:
 
 ```bash
-pip install 'aluminatiai[secure]'
+pip install 'nemulai[secure]'
 ```
 
 Encryption key = SHA-256(API_KEY), using AES-128 Fernet. Without the package, the agent falls back to plaintext WAL with a one-time warning.
@@ -702,10 +702,10 @@ Use a TLS-terminating reverse proxy (nginx, Caddy) in front of the metrics endpo
 
 ```bash
 # No outbound HTTP — all metrics go to WAL
-OFFLINE_MODE=1 aluminatiai
+OFFLINE_MODE=1 nemulai
 
 # Later, on a machine with network access
-aluminatiai replay --output metrics.csv --clear
+nemulai replay --output metrics.csv --clear
 ```
 
 ### Directory permissions
@@ -719,7 +719,7 @@ Point the agent at your own ingest endpoint:
 ```bash
 ALUMINATAI_API_ENDPOINT=https://your-api.internal/v1/metrics/ingest \
 ALUMINATAI_API_KEY=your_key \
-aluminatiai
+nemulai
 ```
 
 ## Package Structure
@@ -772,7 +772,7 @@ agent/
 ├── storage/
 │   └── tsdb.py           # Local SQLite time-series store
 ├── deploy/               # Production deployment files
-│   ├── aluminatai-agent.service  # systemd unit (hardened)
+│   ├── nemulai-agent.service  # systemd unit (hardened)
 │   ├── k8s/              # K8s DaemonSet + RBAC
 │   └── install.sh        # One-line installer
 └── tests/                # 16 test files, 300+ tests
@@ -781,8 +781,8 @@ agent/
 ## Development
 
 ```bash
-git clone https://github.com/AgentMulder404/AluminatAI.git
-cd AluminatAI/agent
+git clone https://github.com/AgentMulder404/NemulAI.git
+cd NemulAI/agent
 pip install -e ".[all]"
 python -m pytest tests/ --ignore=tests/powercap_ab_test.py -v
 ```

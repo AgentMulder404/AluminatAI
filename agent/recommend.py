@@ -1,14 +1,14 @@
 """
-aluminatiai recommend — find the best GPU for your workload.
+nemulai recommend — find the best GPU for your workload.
 
 Ranks GPUs by energy efficiency (J/TFLOP), cost, and CO2 impact for a
 given workload archetype or benchmark profile.
 
 Usage:
-    aluminatiai recommend --workload llm-inference
-    aluminatiai recommend --workload llm-training --gpu "RTX 4090"
-    aluminatiai recommend --workload llm-inference --budget 2.0
-    aluminatiai recommend --from-benchmark results.json
+    nemulai recommend --workload llm-inference
+    nemulai recommend --workload llm-training --gpu "RTX 4090"
+    nemulai recommend --workload llm-inference --budget 2.0
+    nemulai recommend --from-benchmark results.json
 """
 from __future__ import annotations
 
@@ -242,7 +242,7 @@ def _print_plain(
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="aluminatiai recommend",
+        prog="nemulai recommend",
         description="Find the best GPU for your workload by energy efficiency and cost.",
     )
     p.add_argument(

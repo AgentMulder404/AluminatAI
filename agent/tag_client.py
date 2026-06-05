@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 TagClient: polls GET /api/v1/tag and caches active job registrations.
 
@@ -66,7 +66,7 @@ class TagClient:
 
     def __init__(
         self,
-        api_endpoint: str,          # e.g. "https://aluminatiai.com/v1/metrics/ingest"
+        api_endpoint: str,          # e.g. "https://nemulai.com/v1/metrics/ingest"
         api_key: str,
         poll_interval: int = 30,    # seconds between polls
     ):

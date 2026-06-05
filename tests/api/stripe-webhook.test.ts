@@ -35,7 +35,7 @@ describe("POST /api/stripe/webhook", () => {
 
   it("rejects missing stripe-signature header", async () => {
     const req = new Request(
-      "https://www.aluminatai.com/api/stripe/webhook",
+      "https://www.nemulai.com/api/stripe/webhook",
       {
         method: "POST",
         body: "{}",
@@ -53,7 +53,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     const req = new Request(
-      "https://www.aluminatai.com/api/stripe/webhook",
+      "https://www.nemulai.com/api/stripe/webhook",
       {
         method: "POST",
         headers: { "stripe-signature": "bad-sig" },
@@ -87,7 +87,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     const req = new Request(
-      "https://www.aluminatai.com/api/stripe/webhook",
+      "https://www.nemulai.com/api/stripe/webhook",
       {
         method: "POST",
         headers: { "stripe-signature": "valid-sig" },
@@ -117,7 +117,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     const req = new Request(
-      "https://www.aluminatai.com/api/stripe/webhook",
+      "https://www.nemulai.com/api/stripe/webhook",
       {
         method: "POST",
         headers: { "stripe-signature": "valid-sig" },
@@ -151,7 +151,7 @@ describe("POST /api/stripe/webhook", () => {
     });
 
     const req = new Request(
-      "https://www.aluminatai.com/api/stripe/webhook",
+      "https://www.nemulai.com/api/stripe/webhook",
       {
         method: "POST",
         headers: { "stripe-signature": "valid-sig" },
@@ -179,7 +179,7 @@ describe("POST /api/stripe/webhook", () => {
     mockRetrieveSubscription.mockRejectedValue(new Error("Stripe API down"));
 
     const req = new Request(
-      "https://www.aluminatai.com/api/stripe/webhook",
+      "https://www.nemulai.com/api/stripe/webhook",
       {
         method: "POST",
         headers: { "stripe-signature": "valid-sig" },

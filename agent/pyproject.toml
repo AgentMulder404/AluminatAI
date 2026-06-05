@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aluminatiai"
+name = "nemulai"
 version = "0.2.2"
 description = "GPU energy monitoring agent — per-job cost attribution for AI teams"
 readme = "README.md"
@@ -41,31 +41,31 @@ dcgm          = ["pydcgm>=3.0"]
 all           = ["prometheus-client>=0.19", "cryptography>=42.0", "PyYAML>=6.0", "numpy>=1.24"]
 
 [project.scripts]
-aluminatiai = "aluminatiai.cli:main"
+nemulai = "nemulai.cli:main"
 
 [project.urls]
-Homepage = "https://aluminatiai.com"
-Documentation = "https://aluminatiai.com/docs/agent"
-Repository = "https://github.com/AgentMulder404/AluminatAI"
-"Bug Tracker" = "https://github.com/AgentMulder404/AluminatAI/issues"
+Homepage = "https://nemulai.com"
+Documentation = "https://nemulai.com/docs/agent"
+Repository = "https://github.com/AgentMulder404/NemulAI"
+"Bug Tracker" = "https://github.com/AgentMulder404/NemulAI/issues"
 
-# Map the Python package `aluminatiai` to the files in this directory (agent/).
+# Map the Python package `nemulai` to the files in this directory (agent/).
 # All sibling directories that have __init__.py become subpackages.
 [tool.setuptools]
 packages = [
-    "aluminatiai",
-    "aluminatiai.attribution",
-    "aluminatiai.integrations",
-    "aluminatiai.schedulers",
-    "aluminatiai.efficiency",
+    "nemulai",
+    "nemulai.attribution",
+    "nemulai.integrations",
+    "nemulai.schedulers",
+    "nemulai.efficiency",
 ]
 
 [tool.setuptools.package-dir]
-aluminatiai               = "."
-"aluminatiai.attribution"  = "attribution"
-"aluminatiai.integrations" = "integrations"
-"aluminatiai.schedulers"   = "schedulers"
-"aluminatiai.efficiency"   = "efficiency"
+nemulai               = "."
+"nemulai.attribution"  = "attribution"
+"nemulai.integrations" = "integrations"
+"nemulai.schedulers"   = "schedulers"
+"nemulai.efficiency"   = "efficiency"
 
 [tool.setuptools.package-data]
-"aluminatiai" = ["*.txt", "*.md"]
+"nemulai" = ["*.txt", "*.md"]

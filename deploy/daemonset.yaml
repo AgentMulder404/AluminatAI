@@ -1,15 +1,15 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: aluminatai-agent
-  namespace: aluminatai
+  name: nemulai-agent
+  namespace: nemulai
   labels:
-    app: aluminatai-agent
+    app: nemulai-agent
     version: "0.2.0"
 spec:
   selector:
     matchLabels:
-      app: aluminatai-agent
+      app: nemulai-agent
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -17,14 +17,14 @@ spec:
   template:
     metadata:
       labels:
-        app: aluminatai-agent
+        app: nemulai-agent
         version: "0.2.0"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9100"
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: aluminatai-agent
+      serviceAccountName: nemulai-agent
       # Required to read /proc/<pid>/environ for process attribution
       hostPID: true
       tolerations:
@@ -41,18 +41,18 @@ spec:
             limits:
               nvidia.com/gpu: 1
       containers:
-        - name: aluminatai-agent
-          image: aluminatai/agent:0.2.0
+        - name: nemulai-agent
+          image: nemulai/agent:0.2.0
           imagePullPolicy: Always
-          command: ["aluminatai-agent", "--quiet"]
+          command: ["nemulai-agent", "--quiet"]
           env:
             - name: ALUMINATAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: aluminatai-agent-secret
+                  name: nemulai-agent-secret
                   key: api-key
             - name: ALUMINATAI_API_ENDPOINT
-              value: "https://aluminatiai.com/api/metrics/ingest"
+              value: "https://nemulai.com/api/metrics/ingest"
             - name: SAMPLE_INTERVAL
               value: "5.0"
             - name: UPLOAD_INTERVAL

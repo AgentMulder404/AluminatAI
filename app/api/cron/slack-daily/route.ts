@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 
     // Build Slack message
     const dateStr = yesterday.toISOString().slice(0, 10);
-    let text = `*AluminatAI Daily Summary — ${dateStr}*\n\n`;
+    let text = `*NemulAI Daily Summary — ${dateStr}*\n\n`;
     text += `Energy: *${kwh.toFixed(3)} kWh*\n`;
     text += `Cost: *$${cost.toFixed(4)}*\n`;
     if (totalCo2eG != null) {
@@ -95,7 +95,7 @@ export async function GET(req: NextRequest) {
       text += `\n⚠️ ${wasteCount} new waste event${wasteCount > 1 ? "s" : ""} detected\n`;
     }
 
-    text += `\n<https://www.aluminatai.com/dashboard|View Dashboard →>`;
+    text += `\n<https://www.nemulai.com/dashboard|View Dashboard →>`;
 
     // Send via Slack API
     try {

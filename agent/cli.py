@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-AluminatAI CLI entry point.
+NemulAI CLI entry point.
 
-When installed via `pip install aluminatiai`, the `aluminatiai` command
+When installed via `pip install nemulai`, the `nemulai` command
 runs this module.  sys.path is patched first so the bare-import modules
 (collector, config, uploader, etc.) resolve against the installed package
 directory regardless of the working directory.
@@ -33,18 +33,18 @@ import sys
 def main() -> None:
     # Insert the package directory at the front of sys.path so that
     # bare imports like `from collector import GPUCollector` resolve to
-    # the modules installed alongside this file (site-packages/aluminatiai/).
+    # the modules installed alongside this file (site-packages/nemulai/).
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)
 
     # ── Pre-parse subcommand + --config before any module imports ─────────
     # We pre-parse the first positional argument as a subcommand so that
-    # `aluminatiai benchmark ...` dispatches to benchmark.py without loading
+    # `nemulai benchmark ...` dispatches to benchmark.py without loading
     # the full agent stack.  Unknown args are forwarded to the sub-handler.
     _pre = argparse.ArgumentParser(add_help=False)
     _pre.add_argument("subcommand", nargs="?", default="run",
-                      choices=["run", "benchmark", "optimize", "ab", "demo", "report",
+                      choices=["run", "test", "doctor", "benchmark", "optimize", "ab", "demo", "report",
                                "carbon-schedule", "query", "recommend"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
@@ -52,6 +52,14 @@ def main() -> None:
 
     if _known.config:
         os.environ["ALUMINATAI_CONFIG"] = _known.config
+
+    if _known.subcommand == "test":
+        from test_runner import make_parser as test_parser, run_test  # noqa: PLC0415
+        sys.exit(run_test(test_parser().parse_args(_rest)))
+
+    if _known.subcommand == "doctor":
+        from doctor import make_parser as doc_parser, run_doctor  # noqa: PLC0415
+        sys.exit(run_doctor(doc_parser().parse_args(_rest)))
 
     if _known.subcommand == "benchmark":
         from benchmark import make_parser, run_benchmark  # noqa: PLC0415

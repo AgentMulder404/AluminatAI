@@ -2080,7 +2080,7 @@ function PricingTab() {
       {/* Current Pricing */}
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
         <div className="text-sm text-neutral-400 mb-4">
-          Current AluminatAI Pricing
+          Current NemulAI Pricing
         </div>
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-neutral-800 rounded-lg p-4 text-center">
@@ -2113,8 +2113,8 @@ function PricingTab() {
             value={fmt(avgPro)}
             sub={
               49 > avgPro
-                ? `AluminatAI is ${fmt(49 - avgPro)} above avg`
-                : `AluminatAI is ${fmt(avgPro - 49)} below avg`
+                ? `NemulAI is ${fmt(49 - avgPro)} above avg`
+                : `NemulAI is ${fmt(avgPro - 49)} below avg`
             }
             color={Math.abs(49 - avgPro) < 10 ? "text-green-400" : "text-yellow-400"}
           />
@@ -2123,8 +2123,8 @@ function PricingTab() {
             value={fmt(avgEnterprise)}
             sub={
               199 > avgEnterprise
-                ? `AluminatAI is ${fmt(199 - avgEnterprise)} above avg`
-                : `AluminatAI is ${fmt(avgEnterprise - 199)} below avg`
+                ? `NemulAI is ${fmt(199 - avgEnterprise)} above avg`
+                : `NemulAI is ${fmt(avgEnterprise - 199)} below avg`
             }
             color={Math.abs(199 - avgEnterprise) < 30 ? "text-green-400" : "text-yellow-400"}
           />

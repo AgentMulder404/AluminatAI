@@ -11,8 +11,8 @@ total GPU power proportionally, then prints a summary table.
 Usage:
     python multi_workload_attribution.py
 
-Requires the AluminatAI agent running in another terminal:
-    ALUMINATAI_API_KEY=<key> ALUMINATAI_API_ENDPOINT=https://www.aluminatiai.com/v1/metrics/ingest aluminatiai
+Requires the NemulAI agent running in another terminal:
+    ALUMINATAI_API_KEY=<key> ALUMINATAI_API_ENDPOINT=https://www.nemulai.com/v1/metrics/ingest nemulai
 """
 import os, sys, time, signal, subprocess, textwrap, pathlib
 from collections import defaultdict
@@ -327,10 +327,10 @@ def main():
             hit = re.search(rf'^{re.escape(m)}(?:\{{[^}}]*\}})? (\S+)', txt, re.M)
             return float(hit.group(1)) if hit else None
 
-        pw = pval('aluminatai_gpu_power_watts')
-        up = pval('aluminatai_agent_uptime_seconds')
-        ok = pval('aluminatai_upload_success_total')
-        fail = pval('aluminatai_upload_failure_total')
+        pw = pval('nemulai_gpu_power_watts')
+        up = pval('nemulai_agent_uptime_seconds')
+        ok = pval('nemulai_upload_success_total')
+        fail = pval('nemulai_upload_failure_total')
         print(f"  Prometheus:  power={pw:.1f}W  uptime={int((up or 0)//60)}m  "
               f"uploads={int(ok or 0)} ok / {int(fail or 0)} failed")
     except Exception:
@@ -347,7 +347,7 @@ def main():
     for name, p in procs.items():
         if p.poll() is None:
             p.kill()
-    print("Done. Check dashboard → https://www.aluminatiai.com/dashboard\n")
+    print("Done. Check dashboard → https://www.nemulai.com/dashboard\n")
 
 if __name__ == '__main__':
     main()

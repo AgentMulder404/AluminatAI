@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 """Tests for efficiency.stats — CI computation and trapezoidal energy."""
 import math
 import sys

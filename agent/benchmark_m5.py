@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 
 #!/usr/bin/env python3
 """
-AluminatiAI Energy Dashboard Benchmark — Apple Silicon (M5) Edition
+NemulAI Energy Dashboard Benchmark — Apple Silicon (M5) Edition
 
 Runs four jobs with distinct power profiles to populate the 'Energy by Job'
-section of the AluminatiAI dashboard.
+section of the NemulAI dashboard.
 
 Jobs:
   1. Light-Chat          — Short prompt, low token count (chatbot simulation)
@@ -76,7 +76,7 @@ GPU_UUID = "apple-m5-integrated-gpu"
 GPU_NAME = "Apple M5 GPU"
 GPU_INDEX = 0
 POWER_LIMIT_W = 45.0  # Approximate M5 Pro GPU power envelope
-DEFAULT_API_ENDPOINT = "https://aluminatiai.com/api/metrics/ingest"
+DEFAULT_API_ENDPOINT = "https://nemulai.com/api/metrics/ingest"
 
 # ---------------------------------------------------------------------------
 # Job Definitions
@@ -953,7 +953,7 @@ def run_mlx_job(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="AluminatiAI M5 Energy Benchmark — GPU Power Profile Generator",
+        description="NemulAI M5 Energy Benchmark — GPU Power Profile Generator",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -974,7 +974,7 @@ Examples:
     parser.add_argument(
         "--api-key",
         default=os.getenv("ALUMINATAI_API_KEY", ""),
-        help="AluminatiAI API key for dashboard upload (env: ALUMINATAI_API_KEY)",
+        help="NemulAI API key for dashboard upload (env: ALUMINATAI_API_KEY)",
     )
     parser.add_argument(
         "--api-endpoint",
@@ -1027,7 +1027,7 @@ Examples:
     mlx_jobs   = [j for j in args.jobs if j == MLX_JOB_NAME]
 
     print()
-    print("  AluminatiAI M5 Energy Benchmark")
+    print("  NemulAI M5 Energy Benchmark")
     print(f"  {'=' * 50}")
     print(f"  GGUF model:     {model_path.name}")
     print(f"  llama-cli:      {binary}")

@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-aluminatiai benchmark — GPU energy baseline measurement.
+nemulai benchmark — GPU energy baseline measurement.
 
 Samples power draw + utilization for --duration seconds, then prints a
-rich terminal report.  With --upload, posts results to the AluminatiAI
+rich terminal report.  With --upload, posts results to the NemulAI
 benchmarks API using the configured API key.
 
 Usage:
-    aluminatiai benchmark [--gpu N] [--duration SECONDS] [--upload]
+    nemulai benchmark [--gpu N] [--duration SECONDS] [--upload]
                           [--throughput TOKENS_PER_SEC] [--framework FRAMEWORK]
 """
 from __future__ import annotations
@@ -50,8 +50,8 @@ except ImportError:
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="aluminatiai benchmark",
-        description="Measure GPU energy baseline and (optionally) upload to AluminatiAI.",
+        prog="nemulai benchmark",
+        description="Measure GPU energy baseline and (optionally) upload to NemulAI.",
     )
     p.add_argument(
         "--gpu", type=int, default=0, metavar="N",
@@ -63,7 +63,7 @@ def make_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--upload", action="store_true",
-        help="Upload results to AluminatiAI benchmarks API",
+        help="Upload results to NemulAI benchmarks API",
     )
     p.add_argument(
         "--model-tag", default="", metavar="TAG",
@@ -90,7 +90,7 @@ def _resolve_arch(gpu_name: str) -> Optional[object]:
 
 
 def _print_plain(report: dict) -> None:
-    print("\n=== AluminatiAI GPU Benchmark ===")
+    print("\n=== NemulAI GPU Benchmark ===")
     print(f"  GPU           : {report['gpu_name']} (index {report['gpu_index']})")
     print(f"  Duration      : {report['duration_s']} s")
     print(f"  Avg power     : {report['avg_power_w']:.1f} W")
@@ -108,7 +108,7 @@ def _print_plain(report: dict) -> None:
 
 def _print_rich(report: dict) -> None:
     console = Console()
-    console.print("\n[bold]AluminatiAI GPU Benchmark[/bold]", style="green")
+    console.print("\n[bold]NemulAI GPU Benchmark[/bold]", style="green")
 
     t = Table(show_header=False, box=None, padding=(0, 2))
     t.add_column("Field", style="dim")
@@ -240,7 +240,7 @@ def run_benchmark(args: argparse.Namespace) -> int:
         if not args.upload:
             print(
                 "To submit to the Green AI Index:\n"
-                f"  aluminatiai benchmark --throughput <TOKENS/S>"
+                f"  nemulai benchmark --throughput <TOKENS/S>"
                 f" --model-tag <MODEL> --upload"
             )
 
@@ -263,7 +263,7 @@ def _upload(report: dict, model_tag: str) -> None:
     api_key = os.getenv("ALUMINATAI_API_KEY", "")
     endpoint = os.getenv(
         "ALUMINATAI_API_ENDPOINT",
-        "https://aluminatiai.com/v1/metrics/ingest",
+        "https://nemulai.com/v1/metrics/ingest",
     )
     # Derive base URL from ingest endpoint
     base = endpoint.rstrip("/")

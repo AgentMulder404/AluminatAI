@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Run:ai scheduler adapter.
 
@@ -162,7 +162,7 @@ class RunaiAdapter(SchedulerAdapter):
                 job_id=job_data.get("uid", job_data.get("name", "unknown")),
                 job_name=job_data.get("name", "unknown"),
                 team_id=job_data.get("project", "default"),
-                model_tag=annotations.get("aluminatai.io/model", "untagged"),
+                model_tag=annotations.get("nemulai.io/model", "untagged"),
                 scheduler_source="runai",
                 gpu_indices=gpu_indices,
                 user_email=job_data.get("user", "unknown"),

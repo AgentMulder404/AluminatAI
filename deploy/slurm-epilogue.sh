@@ -1,17 +1,17 @@
 #!/bin/bash
-# Slurm Epilog — AluminatAI job completion signal
+# Slurm Epilog — NemulAI job completion signal
 #
-# Signals job completion to the AluminatAI backend, which triggers the
+# Signals job completion to the NemulAI backend, which triggers the
 # energy manifest generation DB trigger.
 #
 # slurm.conf example:
-#   Epilog=/etc/slurm/epilog.d/aluminatai-epilogue.sh
+#   Epilog=/etc/slurm/epilog.d/nemulai-epilogue.sh
 
 set -euo pipefail
 
 ALUMINATAI_API_KEY="${ALUMINATAI_API_KEY:-}"
-ALUMINATAI_API_ENDPOINT="${ALUMINATAI_API_ENDPOINT:-https://aluminatiai.com/api/metrics/ingest}"
-ENV_FILE="/run/aluminatai/job_${SLURM_JOB_ID}.env"
+ALUMINATAI_API_ENDPOINT="${ALUMINATAI_API_ENDPOINT:-https://nemulai.com/api/metrics/ingest}"
+ENV_FILE="/run/nemulai/job_${SLURM_JOB_ID}.env"
 
 # Load job UUID from env file written by the prolog
 if [[ -f "$ENV_FILE" ]]; then

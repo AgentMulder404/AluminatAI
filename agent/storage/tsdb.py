@@ -4,7 +4,7 @@ Local time-series database — SQLite-based rolling metric store.
 Stores GPU metrics locally for historical queries without requiring
 the cloud API. Auto-prunes data older than RETENTION_DAYS on startup.
 
-CLI: aluminatiai query --metric power --gpu 0 --from DATE --to DATE
+CLI: nemulai query --metric power --gpu 0 --from DATE --to DATE
 
 Schema:
     metrics(timestamp INTEGER, gpu_index INTEGER, metric TEXT, value REAL)

@@ -1,6 +1,6 @@
 // POST /api/benchmarks/hardware
 // X-API-Key auth (agent-facing). Accepts a benchmark measurement from the
-// `aluminatiai benchmark --upload` CLI subcommand and upserts into
+// `nemulai benchmark --upload` CLI subcommand and upserts into
 // benchmark_submissions using the HMAC-based user_hash.
 
 import { NextRequest, NextResponse } from "next/server";

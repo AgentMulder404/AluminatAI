@@ -1,6 +1,6 @@
 [Unit]
-Description=AluminatAI GPU Energy Monitoring Agent
-Documentation=https://aluminatiai.com/docs/agent
+Description=NemulAI GPU Energy Monitoring Agent
+Documentation=https://nemulai.com/docs/agent
 After=network-online.target nvidia-persistenced.service
 Wants=network-online.target
 # Restart if NVML driver is temporarily unavailable (e.g. driver reload)
@@ -9,13 +9,13 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=aluminatai
-Group=aluminatai
-EnvironmentFile=/etc/aluminatai/agent.env
-Environment=DATA_DIR=/var/lib/aluminatai
-Environment=LOG_DIR=/var/log/aluminatai
+User=nemulai
+Group=nemulai
+EnvironmentFile=/etc/nemulai/agent.env
+Environment=DATA_DIR=/var/lib/nemulai
+Environment=LOG_DIR=/var/log/nemulai
 
-ExecStart=/usr/local/bin/aluminatiai
+ExecStart=/usr/local/bin/nemulai
 ExecReload=/bin/kill -HUP $MAINPID
 
 Restart=on-failure
@@ -27,13 +27,13 @@ TimeoutStopSec=30
 # Logging
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=aluminatai-agent
+SyslogIdentifier=nemulai-agent
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/aluminatai /opt/aluminatai-agent/data
+ReadWritePaths=/var/log/nemulai /opt/nemulai-agent/data
 
 [Install]
 WantedBy=multi-user.target

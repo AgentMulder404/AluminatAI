@@ -215,7 +215,7 @@ describe("POST /api/metrics/ingest", () => {
 
   it("returns 400 for invalid JSON body", async () => {
     const req = new Request(
-      "https://www.aluminatai.com/api/metrics/ingest",
+      "https://www.nemulai.com/api/metrics/ingest",
       {
         method: "POST",
         headers: {

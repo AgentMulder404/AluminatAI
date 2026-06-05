@@ -578,6 +578,240 @@ function PipelineTab() {
   );
 }
 
+/* ── CRM Database Tab ── */
+interface DbProspect {
+  id: number;
+  company_name: string;
+  company_url?: string;
+  domain?: string;
+  industry?: string;
+  company_size?: string;
+  category?: string;
+  description?: string;
+  notes?: string;
+  status?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_title?: string;
+  location?: string;
+  discovered_at?: string;
+}
+
+function CrmTab() {
+  const [prospects, setProspects] = useState<DbProspect[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loadingCrm, setLoadingCrm] = useState(true);
+  const [crmError, setCrmError] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterCat, setFilterCat] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterSize, setFilterSize] = useState("all");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const fetchProspects = useCallback(async () => {
+    setLoadingCrm(true);
+    setCrmError("");
+    try {
+      const params = new URLSearchParams({ limit: "500" });
+      if (filterStatus !== "all") params.set("status", filterStatus);
+      const res = await fetch(`/api/admin/prospect-agents/load?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setProspects(data.prospects ?? []);
+      setTotalCount(data.count ?? 0);
+    } catch (e: unknown) {
+      setCrmError(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      setLoadingCrm(false);
+    }
+  }, [filterStatus]);
+
+  useEffect(() => { fetchProspects(); }, [fetchProspects]);
+
+  const filtered = prospects.filter((p) => {
+    if (filterCat !== "all" && p.category !== filterCat) return false;
+    if (filterSize !== "all" && p.company_size !== filterSize) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      return (
+        p.company_name?.toLowerCase().includes(q) ||
+        p.industry?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.notes?.toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const catCounts: Record<string, number> = {};
+  for (const p of prospects) {
+    const c = p.category || "uncategorized";
+    catCounts[c] = (catCounts[c] || 0) + 1;
+  }
+
+  const statusCounts: Record<string, number> = {};
+  for (const p of prospects) {
+    const s = p.status || "new";
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  }
+
+  return (
+    <div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div className="bg-neutral-900 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-white">{totalCount}</div>
+          <div className="text-sm text-neutral-500">Total Prospects</div>
+        </div>
+        <div className="bg-neutral-900 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-blue-400">{statusCounts["new"] ?? 0}</div>
+          <div className="text-sm text-neutral-500">New</div>
+        </div>
+        <div className="bg-neutral-900 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-yellow-400">{statusCounts["contacted"] ?? 0}</div>
+          <div className="text-sm text-neutral-500">Contacted</div>
+        </div>
+        <div className="bg-neutral-900 rounded-lg p-4 text-center">
+          <div className="text-2xl font-bold text-green-400">{statusCounts["replied"] ?? 0}</div>
+          <div className="text-sm text-neutral-500">Replied</div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-neutral-900 rounded-lg p-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search companies..."
+            className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm"
+          />
+          <select
+            value={filterCat}
+            onChange={(e) => setFilterCat(e.target.value)}
+            className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm"
+          >
+            <option value="all">All Categories ({totalCount})</option>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label} ({catCounts[c.value] ?? 0})
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterSize}
+            onChange={(e) => setFilterSize(e.target.value)}
+            className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm"
+          >
+            <option value="all">All Sizes</option>
+            {COMPANY_SIZES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm"
+          >
+            <option value="all">All Statuses</option>
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="replied">Replied</option>
+            <option value="not_interested">Not Interested</option>
+          </select>
+        </div>
+      </div>
+
+      {crmError && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-4 mb-6">
+          {crmError}
+        </div>
+      )}
+
+      {loadingCrm ? (
+        <div className="text-center py-12 text-neutral-400 animate-pulse">Loading prospects...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-12 text-neutral-500">No prospects match your filters.</div>
+      ) : (
+        <>
+          <div className="text-sm text-neutral-500 mb-3">
+            Showing {filtered.length} of {totalCount} prospects
+          </div>
+          <div className="space-y-2">
+            {filtered.map((p) => (
+              <div
+                key={p.id}
+                className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden"
+              >
+                <div
+                  className="p-4 cursor-pointer hover:bg-neutral-800/50 transition-colors"
+                  onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="text-green-400 font-medium">{p.company_name}</span>
+                        {p.category && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-700 text-neutral-300">
+                            {CATEGORIES.find((c) => c.value === p.category)?.label ?? p.category}
+                          </span>
+                        )}
+                        {p.company_size && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400">
+                            {p.company_size}
+                          </span>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          STATUS_COLORS[p.status ?? "new"] ?? STATUS_COLORS["new"]
+                        }`}>
+                          {(p.status ?? "new").replace("_", " ")}
+                        </span>
+                      </div>
+                      {p.industry && (
+                        <div className="text-xs text-neutral-500 mt-1">{p.industry}</div>
+                      )}
+                      {p.description && (
+                        <p className="text-neutral-400 text-sm mt-1 line-clamp-1">{p.description}</p>
+                      )}
+                    </div>
+                    <span className="text-neutral-600 text-sm shrink-0">
+                      {expandedId === p.id ? "▲" : "▼"}
+                    </span>
+                  </div>
+                </div>
+                {expandedId === p.id && (
+                  <div className="px-4 pb-4 border-t border-neutral-800 pt-3 space-y-3">
+                    {p.description && (
+                      <div>
+                        <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Description</div>
+                        <p className="text-sm text-neutral-300">{p.description}</p>
+                      </div>
+                    )}
+                    {p.notes && (
+                      <div>
+                        <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">Why They Fit</div>
+                        <p className="text-sm text-neutral-300">{p.notes}</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm text-neutral-400">
+                      {p.contact_name && <span>Contact: {p.contact_name}</span>}
+                      {p.contact_email && <span>Email: {p.contact_email}</span>}
+                      {p.contact_title && <span>Title: {p.contact_title}</span>}
+                      {p.location && <span>Location: {p.location}</span>}
+                      {p.domain && <span>Domain: {p.domain}</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── Main Page ── */
 export default function OutreachPage() {
   const [category, setCategory] = useState("ai-startups");
@@ -587,7 +821,7 @@ export default function OutreachPage() {
   const [results, setResults] = useState<Prospect[]>([]);
   const [saved, setSaved] = useState<Prospect[]>([]);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"search" | "saved" | "pipeline">("pipeline");
+  const [tab, setTab] = useState<"crm" | "search" | "saved" | "pipeline">("crm");
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   useEffect(() => {
@@ -665,7 +899,7 @@ export default function OutreachPage() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">Prospect Pipeline</h1>
       <p className="text-neutral-400 mb-6">
-        Find and enrich potential AluminatAI clients using Apify-powered agents
+        Find and enrich potential NemulAI clients using Apify-powered agents
       </p>
 
       {/* Stats bar */}
@@ -685,7 +919,7 @@ export default function OutreachPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6">
-        {(["pipeline", "search", "saved"] as const).map((t) => (
+        {(["crm", "pipeline", "search", "saved"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -695,11 +929,13 @@ export default function OutreachPage() {
                 : "bg-neutral-800 text-neutral-400 hover:text-white"
             }`}
           >
-            {t === "pipeline" ? "Apify Pipeline" : t}{" "}
+            {t === "pipeline" ? "Apify Pipeline" : t === "crm" ? "CRM" : t}{" "}
             {t === "saved" && `(${saved.length})`}
           </button>
         ))}
       </div>
+
+      {tab === "crm" && <CrmTab />}
 
       {tab === "pipeline" && <PipelineTab />}
 

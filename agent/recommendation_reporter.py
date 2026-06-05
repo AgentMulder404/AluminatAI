@@ -1,6 +1,6 @@
 """
 Recommendation Reporter — collects optimization recommendations from
-local analyzers and uploads them to the AluminatAI cloud for dashboard display.
+local analyzers and uploads them to the NemulAI cloud for dashboard display.
 
 Runs on the same interval as AutoTuner (every AUTO_TUNE_INTERVAL seconds).
 Deduplicates by hashing (machine_id, category, gpu_index) to avoid

@@ -1,4 +1,4 @@
-# AluminatAI agent — Docker Compose deployment
+# NemulAI agent — Docker Compose deployment
 #
 # Prerequisites:
 #   - NVIDIA Container Toolkit installed (nvidia-ctk)
@@ -10,21 +10,21 @@
 
 services:
   agent:
-    image: aluminatai/agent:latest
+    image: nemulai/agent:latest
     restart: unless-stopped
     pid: host           # Required: lets the agent read /proc/<pid>/environ for attribution
     runtime: nvidia     # Provides libnvidia-ml.so at runtime
 
     environment:
       ALUMINATAI_API_KEY: ${ALUMINATAI_API_KEY}
-      ALUMINATAI_API_ENDPOINT: ${ALUMINATAI_API_ENDPOINT:-https://aluminatiai.com/api/metrics/ingest}
+      ALUMINATAI_API_ENDPOINT: ${ALUMINATAI_API_ENDPOINT:-https://nemulai.com/api/metrics/ingest}
       COLLECTION_INTERVAL_S: ${COLLECTION_INTERVAL_S:-5}
       METRICS_PORT: ${METRICS_PORT:-9100}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
     volumes:
       # Persist WAL across container restarts — ensures no metrics lost during outages
-      - aluminatai-wal:/app/data/wal
+      - nemulai-wal:/app/data/wal
 
     ports:
       # Prometheus scrape endpoint (disable by setting METRICS_PORT=0)
@@ -48,5 +48,5 @@ services:
         max-file: "3"
 
 volumes:
-  aluminatai-wal:
+  nemulai-wal:
     driver: local

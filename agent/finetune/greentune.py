@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """GreenTune — energy-efficient QLoRA fine-tuning on AMD MI300X.
 
 Fine-tunes a base LLM on a blended dataset:
@@ -366,7 +366,7 @@ def run_eval(
             "What rocm-smi command shows current GPU power consumption?",
             "We have 3 teams sharing 4 MI300X GPUs. How should we split the energy bill?",
             "Our training loss stopped decreasing after epoch 2. What should I try?",
-            "How do I set up the AluminatiAI agent for monitoring on an AMD GPU?",
+            "How do I set up the NemulAI agent for monitoring on an AMD GPU?",
             "What is the carbon footprint of fine-tuning a 7B model for 1 hour on MI300X?",
         ]
 
@@ -421,7 +421,7 @@ def main():
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
     print(f"{'='*60}")
-    print(f"  AluminatiAI GreenTune")
+    print(f"  NemulAI GreenTune")
     print(f"  Energy-Efficient Fine-Tuning on AMD ROCm")
     print(f"{'='*60}")
 

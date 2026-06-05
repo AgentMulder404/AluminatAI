@@ -101,7 +101,7 @@ export default function BenchmarksPage() {
     return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
   });
 
-  const CLI_CMD = "aluminatiai benchmark --model-tag llama-3-8b --throughput 1500 --upload";
+  const CLI_CMD = "nemulai benchmark --model-tag llama-3-8b --throughput 1500 --upload";
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">

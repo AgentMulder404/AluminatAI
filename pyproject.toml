@@ -6,14 +6,14 @@
 #
 # To install the published package:
 #
-#   pip install aluminatiai
+#   pip install nemulai
 #
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aluminatiai"
+name = "nemulai"
 version = "0.2.1"
 description = "GPU energy monitoring agent — per-job cost attribution for AI teams"
 readme = "agent/README.md"
@@ -42,29 +42,29 @@ dependencies = [
 prometheus = ["prometheus-client>=0.19"]
 
 [project.scripts]
-aluminatiai = "aluminatiai.cli:main"
+nemulai = "nemulai.cli:main"
 
 [project.urls]
-Homepage = "https://aluminatiai.com"
-Documentation = "https://aluminatiai.com/docs/agent"
-Repository = "https://github.com/AgentMulder404/AluminatAI"
-"Bug Tracker" = "https://github.com/AgentMulder404/AluminatAI/issues"
+Homepage = "https://nemulai.com"
+Documentation = "https://nemulai.com/docs/agent"
+Repository = "https://github.com/AgentMulder404/NemulAI"
+"Bug Tracker" = "https://github.com/AgentMulder404/NemulAI/issues"
 
 [tool.setuptools]
 packages = [
-    "aluminatiai",
-    "aluminatiai.attribution",
-    "aluminatiai.integrations",
-    "aluminatiai.schedulers",
-    "aluminatiai.efficiency",
+    "nemulai",
+    "nemulai.attribution",
+    "nemulai.integrations",
+    "nemulai.schedulers",
+    "nemulai.efficiency",
 ]
 
 [tool.setuptools.package-dir]
-aluminatiai               = "agent"
-"aluminatiai.attribution"  = "agent/attribution"
-"aluminatiai.integrations" = "agent/integrations"
-"aluminatiai.schedulers"   = "agent/schedulers"
-"aluminatiai.efficiency"   = "agent/efficiency"
+nemulai               = "agent"
+"nemulai.attribution"  = "agent/attribution"
+"nemulai.integrations" = "agent/integrations"
+"nemulai.schedulers"   = "agent/schedulers"
+"nemulai.efficiency"   = "agent/efficiency"
 
 [tool.setuptools.package-data]
-"aluminatiai" = ["*.txt", "*.md"]
+"nemulai" = ["*.txt", "*.md"]

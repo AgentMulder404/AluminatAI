@@ -22,7 +22,7 @@ export default function Home() {
       <nav className="border-b border-neutral-800 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="text-xl font-bold tracking-tight">
-            <span className="text-green-400">Aluminat</span>AI
+            <span className="text-green-400">Nemul</span>AI
           </div>
           <div className="flex items-center gap-6 text-sm text-neutral-400">
             <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
@@ -38,10 +38,7 @@ export default function Home() {
       <section className="px-6 py-24 text-center">
         <div className="max-w-4xl mx-auto">
           <div className={`transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-            <div className="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm mb-6">
-              Hackathon Demo — Apify Agent Pipeline
-            </div>
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+<h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
               Know what your
               <br />
               <span className="text-green-400">GPUs actually cost</span>
@@ -267,7 +264,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-neutral-800 px-6 py-8 text-center text-neutral-500 text-sm">
-        AluminatAI — Built for the Apify Hackathon 2026
+        NemulAI
       </footer>
     </div>
   );

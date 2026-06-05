@@ -5,35 +5,35 @@
 - **Any GPU**: NVIDIA (driver 450.80.02+), AMD (ROCm 6+), Intel Gaudi (SynapseAI), Intel Arc (oneAPI), or Apple Silicon (macOS)
 - **Or CPU-only**: Linux with Intel/AMD RAPL sysfs access
 - Python 3.8+
-- AluminatAI API key — get one at [aluminatiai.com/dashboard](https://aluminatiai.com/dashboard)
+- NemulAI API key — get one at [nemulai.com/dashboard](https://nemulai.com/dashboard)
 
 ## Install
 
 ```bash
-pip install aluminatiai
+pip install nemulai
 ```
 
 ## Start monitoring
 
 ```bash
 export ALUMINATAI_API_KEY=alum_your_key_here
-aluminatiai
+nemulai
 ```
 
 The agent auto-detects your hardware. You'll see output like:
 
 ```
-[aluminatai] Detected 8x NVIDIA H100-SXM5-80GB — backend: NVIDIA (NVML)
-[aluminatai] Sampling every 5.0s, uploading every 60s
+[nemulai] Detected 8x NVIDIA H100-SXM5-80GB — backend: NVIDIA (NVML)
+[nemulai] Sampling every 5.0s, uploading every 60s
 ```
 
 Or on other hardware:
 ```
-[aluminatai] Detected 2x AMD Instinct MI300X — backend: AMD (amdsmi)
-[aluminatai] Detected 1x Intel Gaudi2 — backend: Intel Gaudi (hl-smi)
-[aluminatai] Detected 1x Intel Arc A770 — backend: Intel Arc (xpu-smi)
-[aluminatai] Detected 1x Apple M5 Max GPU — backend: Apple Silicon (ioreg)
-[aluminatai] Detected 2x CPU sockets — backend: CPU (RAPL)
+[nemulai] Detected 2x AMD Instinct MI300X — backend: AMD (amdsmi)
+[nemulai] Detected 1x Intel Gaudi2 — backend: Intel Gaudi (hl-smi)
+[nemulai] Detected 1x Intel Arc A770 — backend: Intel Arc (xpu-smi)
+[nemulai] Detected 1x Apple M5 Max GPU — backend: Apple Silicon (ioreg)
+[nemulai] Detected 2x CPU sockets — backend: CPU (RAPL)
 ```
 
 ## Tag workloads for per-job attribution
@@ -54,15 +54,15 @@ For Slurm, Kubernetes, or Run:ai — attribution is automatic via scheduler inte
 
 ```python
 # MLflow
-from aluminatiai.integrations.mlflow_callback import AluminatiMLflowCallback
+from nemulai.integrations.mlflow_callback import NemulMLflowCallback
 with mlflow.start_run():
-    trainer.add_callback(AluminatiMLflowCallback())
+    trainer.add_callback(NemulMLflowCallback())
     trainer.train()
 
 # Weights & Biases
-from aluminatiai.integrations.wandb_callback import AluminatiWandbCallback
+from nemulai.integrations.wandb_callback import NemulWandbCallback
 wandb.init(project="my-project")
-trainer.add_callback(AluminatiWandbCallback())
+trainer.add_callback(NemulWandbCallback())
 trainer.train()
 ```
 
@@ -71,15 +71,15 @@ Energy metrics (`energy_kwh`, `cost_usd`, `co2_kg`) are logged automatically at 
 ## Benchmark your GPU
 
 ```bash
-aluminatiai benchmark                         # 60s power baseline
-aluminatiai benchmark --duration 120 --upload  # 2 min, submit to Green AI Index
+nemulai benchmark                         # 60s power baseline
+nemulai benchmark --duration 120 --upload  # 2 min, submit to Green AI Index
 ```
 
 ## Analyze efficiency
 
 ```bash
-aluminatiai optimize              # real-time roofline analysis
-aluminatiai optimize --json       # machine-readable output
+nemulai optimize              # real-time roofline analysis
+nemulai optimize --json       # machine-readable output
 ```
 
 ## Production deployment
@@ -87,15 +87,15 @@ aluminatiai optimize --json       # machine-readable output
 ### systemd (recommended for Linux)
 
 ```bash
-curl -sSL https://get.aluminatiai.com | bash
+curl -sSL https://get.nemulai.com | bash
 ```
 
 Or manually:
 
 ```bash
-sudo cp deploy/aluminatai-agent.service /etc/systemd/system/
+sudo cp deploy/nemulai-agent.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now aluminatai-agent
+sudo systemctl enable --now nemulai-agent
 ```
 
 ### Kubernetes DaemonSet
@@ -109,7 +109,7 @@ kubectl apply -f deploy/k8s/daemonset.yaml
 ```bash
 docker run --rm --runtime=nvidia --pid=host \
   -e ALUMINATAI_API_KEY=alum_your_key_here \
-  ghcr.io/agentmulder404/aluminatai-agent:latest
+  ghcr.io/agentmulder404/nemulai-agent:latest
 ```
 
 ## Prometheus
@@ -119,7 +119,7 @@ The agent exposes GPU metrics on port 9100 by default:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: aluminatiai
+  - job_name: nemulai
     static_configs:
       - targets: ['gpu-host:9100']
 ```
@@ -165,7 +165,7 @@ Without this, the agent falls back to ioreg (estimates power from utilization).
 
 ```bash
 export CPU_ONLY_MODE=1
-aluminatiai
+nemulai
 ```
 
 ## Enable the Advisor (recommendations + one-click apply)
@@ -176,7 +176,7 @@ The Advisor tier surfaces GPU optimization recommendations in your dashboard and
 export ALUMINATAI_API_KEY=alum_your_key_here
 export AUTO_TUNE_ENABLED=1          # enable roofline analysis
 export COMMAND_POLL_ENABLED=1       # enable command execution
-aluminatiai
+nemulai
 ```
 
 The agent analyzes your GPU workloads and uploads recommendations like:
@@ -201,7 +201,7 @@ export AUTO_TUNE_ENABLED=1
 export COMMAND_POLL_ENABLED=1
 export SWARM_ENABLED=1              # participate in leader election
 export ALUMINATAI_CLUSTER_TAG=prod  # group by cluster (optional)
-aluminatiai
+nemulai
 ```
 
 **How it works:**
@@ -252,7 +252,7 @@ sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj
 ### Agent exits immediately
 
 ```bash
-LOG_LEVEL=DEBUG aluminatiai   # see detailed startup diagnostics
+LOG_LEVEL=DEBUG nemulai   # see detailed startup diagnostics
 ```
 
 ## Next steps

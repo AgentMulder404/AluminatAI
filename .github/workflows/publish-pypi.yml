@@ -1,4 +1,4 @@
-name: Publish aluminatiai to PyPI
+name: Publish nemulai to PyPI
 
 on:
   push:

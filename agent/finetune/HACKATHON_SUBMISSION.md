@@ -1,9 +1,9 @@
-# AluminatiAI GreenTune — AMD Developer Hackathon Submission
+# NemulAI GreenTune — AMD Developer Hackathon Submission
 
 **Track:** Fine-Tuning on AMD  
-**Team:** AluminatiAI (Kevin Mello)  
-**GitHub:** [github.com/AgentMulder404/AluminatAI](https://github.com/AgentMulder404/AluminatAI)  
-**Live Dashboard:** [aluminatai.com/admin/fine-tuning](https://aluminatai.com/admin/fine-tuning)
+**Team:** NemulAI (Kevin Mello)  
+**GitHub:** [github.com/AgentMulder404/NemulAI](https://github.com/AgentMulder404/NemulAI)  
+**Live Dashboard:** [nemulai.com/admin/fine-tuning](https://nemulai.com/admin/fine-tuning)
 
 ---
 
@@ -31,7 +31,7 @@ GreenTune is an energy-aware fine-tuning pipeline built on AMD ROCm that treats 
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  AluminatiAI Platform (Next.js + Supabase)       │
+│  NemulAI Platform (Next.js + Supabase)       │
 │  ┌────────────────────────────────────────────┐   │
 │  │  GreenTune Dashboard (/admin/fine-tuning)  │   │
 │  │  • Run Monitor — power curves, loss charts │   │
@@ -107,7 +107,7 @@ We ran identical QLoRA fine-tuning jobs on Qwen2.5-7B-Instruct (500 Hermes agent
 - **30% more total energy wasted** — same watts × more time = more Joules
 - **30% worse J/token efficiency** — the metric that matters
 
-**This insight is invisible without per-token energy measurement.** A team looking at only loss and throughput might assume smaller batches are "lighter" on the GPU. AluminatiAI's energy monitoring proves the opposite and provides data-driven guidance: **maximize batch size on MI300X to optimize energy efficiency.**
+**This insight is invisible without per-token energy measurement.** A team looking at only loss and throughput might assume smaller batches are "lighter" on the GPU. NemulAI's energy monitoring proves the opposite and provides data-driven guidance: **maximize batch size on MI300X to optimize energy efficiency.**
 
 ### Cost Context
 
@@ -155,7 +155,7 @@ Per-step metrics aggregate these samples between training steps to produce:
 
 ### GPU Agent Auto-Detection
 
-The AluminatiAI agent automatically detects the GPU vendor at startup:
+The NemulAI agent automatically detects the GPU vendor at startup:
 
 ```python
 # Try NVIDIA first
@@ -194,7 +194,7 @@ The live dashboard at `/admin/fine-tuning` shows:
 ssh -i ~/.ssh/amd_devcloud root@<ip>
 
 # Inside the ROCm container
-cd /workspace/AluminatAI/agent
+cd /workspace/NemulAI/agent
 
 # Terminal 1: Start the GPU agent
 python3 agent.py --interval 2 --dry-run --duration 300

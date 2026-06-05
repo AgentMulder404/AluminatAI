@@ -27,7 +27,7 @@ export function createRequest(
   }
   const fullUrl = url.startsWith("http")
     ? url
-    : `https://www.aluminatai.com${url}`;
+    : `https://www.nemulai.com${url}`;
   return addNextUrl(new Request(fullUrl, init));
 }
 
@@ -36,7 +36,7 @@ export function createJsonRequest(
   body: unknown,
   headers: Record<string, string> = {}
 ) {
-  return createRequest(`https://www.aluminatai.com${path}`, {
+  return createRequest(`https://www.nemulai.com${path}`, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body,
@@ -47,7 +47,7 @@ export function createGetRequest(
   path: string,
   headers: Record<string, string> = {}
 ) {
-  return createRequest(`https://www.aluminatai.com${path}`, {
+  return createRequest(`https://www.nemulai.com${path}`, {
     method: "GET",
     headers,
   });

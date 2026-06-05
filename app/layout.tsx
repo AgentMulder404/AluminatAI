@@ -3,16 +3,16 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "AluminatAI — GPU Cost Intelligence",
-    template: "%s | AluminatAI",
+    default: "NemulAI — GPU Cost Intelligence",
+    template: "%s | NemulAI",
   },
   description:
     "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
-  metadataBase: new URL("https://www.aluminatai.com"),
+  metadataBase: new URL("https://www.nemulai.com"),
   openGraph: {
     type: "website",
-    siteName: "AluminatAI",
-    title: "AluminatAI — GPU Cost Intelligence",
+    siteName: "NemulAI",
+    title: "NemulAI — GPU Cost Intelligence",
     description:
       "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
     images: [
@@ -20,13 +20,13 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "AluminatAI — GPU Cost Intelligence",
+        alt: "NemulAI — GPU Cost Intelligence",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "AluminatAI — GPU Cost Intelligence",
+    title: "NemulAI — GPU Cost Intelligence",
     description:
       "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
     images: [
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "AluminatAI — GPU Cost Intelligence",
+        alt: "NemulAI — GPU Cost Intelligence",
       },
     ],
   },

@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Fleet-scale savings projections from A/B experiment results.
 
-Takes an ABResult JSON (from `aluminatiai ab --json`) and extrapolates
+Takes an ABResult JSON (from `nemulai ab --json`) and extrapolates
 savings to fleet sizes of 100, 1,000, and 10,000 GPUs.
 
 Usage:
@@ -157,7 +157,7 @@ def _print_rich(
     console = Console()
     console.print()
     console.print(Panel(
-        f"[bold white]AluminatAI Fleet Savings Projection[/bold white]\n"
+        f"[bold white]NemulAI Fleet Savings Projection[/bold white]\n"
         f"GPU: {gpu_name} | Energy savings: {energy_pct:.1f}% | "
         f"Throughput impact: {_tp_str(throughput_pct)} | "
         f"AEM: {_aem_str(aem)}",
@@ -209,7 +209,7 @@ def _print_plain(
 ) -> None:
     print()
     print("=" * 70)
-    print("  AluminatAI Fleet Savings Projection")
+    print("  NemulAI Fleet Savings Projection")
     print(f"  GPU: {gpu_name} | Energy savings: {energy_pct:.1f}% | "
           f"Throughput: {_tp_str(throughput_pct)} | AEM: {_aem_str(aem)}")
     print("=" * 70)

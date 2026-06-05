@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Dense matrix multiplication workload for A/B energy testing.
 
 Runs configurable FP32 or BF16 matmul on GPU and prints throughput
-in a format parseable by `aluminatiai ab` (XXX.X it/s).
+in a format parseable by `nemulai ab` (XXX.X it/s).
 
 Usage:
     python matmul_workload.py --duration 30 --dtype bf16

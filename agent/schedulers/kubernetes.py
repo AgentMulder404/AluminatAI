@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Kubernetes scheduler adapter.
 
@@ -20,11 +20,11 @@ Watches GPU-requesting pods on the local node and maps GPU indices
 to job metadata for energy attribution.
 
 Labeling convention:
-  aluminatai.io/team:  Team identifier (falls back to namespace)
-  aluminatai.io/model: ML model tag (falls back to "untagged")
-  aluminatai.io/user:  Submitter email (annotation, optional)
+  nemulai.io/team:  Team identifier (falls back to namespace)
+  nemulai.io/model: ML model tag (falls back to "untagged")
+  nemulai.io/user:  Submitter email (annotation, optional)
 
-Deployment: Runs as a DaemonSet sidecar alongside the AluminatAI agent.
+Deployment: Runs as a DaemonSet sidecar alongside the NemulAI agent.
 Requires RBAC: pods (get, list, watch) cluster-wide or per-namespace.
 """
 
@@ -44,9 +44,9 @@ except ImportError:
     logger.debug("kubernetes package not installed — K8s adapter unavailable")
 
 
-TEAM_LABEL = "aluminatai.io/team"
-MODEL_LABEL = "aluminatai.io/model"
-USER_ANNOTATION = "aluminatai.io/user"
+TEAM_LABEL = "nemulai.io/team"
+MODEL_LABEL = "nemulai.io/model"
+USER_ANNOTATION = "nemulai.io/user"
 GPU_RESOURCE = "nvidia.com/gpu"
 
 
@@ -181,7 +181,7 @@ class KubernetesAdapter(SchedulerAdapter):
         """
         Derive team identifier.
 
-        Priority: aluminatai.io/team label > namespace > "default"
+        Priority: nemulai.io/team label > namespace > "default"
         """
         labels = pod.metadata.labels or {}
         if TEAM_LABEL in labels:

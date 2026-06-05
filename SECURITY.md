@@ -4,7 +4,7 @@
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Email: contact@aluminatiai.com
+Email: contact@nemulai.com
 Subject line: `[SECURITY] <brief description>`
 
 Include:
@@ -18,9 +18,9 @@ You will receive an acknowledgement within 48 hours and a resolution timeline wi
 ## Scope
 
 In scope:
-- The `aluminatiai` Python agent (this repo)
-- The ingest API at `aluminatiai.com/v1/metrics/ingest`
-- The dashboard at `aluminatiai.com`
+- The `nemulai` Python agent (this repo)
+- The ingest API at `nemulai.com/v1/metrics/ingest`
+- The dashboard at `nemulai.com`
 
 Out of scope:
 - Vulnerabilities in third-party dependencies (report to them directly)

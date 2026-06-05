@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-AluminatAI Weights & Biases integration.
+NemulAI Weights & Biases integration.
 
 Auto-logs GPU energy and cost to W&B runs.
 
 Usage:
     import wandb
-    from agent.integrations.wandb_callback import AluminatAIWandbCallback
+    from agent.integrations.wandb_callback import NemulAIWandbCallback
 
-    callback = AluminatAIWandbCallback()
+    callback = NemulAIWandbCallback()
 
     run = wandb.init(project="my-project", entity="my-team")
     callback.on_run_start(run)
@@ -55,7 +55,7 @@ except ImportError:
     _WANDB = False
 
 
-class AluminatAIWandbCallback:
+class NemulAIWandbCallback:
     """
     Logs GPU energy and cost to W&B runs.
 
@@ -64,7 +64,7 @@ class AluminatAIWandbCallback:
       - Sets ALUMINATAI_TEAM to wandb.run.entity/project
 
     On run end:
-      - Fetches energy from AluminatAI API
+      - Fetches energy from NemulAI API
       - Logs to wandb.run.summary: energy_kwh, cost_usd, co2_kg
     """
 
@@ -75,7 +75,7 @@ class AluminatAIWandbCallback:
     ):
         self.api_key = api_key or os.getenv("ALUMINATAI_API_KEY", "")
         self.api_endpoint = api_endpoint or os.getenv(
-            "ALUMINATAI_API_ENDPOINT", "https://aluminatiai.com/api/metrics/ingest"
+            "ALUMINATAI_API_ENDPOINT", "https://nemulai.com/api/metrics/ingest"
         )
         self._start_times: dict[str, float] = {}
 
@@ -91,9 +91,9 @@ class AluminatAIWandbCallback:
             team_id = f"{run.entity}/{run.project}" if run.entity else run.project
             os.environ["ALUMINATAI_MODEL"] = run.name or run_id
             os.environ["ALUMINATAI_TEAM"] = team_id
-            logger.info("AluminatAI: tracking W&B run '%s' (%s)", run.name, team_id)
+            logger.info("NemulAI: tracking W&B run '%s' (%s)", run.name, team_id)
         except Exception as exc:
-            logger.warning("AluminatAI WandbCallback on_run_start: %s", exc)
+            logger.warning("NemulAI WandbCallback on_run_start: %s", exc)
 
     def on_run_end(self, run) -> None:
         """Call before wandb.finish()."""
@@ -109,17 +109,17 @@ class AluminatAIWandbCallback:
             energy = self._fetch_energy(start_time)
             if energy:
                 run.summary.update({
-                    "aluminatai_energy_kwh": energy.get("today_kwh", 0),
-                    "aluminatai_cost_usd": energy.get("today_cost_usd", 0),
+                    "nemulai_energy_kwh": energy.get("today_kwh", 0),
+                    "nemulai_cost_usd": energy.get("today_cost_usd", 0),
                 })
                 logger.info(
-                    "AluminatAI: logged %.4f kWh / $%.4f to W&B run %s",
+                    "NemulAI: logged %.4f kWh / $%.4f to W&B run %s",
                     energy.get("today_kwh", 0),
                     energy.get("today_cost_usd", 0),
                     run_id,
                 )
         except Exception as exc:
-            logger.warning("AluminatAI WandbCallback on_run_end: %s", exc)
+            logger.warning("NemulAI WandbCallback on_run_end: %s", exc)
         finally:
             os.environ.pop("ALUMINATAI_MODEL", None)
             os.environ.pop("ALUMINATAI_TEAM", None)

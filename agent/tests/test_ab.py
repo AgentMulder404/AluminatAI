@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 """Tests for the ab command — CI significance, AEM, serialization."""
 import json
 import os

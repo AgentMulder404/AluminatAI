@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-aluminatiai optimize — GPU energy efficiency recommendations.
+nemulai optimize — GPU energy efficiency recommendations.
 
 Samples live GPU metrics, analyzes workload characteristics against the
 roofline model, and outputs ranked suggestions to reduce energy cost.
 
 Usage:
-    aluminatiai optimize [--gpu N] [--duration SECONDS] [--json]
+    nemulai optimize [--gpu N] [--duration SECONDS] [--json]
 """
 from __future__ import annotations
 
@@ -589,7 +589,7 @@ def _print_json(result: OptimizeResult) -> None:
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="aluminatiai optimize",
+        prog="nemulai optimize",
         description="Analyze GPU workload and suggest energy efficiency improvements.",
     )
     p.add_argument(

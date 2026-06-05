@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
       provider,
       bucket,
-      prefix: prefix ?? "aluminatai/",
+      prefix: prefix ?? "nemulai/",
       region: region ?? null,
       format: format ?? "csv",
       schedule: schedule ?? "weekly",

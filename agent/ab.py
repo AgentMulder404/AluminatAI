@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-aluminatiai ab — A/B energy efficiency experiment runner.
+nemulai ab — A/B energy efficiency experiment runner.
 
 Runs two workload configurations (or the same workload at two power limits),
 profiles both with confidence intervals, and outputs a diff report proving
 whether the optimization reduced energy.
 
 Usage:
-    aluminatiai ab --baseline "CMD" --optimized "CMD" [--duration 120] [--iterations 3]
-    aluminatiai ab --powercap --baseline-watts 400 --optimized-watts 250 --workload "CMD"
+    nemulai ab --baseline "CMD" --optimized "CMD" [--duration 120] [--iterations 3]
+    nemulai ab --powercap --baseline-watts 400 --optimized-watts 250 --workload "CMD"
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ class ABResult:
     energy_savings_pct: float = 0.0
     throughput_change_pct: Optional[float] = None
     cost_savings_usd_per_hour: float = 0.0
-    aem: float = 0.0  # Aluminati Efficiency Multiplier
+    aem: float = 0.0  # NemulAI Efficiency Multiplier
 
     # Statistical significance
     energy_significant: bool = False
@@ -559,9 +559,9 @@ def _print_rich(result: ABResult) -> None:
 
     # AEM
     if result.aem > 0 and result.aem != float("inf"):
-        console.print(f"  [bold]Aluminati Efficiency Multiplier (AEM):[/bold] {result.aem}x")
+        console.print(f"  [bold]NemulAI Efficiency Multiplier (AEM):[/bold] {result.aem}x")
     elif result.aem == float("inf"):
-        console.print(f"  [bold]Aluminati Efficiency Multiplier (AEM):[/bold] inf (no throughput loss)")
+        console.print(f"  [bold]NemulAI Efficiency Multiplier (AEM):[/bold] inf (no throughput loss)")
     console.print(f"  [bold]Cost savings:[/bold] ${result.cost_savings_usd_per_hour:.4f}/hr")
 
     if result.carbon_zone:
@@ -659,7 +659,7 @@ def _export_csv(result: ABResult, path: str) -> None:
 
 def make_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="aluminatiai ab",
+        prog="nemulai ab",
         description="A/B energy efficiency experiment runner.",
     )
 

@@ -898,7 +898,7 @@ function LeaderboardTab({ runs }: { runs: TrainingRun[] }) {
           return (
             <div className="mt-4 bg-green-500/10 border border-green-500/30 rounded-lg p-4 text-sm">
               <div className="text-green-400 font-bold mb-1">
-                AluminatiAI Insight
+                NemulAI Insight
               </div>
               <p className="text-neutral-300">
                 <span className="text-green-400 font-semibold">{bestRun?.name}</span> is{" "}

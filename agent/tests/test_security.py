@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 Security hardening unit tests.
 
@@ -82,7 +82,7 @@ class TestEnvironAllowlist(unittest.TestCase):
         self.assertIn("ALUMINATAI_TEAM", result)
         self.assertIn("SLURM_JOB_ID", result)
 
-    def test_aluminatai_prefix_kept(self):
+    def test_nemulai_prefix_kept(self):
         from attribution.process_probe import _filter_environ
         env = {
             "ALUMINATAI_MODEL": "gpt4",

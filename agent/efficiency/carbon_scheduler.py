@@ -4,7 +4,7 @@ Carbon-aware job scheduling — recommend optimal start windows.
 Given a job's estimated duration and the 24h carbon forecast, recommends
 the time window with the lowest average carbon intensity.
 
-CLI: aluminatiai carbon-schedule --duration 4h --zone US-CAL-CISO
+CLI: nemulai carbon-schedule --duration 4h --zone US-CAL-CISO
 
 Advisory-only in daemon mode (logs recommendation, does NOT auto-defer).
 """

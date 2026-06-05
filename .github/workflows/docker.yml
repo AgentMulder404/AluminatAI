@@ -31,12 +31,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Derives tags automatically from the git tag:
-      #   v0.2.1  →  ghcr.io/agentmulder404/aluminatai-agent:0.2.1, :0.2, :latest
+      #   v0.2.1  →  ghcr.io/agentmulder404/nemulai-agent:0.2.1, :0.2, :latest
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/agentmulder404/aluminatai-agent
+          images: ghcr.io/agentmulder404/nemulai-agent
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

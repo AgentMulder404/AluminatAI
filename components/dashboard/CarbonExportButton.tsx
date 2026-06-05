@@ -57,7 +57,7 @@ export default function CarbonExportButton({ clusterTag }: { clusterTag?: string
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `aluminatai-carbon-${slug}.${ext}`;
+      a.download = `nemulai-carbon-${slug}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {

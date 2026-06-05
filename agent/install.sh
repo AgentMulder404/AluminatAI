@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# AluminatAI GPU Agent — installer
+# NemulAI GPU Agent — installer
 # Usage (recommended):
-#   curl -sSL https://get.aluminatiai.com | bash
+#   curl -sSL https://get.nemulai.com | bash
 # Usage (local dev):
 #   bash install.sh --local
 #
 # What this script does:
 #   1. Checks prerequisites (NVIDIA drivers, Python 3.9+, pip, systemd)
-#   2. Installs the aluminatiai Python package from PyPI (or locally with --local)
+#   2. Installs the nemulai Python package from PyPI (or locally with --local)
 #   3. Creates a dedicated system user and data/log directories
-#   4. Writes /etc/aluminatai/agent.env with your API key
+#   4. Writes /etc/nemulai/agent.env with your API key
 #   5. Installs and starts the systemd service
 #
 # Supported: Ubuntu 20.04+, Debian 11+, RHEL/Rocky 8+, Amazon Linux 2023
@@ -44,7 +44,7 @@ for arg in "$@"; do
         --unattended|-y) UNATTENDED=1 ;;
         --help|-h)
             cat <<'EOF'
-AluminatAI Agent installer
+NemulAI Agent installer
 
 Options:
   --local        Install from local source directory instead of PyPI
@@ -55,10 +55,10 @@ Options:
 
 Examples:
   # Standard install from PyPI
-  curl -sSL https://get.aluminatiai.com | bash
+  curl -sSL https://get.nemulai.com | bash
 
   # Air-gapped: install from local wheel
-  pip download aluminatiai -d /tmp/pkg
+  pip download nemulai -d /tmp/pkg
   bash install.sh --local
 
   # Package only (manage service yourself)
@@ -78,9 +78,9 @@ done
 # ── Banner ────────────────────────────────────────────────────────────────────
 
 echo
-echo -e "${BOLD}AluminatAI GPU Agent Installer${NC}"
-echo "  Docs:      https://aluminatiai.com/docs/agent"
-echo "  Dashboard: https://aluminatiai.com/dashboard"
+echo -e "${BOLD}NemulAI GPU Agent Installer${NC}"
+echo "  Docs:      https://nemulai.com/docs/agent"
+echo "  Dashboard: https://nemulai.com/dashboard"
 echo
 
 # ── Check: root ───────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ ok "pip available"
 if [[ $SKIP_SERVICE -eq 0 ]]; then
     if ! command -v systemctl &>/dev/null; then
         warn "systemd not found — installing package only (no service setup)."
-        warn "Start manually:  aluminatiai"
+        warn "Start manually:  nemulai"
         SKIP_SERVICE=1
     else
         ok "systemd available"
@@ -139,7 +139,7 @@ fi
 
 # ── Install package ───────────────────────────────────────────────────────────
 
-step "Installing aluminatiai package"
+step "Installing nemulai package"
 
 if [[ $LOCAL_INSTALL -eq 1 ]]; then
     # Find the closest pyproject.toml to locate the source tree.
@@ -154,28 +154,28 @@ if [[ $LOCAL_INSTALL -eq 1 ]]; then
     echo "  Source: $SRC_DIR"
     python3 -m pip install "$SRC_DIR" --quiet
 else
-    python3 -m pip install --upgrade aluminatiai --quiet
+    python3 -m pip install --upgrade nemulai --quiet
 fi
 
-INSTALLED_VER=$(python3 -c 'import importlib.metadata; print(importlib.metadata.version("aluminatiai"))' 2>/dev/null || echo "unknown")
-ok "aluminatiai $INSTALLED_VER installed"
+INSTALLED_VER=$(python3 -c 'import importlib.metadata; print(importlib.metadata.version("nemulai"))' 2>/dev/null || echo "unknown")
+ok "nemulai $INSTALLED_VER installed"
 
 # Find the installed binary
-AGENT_BIN=$(command -v aluminatiai 2>/dev/null || python3 -m site --user-base 2>/dev/null | xargs -I{} find {}/bin -name aluminatiai 2>/dev/null | head -1 || echo "")
+AGENT_BIN=$(command -v nemulai 2>/dev/null || python3 -m site --user-base 2>/dev/null | xargs -I{} find {}/bin -name nemulai 2>/dev/null | head -1 || echo "")
 if [[ -z "$AGENT_BIN" ]]; then
     # Try common pip install locations
-    for candidate in /usr/local/bin/aluminatiai /usr/bin/aluminatiai ~/.local/bin/aluminatiai; do
+    for candidate in /usr/local/bin/nemulai /usr/bin/nemulai ~/.local/bin/nemulai; do
         [[ -x "$candidate" ]] && AGENT_BIN="$candidate" && break
     done
 fi
-[[ -z "$AGENT_BIN" ]] && die "aluminatiai binary not found after install.  Check PATH."
+[[ -z "$AGENT_BIN" ]] && die "nemulai binary not found after install.  Check PATH."
 ok "Binary: $AGENT_BIN"
 
 if [[ $SKIP_SERVICE -eq 1 ]]; then
     echo
     echo -e "${GREEN}Package installed.${NC}  Start with:"
     echo "  export ALUMINATAI_API_KEY=alum_your_key"
-    echo "  aluminatiai"
+    echo "  nemulai"
     exit 0
 fi
 
@@ -183,18 +183,18 @@ fi
 
 step "Creating system user and directories"
 
-if ! id -u aluminatai &>/dev/null; then
+if ! id -u nemulai &>/dev/null; then
     useradd --system --no-create-home --shell /usr/sbin/nologin \
-            --comment "AluminatAI GPU agent" aluminatai
-    ok "System user 'aluminatai' created"
+            --comment "NemulAI GPU agent" nemulai
+    ok "System user 'nemulai' created"
 else
-    ok "System user 'aluminatai' already exists"
+    ok "System user 'nemulai' already exists"
 fi
 
-install -d -m 0700 -o aluminatai -g aluminatai /var/lib/aluminatai
-install -d -m 0755 -o aluminatai -g aluminatai /var/log/aluminatai
-install -d -m 0750 /etc/aluminatai
-ok "Directories created  (/var/lib/aluminatai, /var/log/aluminatai, /etc/aluminatai)"
+install -d -m 0700 -o nemulai -g nemulai /var/lib/nemulai
+install -d -m 0755 -o nemulai -g nemulai /var/log/nemulai
+install -d -m 0750 /etc/nemulai
+ok "Directories created  (/var/lib/nemulai, /var/log/nemulai, /etc/nemulai)"
 
 # ── API key ───────────────────────────────────────────────────────────────────
 
@@ -206,12 +206,12 @@ if [[ $UNATTENDED -eq 1 ]]; then
     fi
     API_KEY="$ALUMINATAI_API_KEY"
     echo "  Using API key from environment."
-elif [[ -f /etc/aluminatai/agent.env ]]; then
-    warn "Existing /etc/aluminatai/agent.env found — keeping it."
-    warn "To replace it, run:  aluminatiai service install"
+elif [[ -f /etc/nemulai/agent.env ]]; then
+    warn "Existing /etc/nemulai/agent.env found — keeping it."
+    warn "To replace it, run:  nemulai service install"
     API_KEY=""
 else
-    echo "  Get your key at: https://aluminatiai.com/dashboard/setup"
+    echo "  Get your key at: https://nemulai.com/dashboard/setup"
     echo
     while true; do
         read -rp "  Enter API Key: " API_KEY
@@ -228,36 +228,36 @@ fi
 # ── Write env file ────────────────────────────────────────────────────────────
 
 if [[ -n "$API_KEY" ]]; then
-    cat > /etc/aluminatai/agent.env <<EOF
-# AluminatAI Agent Configuration
+    cat > /etc/nemulai/agent.env <<EOF
+# NemulAI Agent Configuration
 # Generated by install.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Edit this file to change settings; restart the service afterwards:
-#   sudo systemctl restart aluminatai-agent
+#   sudo systemctl restart nemulai-agent
 #
-# Full reference: https://aluminatiai.com/docs/agent#configuration
+# Full reference: https://nemulai.com/docs/agent#configuration
 
 ALUMINATAI_API_KEY=$API_KEY
-ALUMINATAI_API_ENDPOINT=https://aluminatiai.com/api/metrics/ingest
+ALUMINATAI_API_ENDPOINT=https://nemulai.com/api/metrics/ingest
 SAMPLE_INTERVAL=5.0
 UPLOAD_INTERVAL=60
 METRICS_PORT=9100
 LOG_LEVEL=INFO
 EOF
-    chmod 600 /etc/aluminatai/agent.env
-    chown root:root /etc/aluminatai/agent.env
-    ok "Wrote /etc/aluminatai/agent.env (mode 600)"
+    chmod 600 /etc/nemulai/agent.env
+    chown root:root /etc/nemulai/agent.env
+    ok "Wrote /etc/nemulai/agent.env (mode 600)"
 fi
 
 # ── Systemd unit ──────────────────────────────────────────────────────────────
 
 step "Installing systemd service"
 
-cat > /etc/systemd/system/aluminatai-agent.service <<UNIT
-# AluminatAI GPU Energy Monitoring Agent
+cat > /etc/systemd/system/nemulai-agent.service <<UNIT
+# NemulAI GPU Energy Monitoring Agent
 # Managed by install.sh — edit with care
 [Unit]
-Description=AluminatAI GPU Energy Monitoring Agent
-Documentation=https://aluminatiai.com/docs/agent
+Description=NemulAI GPU Energy Monitoring Agent
+Documentation=https://nemulai.com/docs/agent
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=120
@@ -265,11 +265,11 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=aluminatai
-Group=aluminatai
-EnvironmentFile=/etc/aluminatai/agent.env
-Environment=DATA_DIR=/var/lib/aluminatai
-Environment=LOG_DIR=/var/log/aluminatai
+User=nemulai
+Group=nemulai
+EnvironmentFile=/etc/nemulai/agent.env
+Environment=DATA_DIR=/var/lib/nemulai
+Environment=LOG_DIR=/var/log/nemulai
 ExecStart=$AGENT_BIN
 Restart=on-failure
 RestartSec=10s
@@ -278,7 +278,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/aluminatai /var/log/aluminatai
+ReadWritePaths=/var/lib/nemulai /var/log/nemulai
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
@@ -289,30 +289,30 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 UNIT
 
-chmod 644 /etc/systemd/system/aluminatai-agent.service
-ok "Wrote /etc/systemd/system/aluminatai-agent.service"
+chmod 644 /etc/systemd/system/nemulai-agent.service
+ok "Wrote /etc/systemd/system/nemulai-agent.service"
 
 systemctl daemon-reload
-systemctl enable aluminatai-agent
-systemctl restart aluminatai-agent
+systemctl enable nemulai-agent
+systemctl restart nemulai-agent
 
 # Give it a moment to start
 sleep 3
 
-if systemctl is-active --quiet aluminatai-agent; then
+if systemctl is-active --quiet nemulai-agent; then
     echo
     echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}${BOLD}  AluminatAI Agent is running!${NC}"
+    echo -e "${GREEN}${BOLD}  NemulAI Agent is running!${NC}"
     echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo
-    echo "  Status:    sudo systemctl status aluminatai-agent"
-    echo "  Logs:      sudo journalctl -u aluminatai-agent -f"
+    echo "  Status:    sudo systemctl status nemulai-agent"
+    echo "  Logs:      sudo journalctl -u nemulai-agent -f"
     echo "  Metrics:   curl -s localhost:9100/metrics | head -20"
-    echo "  Dashboard: https://aluminatiai.com/dashboard"
+    echo "  Dashboard: https://nemulai.com/dashboard"
     echo
 else
     echo
     echo -e "${RED}Service failed to start.${NC}"
-    echo "  Check logs: sudo journalctl -u aluminatai-agent -n 50"
+    echo "  Check logs: sudo journalctl -u nemulai-agent -n 50"
     exit 1
 fi

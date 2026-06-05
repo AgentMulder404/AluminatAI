@@ -1,1 +1,1 @@
-# AluminatiAI GreenTune — energy-efficient fine-tuning on AMD ROCm
+# NemulAI GreenTune — energy-efficient fine-tuning on AMD ROCm

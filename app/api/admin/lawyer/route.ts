@@ -11,7 +11,7 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAIL ?? "")
   .filter(Boolean);
 
 const ALUMINATAI_SECURITY_CONTEXT = `
-AluminatAI Security Posture:
+NemulAI Security Posture:
 - Infrastructure: Vercel serverless (Next.js), no self-hosted servers
 - Database: Supabase PostgreSQL with Row Level Security (RLS) policies on all user-facing tables
 - Authentication: Cookie-based SSR auth via @supabase/ssr; service role key for server-side operations only
@@ -23,7 +23,7 @@ AluminatAI Security Posture:
 - Data Retention: Configurable retention policies, cron-based cleanup
 - Encryption: API keys hashed with SHA-256 before storage; pgcrypto gen_random_bytes() for key generation
 - Monitoring: Agent heartbeat system (5-min intervals), SLA dashboard tracking uptime/latency
-- Vulnerability Disclosure: 90-day coordinated disclosure policy, contact@aluminatiai.com
+- Vulnerability Disclosure: 90-day coordinated disclosure policy, contact@nemulai.com
 - SOC 2: Not yet certified (in progress)
 - GDPR: Data processing on EU Supabase region available; no formal DPA published yet
 - Data Collected: GPU metrics (power, temperature, utilization), user email, Stripe billing info
@@ -74,8 +74,8 @@ async function handleGenerateContract(body: Record<string, unknown>) {
   const template = templates[contractType as string] || templates.MSA;
 
   const document = await callClaude(
-    "You are a legal document drafter for AluminatAI, a GPU cost intelligence and energy monitoring SaaS platform. Generate professional, enforceable contracts in markdown format. Use clear section numbering. Include signature blocks at the end with Company Name, Authorized Signatory, Title, and Date fields for both parties.",
-    `Generate a ${contractType} between AluminatAI, Inc. and ${companyName}.
+    "You are a legal document drafter for NemulAI, a GPU cost intelligence and energy monitoring SaaS platform. Generate professional, enforceable contracts in markdown format. Use clear section numbering. Include signature blocks at the end with Company Name, Authorized Signatory, Title, and Date fields for both parties.",
+    `Generate a ${contractType} between NemulAI, Inc. and ${companyName}.
 
 Template structure: ${template}
 
@@ -83,7 +83,7 @@ ${jurisdiction ? `Governing law: ${jurisdiction}` : "Governing law: State of Del
 ${dealTerms ? `Deal terms and specifics:\n${dealTerms}` : ""}
 ${specialClauses ? `Additional clauses to include:\n${specialClauses}` : ""}
 
-Use today's date as the effective date. AluminatAI's address is: AluminatAI, Inc., Delaware, USA.`
+Use today's date as the effective date. NemulAI's address is: NemulAI, Inc., Delaware, USA.`
   );
 
   return NextResponse.json({
@@ -103,7 +103,7 @@ async function handleRedlineContract(body: Record<string, unknown>) {
   }
 
   const raw = await callClaude(
-    `You are a legal contract reviewer for AluminatAI, a GPU cost intelligence SaaS company. Analyze contracts and identify clauses that are risky or unfavorable to AluminatAI. For each flagged item provide the exact clause text, risk level, category, explanation, and suggested counter-language.
+    `You are a legal contract reviewer for NemulAI, a GPU cost intelligence SaaS company. Analyze contracts and identify clauses that are risky or unfavorable to NemulAI. For each flagged item provide the exact clause text, risk level, category, explanation, and suggested counter-language.
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -113,7 +113,7 @@ Respond ONLY with valid JSON in this exact format:
       "clause": "exact text from the contract",
       "riskLevel": "high" | "medium" | "low",
       "category": "liability" | "indemnity" | "ip" | "sla" | "termination" | "payment" | "data_privacy" | "other",
-      "explanation": "why this is risky for AluminatAI",
+      "explanation": "why this is risky for NemulAI",
       "suggestedLanguage": "proposed alternative clause text"
     }
   ]
@@ -139,7 +139,7 @@ async function handleFillQuestionnaire(body: Record<string, unknown>) {
   }
 
   const raw = await callClaude(
-    `You are a security compliance specialist for AluminatAI. Answer security questionnaires based on AluminatAI's actual security posture.
+    `You are a security compliance specialist for NemulAI. Answer security questionnaires based on NemulAI's actual security posture.
 
 ${ALUMINATAI_SECURITY_CONTEXT}
 
@@ -176,7 +176,7 @@ async function handleScanCompliance(body: Record<string, unknown>) {
   }
 
   const raw = await callClaude(
-    `You are a compliance auditor evaluating AluminatAI's compliance posture.
+    `You are a compliance auditor evaluating NemulAI's compliance posture.
 
 ${ALUMINATAI_SECURITY_CONTEXT}
 
@@ -198,7 +198,7 @@ Respond ONLY with valid JSON in this exact format:
     }
   ]
 }`,
-    `Evaluate AluminatAI's compliance with these frameworks: ${(frameworks as string[]).join(", ")}`
+    `Evaluate NemulAI's compliance with these frameworks: ${(frameworks as string[]).join(", ")}`
   );
 
   try {
@@ -228,9 +228,9 @@ async function handleGeneratePolicy(body: Record<string, unknown>) {
 
   const document = await callClaude(
     "You are a legal policy drafter. Generate a complete, professional legal document in markdown format. Include standard sections, effective date (today), and jurisdiction-specific language where applicable. The document should be comprehensive and ready for legal review.",
-    `Generate a ${policyName} for AluminatAI.
+    `Generate a ${policyName} for NemulAI.
 
-AluminatAI is a GPU cost intelligence and energy monitoring SaaS platform. We provide a Python agent that runs on users' GPU machines to collect metrics (power draw, temperature, utilization), and a web dashboard for visualization, cost attribution, and benchmarking.
+NemulAI is a GPU cost intelligence and energy monitoring SaaS platform. We provide a Python agent that runs on users' GPU machines to collect metrics (power draw, temperature, utilization), and a web dashboard for visualization, cost attribution, and benchmarking.
 
 ${companyDetails ? `Additional company details: ${companyDetails}` : ""}
 ${productDescription ? `Product specifics: ${productDescription}` : ""}

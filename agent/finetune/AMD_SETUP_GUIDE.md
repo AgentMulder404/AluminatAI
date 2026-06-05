@@ -1,4 +1,4 @@
-# AluminatiAI GreenTune — AMD Developer Cloud Setup Guide
+# NemulAI GreenTune — AMD Developer Cloud Setup Guide
 
 Complete setup for QLoRA fine-tuning on AMD MI300X with real-time energy monitoring.
 
@@ -108,7 +108,7 @@ echo "=== Done! Activate with: source /opt/greentune/bin/activate ==="
 # Dockerfile.greentune
 FROM rocm/pytorch:rocm6.4_ubuntu22.04_py3.10_pytorch_release_2.9.1
 
-LABEL maintainer="AluminatiAI <kevin@aluminatiai.com>"
+LABEL maintainer="NemulAI <kevin@nemulai.com>"
 LABEL description="GreenTune — energy-efficient fine-tuning on AMD MI300X"
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -189,7 +189,7 @@ export TRANSFORMERS_CACHE="/workspace/.cache/huggingface/hub"
 # Disable tokenizer parallelism warnings
 export TOKENIZERS_PARALLELISM="false"
 
-# Your AluminatiAI API key (for energy metric upload)
+# Your NemulAI API key (for energy metric upload)
 export ALUMINATAI_API_KEY="alum_..."
 
 # Anthropic key (for dataset generation)

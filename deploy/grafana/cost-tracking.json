@@ -7,7 +7,7 @@
       "pluginId": "prometheus"
     }
   ],
-  "description": "AluminatAI cost tracking — energy costs, waste detection, and budget monitoring derived from GPU power metrics",
+  "description": "NemulAI cost tracking — energy costs, waste detection, and budget monitoring derived from GPU power metrics",
   "editable": true,
   "panels": [
     {
@@ -16,7 +16,7 @@
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "increase(aluminatai_gpu_energy_joules_total[1h]) / 3600000 * $kwh_rate",
+          "expr": "increase(nemulai_gpu_energy_joules_total[1h]) / 3600000 * $kwh_rate",
           "legendFormat": "GPU {{gpu_uuid}}",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -31,7 +31,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "targets": [
         {
-          "expr": "sum(aluminatai_gpu_power_watts) / 1000",
+          "expr": "sum(nemulai_gpu_power_watts) / 1000",
           "legendFormat": "Total kW",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -44,7 +44,7 @@
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
       "targets": [
         {
-          "expr": "sum(aluminatai_gpu_power_watts) / 1000 * $kwh_rate",
+          "expr": "sum(nemulai_gpu_power_watts) / 1000 * $kwh_rate",
           "legendFormat": "$/hr",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -57,7 +57,7 @@
       "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
       "targets": [
         {
-          "expr": "sum(aluminatai_gpu_power_watts) / 1000 * $kwh_rate * 24",
+          "expr": "sum(nemulai_gpu_power_watts) / 1000 * $kwh_rate * 24",
           "legendFormat": "$/day (projected)",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -71,7 +71,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_utilization_pct",
+          "expr": "nemulai_gpu_utilization_pct",
           "legendFormat": "GPU {{gpu_index}} util%",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -99,7 +99,7 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
       "targets": [
         {
-          "expr": "aluminatai_gpu_idle_power_watts",
+          "expr": "nemulai_gpu_idle_power_watts",
           "legendFormat": "GPU {{gpu_index}} idle",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -118,12 +118,12 @@
       "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
       "targets": [
         {
-          "expr": "aluminatai_wal_entries_pending",
+          "expr": "nemulai_wal_entries_pending",
           "legendFormat": "Pending",
           "datasource": "${DS_PROMETHEUS}"
         },
         {
-          "expr": "rate(aluminatai_wal_replay_uploaded_total[5m])",
+          "expr": "rate(nemulai_wal_replay_uploaded_total[5m])",
           "legendFormat": "Replay rate",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -135,7 +135,7 @@
       "gridPos": { "h": 6, "w": 6, "x": 12, "y": 24 },
       "targets": [
         {
-          "expr": "rate(aluminatai_upload_success_total[5m]) / (rate(aluminatai_upload_success_total[5m]) + rate(aluminatai_upload_failure_total[5m]))",
+          "expr": "rate(nemulai_upload_success_total[5m]) / (rate(nemulai_upload_success_total[5m]) + rate(nemulai_upload_failure_total[5m]))",
           "legendFormat": "Success %",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -162,7 +162,7 @@
       "gridPos": { "h": 6, "w": 6, "x": 18, "y": 24 },
       "targets": [
         {
-          "expr": "rate(aluminatai_attribution_unresolved_total[5m])",
+          "expr": "rate(nemulai_attribution_unresolved_total[5m])",
           "legendFormat": "Unresolved/sec",
           "datasource": "${DS_PROMETHEUS}"
         }
@@ -170,7 +170,7 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["aluminatai", "cost", "energy"],
+  "tags": ["nemulai", "cost", "energy"],
   "templating": {
     "list": [
       {
@@ -183,7 +183,7 @@
     ]
   },
   "time": { "from": "now-24h", "to": "now" },
-  "title": "AluminatAI — Cost Tracking",
-  "uid": "aluminatai-cost-tracking",
+  "title": "NemulAI — Cost Tracking",
+  "uid": "nemulai-cost-tracking",
   "version": 1
 }

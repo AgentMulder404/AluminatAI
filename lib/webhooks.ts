@@ -58,8 +58,8 @@ async function deliverWebhook(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-AluminatAI-Signature": `sha256=${signature}`,
-        "X-AluminatAI-Event": eventType,
+        "X-NemulAI-Signature": `sha256=${signature}`,
+        "X-NemulAI-Event": eventType,
       },
       body,
       signal: AbortSignal.timeout(10_000),

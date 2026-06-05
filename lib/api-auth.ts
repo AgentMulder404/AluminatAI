@@ -1,5 +1,5 @@
 // API key authentication for agent-facing endpoints.
-// Validates keys against the users table (populated by aluminatai-landing auth).
+// Validates keys against the users table (populated by nemulai-landing auth).
 
 import { createSupabaseServerClient } from "./supabase-client";
 

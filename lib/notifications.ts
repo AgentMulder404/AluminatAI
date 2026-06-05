@@ -60,7 +60,7 @@ export async function sendEmail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "AluminatAI <alerts@aluminatai.com>",
+        from: "NemulAI <alerts@nemulai.com>",
         to: [to],
         subject,
         text: body,
@@ -92,14 +92,14 @@ export async function sendPagerDutyAlert(
         payload: {
           summary,
           severity,
-          source: "AluminatAI",
+          source: "NemulAI",
           component: "gpu-cost-monitoring",
           custom_details: details,
         },
         links: [
           {
-            href: "https://www.aluminatai.com/dashboard",
-            text: "AluminatAI Dashboard",
+            href: "https://www.nemulai.com/dashboard",
+            text: "NemulAI Dashboard",
           },
         ],
       }),
@@ -130,8 +130,8 @@ export async function sendOpsGenieAlert(
       body: JSON.stringify({
         message,
         priority,
-        source: "AluminatAI",
-        tags: ["aluminatai", "gpu", "cost"],
+        source: "NemulAI",
+        tags: ["nemulai", "gpu", "cost"],
         details,
       }),
     });
@@ -167,7 +167,7 @@ export async function dispatchBudgetAlert(
     }
 
     if (channel.type === "email") {
-      const subject = `[AluminatAI] Budget ${statusText}: ${context.budget_name}`;
+      const subject = `[NemulAI] Budget ${statusText}: ${context.budget_name}`;
       const body =
         `Your budget "${context.budget_name}" has ${context.alert_type === "exceeded" ? "been exceeded" : "reached the warning threshold"}.\n\n` +
         `Current spend: $${context.spend_usd.toFixed(2)}\n` +
@@ -175,7 +175,7 @@ export async function dispatchBudgetAlert(
         `Usage: ${pctUsed}%\n` +
         `Period: ${context.period}\n` +
         `Scope: ${context.scope}\n\n` +
-        `View your dashboard: https://www.aluminatai.com/dashboard`;
+        `View your dashboard: https://www.nemulai.com/dashboard`;
 
       const ok = await sendEmail(channel.target, subject, body);
       if (ok) sent.push(`email:${channel.target}`);
@@ -308,7 +308,7 @@ export async function dispatchNotification(
             const ok = await sendSlackWebhook(ch.target, { text: `*${title}*\n${message}` });
             if (ok) sent.push("slack");
           } else if (ch.type === "email") {
-            const ok = await sendEmail(ch.target, `[AluminatAI] ${title}`, message);
+            const ok = await sendEmail(ch.target, `[NemulAI] ${title}`, message);
             if (ok) sent.push("email");
           } else if (ch.type === "pagerduty") {
             const ok = await sendPagerDutyAlert(ch.target, `${title}: ${message}`);

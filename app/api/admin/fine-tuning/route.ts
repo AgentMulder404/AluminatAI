@@ -43,7 +43,7 @@ Your domain knowledge includes:
 - ROCm tools: rocm-smi, amd-smi, amdsmi Python bindings
 - QLoRA/LoRA fine-tuning: rank selection, NF4 quantization, PEFT, TRL
 - Cost attribution for multi-tenant GPU clusters
-- AluminatiAI platform: agent monitoring, energy benchmarks, chargeback
+- NemulAI platform: agent monitoring, energy benchmarks, chargeback
 
 Always include specific numbers (watts, joules, dollars, grams CO2) in your answers.
 Be concise and practical. Reference exact commands and configurations.`;

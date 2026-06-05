@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 #!/usr/bin/env python3
 """
-AluminatAI GPU Agent v0.2.0 — unified production daemon.
+NemulAI GPU Agent v0.2.0 — unified production daemon.
 
-Combines the signal-handling / CSV reliability of aluminati_agent.py with
+Combines the signal-handling / CSV reliability of nemulai_agent.py with
 the attribution engine, scheduler detection, and API uploader from main.py.
 
 Usage:
-    aluminatai-agent                        # reads env vars, runs forever
-    aluminatai-agent --interval 2           # 0.5 Hz sampling
-    aluminatai-agent --duration 3600        # run 1 h then exit 0
-    aluminatai-agent --output /data/m.csv   # local CSV manifest too
-    aluminatai-agent --help
+    nemulai-agent                        # reads env vars, runs forever
+    nemulai-agent --interval 2           # 0.5 Hz sampling
+    nemulai-agent --duration 3600        # run 1 h then exit 0
+    nemulai-agent --output /data/m.csv   # local CSV manifest too
+    nemulai-agent --help
 
 Signal handling:
     SIGINT / SIGTERM → flush buffer → close CSV → signal_job_complete → exit 0
@@ -175,7 +175,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%dT%H:%M:%S",
     stream=sys.stderr,
 )
-log = logging.getLogger("aluminatai-agent")
+log = logging.getLogger("nemulai-agent")
 
 # ── Optional rich console ──────────────────────────────────────────────────────
 
@@ -270,7 +270,7 @@ except ImportError:
     _UPLOADER = False
     UPLOAD_ENABLED = False
     API_KEY = ""
-    API_ENDPOINT = "https://aluminatiai.com/api/metrics/ingest"
+    API_ENDPOINT = "https://nemulai.com/api/metrics/ingest"
     UPLOAD_INTERVAL = 60
     SCHEDULER_POLL_INTERVAL = 30
     SAMPLE_INTERVAL = 5.0
@@ -341,7 +341,7 @@ except ImportError:
     _METRICS_SERVER = False
 
 try:
-    from integrations.otel_exporter import AluminatAIOtelExporter
+    from integrations.otel_exporter import NemulAIOtelExporter
     _OTEL = True
 except ImportError:
     _OTEL = False
@@ -632,7 +632,7 @@ class Agent:
         # OpenTelemetry exporter (auto-enabled when OTEL_EXPORTER_OTLP_ENDPOINT is set)
         self.otel_exporter = None
         if _OTEL and os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
-            self.otel_exporter = AluminatAIOtelExporter()
+            self.otel_exporter = NemulAIOtelExporter()
             self.otel_exporter.start()
             log.info("OTel exporter wired → %s", os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
 
@@ -1463,7 +1463,7 @@ class Agent:
 
     def _print_banner(self, gpu_count: int, scheduler: str, gpu_backend: str = "NVIDIA"):
         log.info("=" * 60)
-        log.info("  AluminatAI GPU Agent v%s", AGENT_VERSION)
+        log.info("  NemulAI GPU Agent v%s", AGENT_VERSION)
         log.info("=" * 60)
         log.info("  GPUs        : %d (%s)", gpu_count, gpu_backend)
         log.info("  Interval    : %.2fs", self.interval)
@@ -1539,8 +1539,8 @@ class Agent:
 
 _SERVICE_UNIT = """\
 [Unit]
-Description=AluminatAI GPU Energy Monitoring Agent
-Documentation=https://aluminatiai.com/docs/agent
+Description=NemulAI GPU Energy Monitoring Agent
+Documentation=https://nemulai.com/docs/agent
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=120
@@ -1548,11 +1548,11 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=aluminatai
-Group=aluminatai
-EnvironmentFile=/etc/aluminatai/agent.env
-Environment=DATA_DIR=/var/lib/aluminatai
-Environment=LOG_DIR=/var/log/aluminatai
+User=nemulai
+Group=nemulai
+EnvironmentFile=/etc/nemulai/agent.env
+Environment=DATA_DIR=/var/lib/nemulai
+Environment=LOG_DIR=/var/log/nemulai
 ExecStart={bin_path}
 Restart=on-failure
 RestartSec=10s
@@ -1561,7 +1561,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/aluminatai /var/log/aluminatai
+ReadWritePaths=/var/lib/nemulai /var/log/nemulai
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
@@ -1573,20 +1573,20 @@ WantedBy=multi-user.target
 """
 
 _ENV_TEMPLATE = """\
-# AluminatAI Agent Configuration
-# Edit this file, then restart: sudo systemctl restart aluminatai-agent
-# Full reference: https://aluminatiai.com/docs/agent#configuration
+# NemulAI Agent Configuration
+# Edit this file, then restart: sudo systemctl restart nemulai-agent
+# Full reference: https://nemulai.com/docs/agent#configuration
 
 ALUMINATAI_API_KEY={api_key}
-ALUMINATAI_API_ENDPOINT=https://aluminatiai.com/api/metrics/ingest
+ALUMINATAI_API_ENDPOINT=https://nemulai.com/api/metrics/ingest
 SAMPLE_INTERVAL=5.0
 UPLOAD_INTERVAL=60
 METRICS_PORT=9100
 LOG_LEVEL=INFO
 """
 
-_UNIT_PATH = Path("/etc/systemd/system/aluminatai-agent.service")
-_ENV_PATH  = Path("/etc/aluminatai/agent.env")
+_UNIT_PATH = Path("/etc/systemd/system/nemulai-agent.service")
+_ENV_PATH  = Path("/etc/nemulai/agent.env")
 
 
 def _cmd_service(args) -> int:
@@ -1594,15 +1594,15 @@ def _cmd_service(args) -> int:
     action = args.service_action
 
     if action == "status":
-        ret = subprocess.run(["systemctl", "status", "aluminatai-agent"]).returncode
+        ret = subprocess.run(["systemctl", "status", "nemulai-agent"]).returncode
         return 0 if ret == 0 else 1
 
     if action == "uninstall":
         if os.geteuid() != 0:
-            print("error: 'service uninstall' must be run as root (try: sudo aluminatiai service uninstall)")
+            print("error: 'service uninstall' must be run as root (try: sudo nemulai service uninstall)")
             return 1
-        subprocess.run(["systemctl", "stop", "aluminatai-agent"], stderr=subprocess.DEVNULL)
-        subprocess.run(["systemctl", "disable", "aluminatai-agent"], stderr=subprocess.DEVNULL)
+        subprocess.run(["systemctl", "stop", "nemulai-agent"], stderr=subprocess.DEVNULL)
+        subprocess.run(["systemctl", "disable", "nemulai-agent"], stderr=subprocess.DEVNULL)
         for path in [_UNIT_PATH]:
             if path.exists():
                 path.unlink()
@@ -1614,7 +1614,7 @@ def _cmd_service(args) -> int:
 
     # install
     if os.geteuid() != 0:
-        print("error: 'service install' must be run as root (try: sudo aluminatiai service install)")
+        print("error: 'service install' must be run as root (try: sudo nemulai service install)")
         return 1
 
     if not hasattr(args, "api_key") or not args.api_key:
@@ -1628,7 +1628,7 @@ def _cmd_service(args) -> int:
             print(f"Found existing API key in {_ENV_PATH}")
             api_key = existing_key
         else:
-            print("Get your API key at: https://aluminatiai.com/dashboard/setup")
+            print("Get your API key at: https://nemulai.com/dashboard/setup")
             try:
                 api_key = input("Enter API Key: ").strip()
             except (EOFError, KeyboardInterrupt):
@@ -1642,23 +1642,23 @@ def _cmd_service(args) -> int:
         api_key = args.api_key
 
     # Find the installed binary
-    bin_path = sys.executable.replace("python", "aluminatiai").replace("python3", "aluminatiai")
-    bin_path = shutil.which("aluminatiai") or bin_path
+    bin_path = sys.executable.replace("python", "nemulai").replace("python3", "nemulai")
+    bin_path = shutil.which("nemulai") or bin_path
 
     # Create user if missing
-    if subprocess.run(["id", "aluminatai"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+    if subprocess.run(["id", "nemulai"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
         subprocess.run([
             "useradd", "--system", "--no-create-home",
             "--shell", "/usr/sbin/nologin",
-            "--comment", "AluminatAI GPU agent", "aluminatai",
+            "--comment", "NemulAI GPU agent", "nemulai",
         ])
-        print("Created system user 'aluminatai'")
+        print("Created system user 'nemulai'")
 
     # Directories
     for d, mode in [
-        (Path("/var/lib/aluminatai"), 0o700),
-        (Path("/var/log/aluminatai"), 0o755),
-        (Path("/etc/aluminatai"),     0o750),
+        (Path("/var/lib/nemulai"), 0o700),
+        (Path("/var/log/nemulai"), 0o755),
+        (Path("/etc/nemulai"),     0o750),
     ]:
         d.mkdir(parents=True, exist_ok=True, mode=mode)
 
@@ -1676,23 +1676,23 @@ def _cmd_service(args) -> int:
     print(f"Wrote {_UNIT_PATH}")
 
     subprocess.run(["systemctl", "daemon-reload"])
-    subprocess.run(["systemctl", "enable", "aluminatai-agent"])
-    subprocess.run(["systemctl", "restart", "aluminatai-agent"])
+    subprocess.run(["systemctl", "enable", "nemulai-agent"])
+    subprocess.run(["systemctl", "restart", "nemulai-agent"])
 
     import time as _t
     _t.sleep(3)
 
-    active = subprocess.run(["systemctl", "is-active", "--quiet", "aluminatai-agent"]).returncode == 0
+    active = subprocess.run(["systemctl", "is-active", "--quiet", "nemulai-agent"]).returncode == 0
     if active:
-        print("\nAluminatAI Agent is running!")
-        print("  Status:    sudo systemctl status aluminatai-agent")
-        print("  Logs:      sudo journalctl -u aluminatai-agent -f")
+        print("\nNemulAI Agent is running!")
+        print("  Status:    sudo systemctl status nemulai-agent")
+        print("  Logs:      sudo journalctl -u nemulai-agent -f")
         print("  Metrics:   curl -s localhost:9100/metrics | head -20")
-        print("  Dashboard: https://aluminatiai.com/dashboard")
+        print("  Dashboard: https://nemulai.com/dashboard")
         return 0
     else:
         print("\nService failed to start.")
-        print("  Logs: sudo journalctl -u aluminatai-agent -n 50")
+        print("  Logs: sudo journalctl -u nemulai-agent -n 50")
         return 1
 
 
@@ -1728,8 +1728,8 @@ def _cmd_replay(args) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="aluminatai-agent",
-        description="AluminatAI GPU Energy Agent v0.2.2",
+        prog="nemulai-agent",
+        description="NemulAI GPU Energy Agent v0.2.2",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Environment variables and config file (lowest to highest priority):
@@ -1750,15 +1750,15 @@ Config file keys (JSON/YAML): sample_interval, upload_interval,
   prometheus_only, offline_mode, … (see docs)
 
 Examples:
-  aluminatiai
-  aluminatiai --interval 1 --duration 3600
-  aluminatiai --dry-run --log-format json
-  aluminatiai --prometheus-only --interval 2
-  aluminatiai --config /etc/aluminatai.json
-  aluminatiai replay --output /data/metrics.csv --clear
-  aluminatiai service install
-  aluminatiai service status
-  aluminatiai service uninstall
+  nemulai
+  nemulai --interval 1 --duration 3600
+  nemulai --dry-run --log-format json
+  nemulai --prometheus-only --interval 2
+  nemulai --config /etc/nemulai.json
+  nemulai replay --output /data/metrics.csv --clear
+  nemulai service install
+  nemulai service status
+  nemulai service uninstall
         """,
     )
     parser.add_argument("--config", "-c", type=str, default=None,
@@ -1783,7 +1783,7 @@ Examples:
                         help="Logging verbosity: DEBUG, INFO, WARNING, ERROR (default: LOG_LEVEL or INFO)")
     parser.add_argument("--integrations", default="",
                         help="Comma-separated ML integrations to auto-register: mlflow,wandb")
-    parser.add_argument("--version", action="version", version=f"aluminatai-agent {AGENT_VERSION}")
+    parser.add_argument("--version", action="version", version=f"nemulai-agent {AGENT_VERSION}")
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -1804,7 +1804,7 @@ Examples:
     # service subcommand: install / uninstall / status for systemd
     service_parser = subparsers.add_parser(
         "service",
-        help="Manage the aluminatai-agent systemd service (requires root for install/uninstall)",
+        help="Manage the nemulai-agent systemd service (requires root for install/uninstall)",
     )
     service_sub = service_parser.add_subparsers(dest="service_action")
     service_sub.required = True
@@ -1816,7 +1816,7 @@ Examples:
     )
     svc_install.add_argument(
         "--update-env", action="store_true",
-        help="Overwrite existing /etc/aluminatai/agent.env",
+        help="Overwrite existing /etc/nemulai/agent.env",
     )
 
     service_sub.add_parser("uninstall", help="Stop, disable, and remove the systemd service")
@@ -1844,7 +1844,7 @@ Examples:
     if not UPLOAD_ENABLED and not args.dry_run and not args.prometheus_only:
         log.warning(
             "ALUMINATAI_API_KEY is not set — metrics will NOT be uploaded to the dashboard. "
-            "Get your API key at https://aluminatiai.com/dashboard"
+            "Get your API key at https://nemulai.com/dashboard"
         )
 
     interval = args.interval if args.interval is not None else SAMPLE_INTERVAL
@@ -1857,13 +1857,13 @@ Examples:
     for _integ in _integrations:
         if _integ == "mlflow":
             try:
-                from integrations.mlflow_callback import AluminatAIMLflowCallback
+                from integrations.mlflow_callback import NemulAIMLflowCallback
                 log.info("MLflow integration enabled")
             except ImportError:
                 log.warning("MLflow integration requested but mlflow package not installed")
         elif _integ == "wandb":
             try:
-                from integrations.wandb_callback import AluminatAIWandbCallback
+                from integrations.wandb_callback import NemulAIWandbCallback
                 log.info("W&B integration enabled")
             except ImportError:
                 log.warning("W&B integration requested but wandb package not installed")

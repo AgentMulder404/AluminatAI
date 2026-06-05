@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
-Metrics uploader for AluminatAI API — v0.2.0
+Metrics uploader for NemulAI API — v0.2.0
 
 Features:
   - Exponential backoff with jitter (1s → 2s → 4s → 8s → 16s, capped 60s)
@@ -74,7 +74,7 @@ def _init_fernet():
         return Fernet(base64.urlsafe_b64encode(raw))
     except ImportError:
         logger.warning(
-            "WAL encryption unavailable — install aluminatai[secure] for encrypted WAL"
+            "WAL encryption unavailable — install nemulai[secure] for encrypted WAL"
         )
         return None
 
@@ -273,7 +273,7 @@ def _build_session(api_key: str) -> requests.Session:
 
 
 class MetricsUploader:
-    """Upload GPU metrics to the AluminatAI API with backoff + WAL durability."""
+    """Upload GPU metrics to the NemulAI API with backoff + WAL durability."""
 
     CIRCUIT_OPEN_THRESHOLD = 5
     CIRCUIT_COOLDOWN_SECONDS = 300

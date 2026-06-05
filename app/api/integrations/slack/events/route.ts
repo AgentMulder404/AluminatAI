@@ -1,5 +1,5 @@
 // POST /api/integrations/slack/events
-// Handles Slack slash commands: /aluminatai cost | waste | budget | status
+// Handles Slack slash commands: /nemulai cost | waste | budget | status
 // Also handles Slack URL verification challenge.
 
 import { NextRequest, NextResponse } from "next/server";
@@ -45,7 +45,7 @@ async function verifySlackSignature(
 }
 
 /**
- * Look up the AluminatAI user associated with a Slack team.
+ * Look up the NemulAI user associated with a Slack team.
  */
 async function findUserBySlackTeam(
   slackTeamId: string
@@ -63,7 +63,7 @@ async function findUserBySlackTeam(
 }
 
 /**
- * Handle /aluminatai cost
+ * Handle /nemulai cost
  */
 async function handleCost(userId: string): Promise<string> {
   const supabase = createSupabaseServerClient();
@@ -99,7 +99,7 @@ async function handleCost(userId: string): Promise<string> {
 }
 
 /**
- * Handle /aluminatai waste
+ * Handle /nemulai waste
  */
 async function handleWaste(userId: string): Promise<string> {
   const supabase = createSupabaseServerClient();
@@ -134,7 +134,7 @@ async function handleWaste(userId: string): Promise<string> {
 }
 
 /**
- * Handle /aluminatai budget
+ * Handle /nemulai budget
  */
 async function handleBudget(userId: string): Promise<string> {
   const supabase = createSupabaseServerClient();
@@ -148,7 +148,7 @@ async function handleBudget(userId: string): Promise<string> {
     .limit(10);
 
   if (!data || data.length === 0) {
-    return "No active budgets configured. Set one up at aluminatai.com/dashboard/settings";
+    return "No active budgets configured. Set one up at nemulai.com/dashboard/settings";
   }
 
   const budgets = data as unknown as Record<string, unknown>[];
@@ -161,7 +161,7 @@ async function handleBudget(userId: string): Promise<string> {
 }
 
 /**
- * Handle /aluminatai status
+ * Handle /nemulai status
  */
 async function handleStatus(userId: string): Promise<string> {
   const supabase = createSupabaseServerClient();
@@ -182,7 +182,7 @@ async function handleStatus(userId: string): Promise<string> {
   return (
     `*Agent Status*\n` +
     `Online agents: ${onlineAgents ?? 0}\n` +
-    `View dashboard: https://www.aluminatai.com/dashboard`
+    `View dashboard: https://www.nemulai.com/dashboard`
   );
 }
 
@@ -220,20 +220,20 @@ export async function POST(req: NextRequest) {
   const text = (params.get("text") ?? "").trim().toLowerCase();
   const slackTeamId = params.get("team_id") ?? "";
 
-  // Only handle /aluminatai command
-  if (!command.includes("aluminatai")) {
+  // Only handle /nemulai command
+  if (!command.includes("nemulai")) {
     return NextResponse.json({
       response_type: "ephemeral",
       text: "Unknown command.",
     });
   }
 
-  // Find the AluminatAI user for this Slack workspace
+  // Find the NemulAI user for this Slack workspace
   const userId = await findUserBySlackTeam(slackTeamId);
   if (!userId) {
     return NextResponse.json({
       response_type: "ephemeral",
-      text: "This Slack workspace isn't connected to AluminatAI. Visit aluminatai.com/dashboard/settings to connect.",
+      text: "This Slack workspace isn't connected to NemulAI. Visit nemulai.com/dashboard/settings to connect.",
     });
   }
 
@@ -255,11 +255,11 @@ export async function POST(req: NextRequest) {
       break;
     default:
       responseText =
-        "*AluminatAI Commands*\n" +
-        "• `/aluminatai cost` — Today's GPU cost & energy\n" +
-        "• `/aluminatai waste` — Active waste events\n" +
-        "• `/aluminatai budget` — Budget status\n" +
-        "• `/aluminatai status` — Agent connectivity";
+        "*NemulAI Commands*\n" +
+        "• `/nemulai cost` — Today's GPU cost & energy\n" +
+        "• `/nemulai waste` — Active waste events\n" +
+        "• `/nemulai budget` — Budget status\n" +
+        "• `/nemulai status` — Agent connectivity";
       break;
   }
 

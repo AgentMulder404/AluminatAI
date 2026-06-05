@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 """Tests for the optimize command — WorkloadAnalyzer recommendations."""
 import json
 import sys

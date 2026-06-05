@@ -1,4 +1,4 @@
-# Copyright 2026 Kevin (AluminatiAI)
+# Copyright 2026 Kevin (NemulAI)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# AluminatiAI — https://github.com/AgentMulder404/AluminatAI
+# NemulAI — https://github.com/AgentMulder404/NemulAI
 """
 IdleBaseline — auto-calibrate per-GPU idle power draw.
 
 Calibration samples GPU power draw for IDLE_BASELINE_WINDOW seconds while
 confirming no compute processes are running on any GPU.  The resulting
 per-GPU baseline watt values are persisted to
-~/.config/aluminatai/baselines.json and loaded on agent startup.
+~/.config/nemulai/baselines.json and loaded on agent startup.
 
 The agent subtracts the baseline from each sample before passing power to
 the attribution engine, removing steady-state idle power (driver overhead,
@@ -41,7 +41,7 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
-_BASELINES_PATH = Path.home() / ".config" / "aluminatai" / "baselines.json"
+_BASELINES_PATH = Path.home() / ".config" / "nemulai" / "baselines.json"
 _STALE_AFTER_HOURS = 24
 
 
