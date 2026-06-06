@@ -4,12 +4,43 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 
 const FEATURES = [
-  { title: "GPU Cost Attribution", desc: "Track energy spend per job, model, and team in real-time", icon: "⚡" },
-  { title: "Waste Detection", desc: "Identify idle GPUs and underutilized workloads automatically", icon: "🔍" },
-  { title: "Carbon Tracking", desc: "Monitor CO₂ emissions with grid-aware carbon intensity data", icon: "🌱" },
-  { title: "Prospect Pipeline", desc: "Apify-powered agents discover and enrich leads automatically", icon: "🤖" },
-  { title: "Budget Alerts", desc: "Set spend limits and get notified before you blow your budget", icon: "💰" },
-  { title: "Green AI Index", desc: "Benchmark your efficiency against anonymous industry peers", icon: "📊" },
+  {
+    title: "Per-Job Cost Attribution",
+    desc: "See exactly what each training run costs. Break down spend by job, model, team, or cluster — in real time, not after the invoice.",
+    icon: "💰",
+  },
+  {
+    title: "Waste Detection",
+    desc: "Idle GPUs are burning cash. NemulAI flags underutilized machines the moment they start wasting money.",
+    icon: "🔍",
+  },
+  {
+    title: "Self-Learning Optimizer",
+    desc: "The agent learns your workload patterns over time. It starts with basic recommendations and evolves into fleet-wide optimization.",
+    icon: "🧠",
+  },
+  {
+    title: "Team Chargeback",
+    desc: "Split GPU costs by team with one environment variable. Finance gets the attribution data they've been asking for.",
+    icon: "👥",
+  },
+  {
+    title: "Budget Alerts",
+    desc: "Set daily, weekly, or monthly spend limits. Get notified in Slack, email, or PagerDuty before you blow your budget.",
+    icon: "🔔",
+  },
+  {
+    title: "Green AI Index",
+    desc: "Benchmark your GPU efficiency against anonymous industry peers. Useful for ESG reporting and EU AI Act compliance.",
+    icon: "🌱",
+  },
+];
+
+const STEPS = [
+  { cmd: "pip install nemulai", label: "Install the agent" },
+  { cmd: "export ALUMINATAI_API_KEY=alum_...", label: "Set your API key" },
+  { cmd: "nemulai", label: "Start monitoring" },
+  { cmd: null, label: "See costs in real time", icon: "📊" },
 ];
 
 export default function Home() {
@@ -27,6 +58,7 @@ export default function Home() {
           <div className="flex items-center gap-6 text-sm text-neutral-400">
             <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
             <Link href="/benchmarks" className="hover:text-white transition-colors">Benchmarks</Link>
+            <a href="https://github.com/AgentMulder404/NemulAI" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
             <Link href="/login" className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors">
               Sign In
             </Link>
@@ -38,28 +70,74 @@ export default function Home() {
       <section className="px-6 py-24 text-center">
         <div className="max-w-4xl mx-auto">
           <div className={`transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-<h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              Know what your
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
+              Cut your GPU bill.
               <br />
-              <span className="text-green-400">GPUs actually cost</span>
+              <span className="text-green-400">Automatically.</span>
             </h1>
             <p className="text-xl text-neutral-400 mb-8 max-w-2xl mx-auto">
-              Real-time energy monitoring, cost attribution, and carbon tracking for every GPU workload.
-              Plus AI-powered prospect discovery to find your next customers.
+              NemulAI&apos;s self-learning agent monitors every GPU workload, finds waste,
+              and optimizes power — saving teams 15-40% on compute costs.
             </p>
             <div className="flex items-center justify-center gap-4">
               <Link
-                href="/admin/outreach"
+                href="/login"
                 className="px-8 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-semibold text-lg transition-colors"
               >
-                Try Prospect Pipeline
+                Get Started Free
               </Link>
-              <Link
-                href="/dashboard"
+              <a
+                href="https://github.com/AgentMulder404/NemulAI"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="px-8 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-lg font-semibold text-lg transition-colors"
               >
-                View Dashboard
-              </Link>
+                View on GitHub
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Bar */}
+      <section className="px-6 pb-16">
+        <div className="max-w-3xl mx-auto flex items-center justify-center gap-8 text-sm text-neutral-500">
+          {["Open source", "7-day free trial", "No credit card", "2-minute install"].map((t) => (
+            <div key={t} className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500/50" />
+              {t}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Problem / Solution */}
+      <section className="px-6 py-16 border-t border-neutral-800">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-8">
+              <div className="text-red-400 text-sm font-semibold mb-3 uppercase tracking-wider">The Problem</div>
+              <h3 className="text-lg font-bold mb-3">GPU bills are a black box</h3>
+              <p className="text-neutral-400 text-sm leading-relaxed">
+                You get a monthly invoice with zero attribution. Which jobs are worth it?
+                Which GPUs are sitting idle? Nobody knows until it&apos;s too late.
+              </p>
+            </div>
+            <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-xl p-8">
+              <div className="text-yellow-400 text-sm font-semibold mb-3 uppercase tracking-wider">The Old Way</div>
+              <h3 className="text-lg font-bold mb-3">Static dashboards and spreadsheets</h3>
+              <p className="text-neutral-400 text-sm leading-relaxed">
+                Grafana queries and manual spreadsheets that tell you what happened
+                last month — not what to do about it. No attribution, no optimization.
+              </p>
+            </div>
+            <div className="bg-green-500/5 border border-green-500/10 rounded-xl p-8">
+              <div className="text-green-400 text-sm font-semibold mb-3 uppercase tracking-wider">NemulAI</div>
+              <h3 className="text-lg font-bold mb-3">Self-learning cost intelligence</h3>
+              <p className="text-neutral-400 text-sm leading-relaxed">
+                A self-learning agent that watches every GPU, attributes cost per job,
+                detects waste in real time, and gets smarter the longer it runs.
+              </p>
             </div>
           </div>
         </div>
@@ -68,7 +146,10 @@ export default function Home() {
       {/* Features Grid */}
       <section className="px-6 py-16 border-t border-neutral-800">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">What we built</h2>
+          <h2 className="text-3xl font-bold text-center mb-4">Everything you need to cut GPU costs</h2>
+          <p className="text-neutral-400 text-center mb-12 max-w-2xl mx-auto">
+            From per-job attribution to fleet-wide optimization. Start with visibility, graduate to automation.
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {FEATURES.map((f) => (
               <div
@@ -84,159 +165,26 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Apify Agent Pipeline */}
+      {/* How It Works */}
       <section className="px-6 py-16 border-t border-neutral-800">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="inline-block px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400 text-xs font-medium mb-4">
-              Powered by Apify
-            </div>
-            <h2 className="text-3xl font-bold mb-3">Two-Agent Prospect Pipeline</h2>
-            <p className="text-neutral-400 max-w-2xl mx-auto">
-              We built two autonomous agents that use Apify actors to find, enrich, verify, and load
-              potential customers into our CRM — all from a single button click.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            {/* Agent 1 */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400 font-bold">
-                    1
-                  </div>
-                  <h3 className="text-xl font-bold">Discovery Agent</h3>
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Up and running in 2 minutes</h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {STEPS.map((step, i) => (
+              <div key={i} className="text-center">
+                <div className="w-10 h-10 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400 font-bold mx-auto mb-4">
+                  {i + 1}
                 </div>
-                <p className="text-neutral-400 text-sm mb-6">
-                  Finds AI/ML companies on LinkedIn and extracts decision-maker contact info.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 text-xs mt-0.5 shrink-0">a</div>
-                    <div>
-                      <div className="text-sm font-medium">LinkedIn Company Search</div>
-                      <div className="text-xs text-neutral-500 mt-0.5">
-                        <span className="text-neutral-600">Actor:</span> harvestapi/linkedin-company-search
-                      </div>
-                      <div className="text-xs text-neutral-400 mt-1">
-                        Searches by keywords like &quot;GPU cloud&quot;, &quot;AI infrastructure&quot;, &quot;deep learning&quot;.
-                        Filters by company size and location. Returns company profiles with website, industry, and employee count.
-                      </div>
-                    </div>
-                  </div>
-                  <div className="border-l-2 border-dashed border-neutral-700 ml-3 h-4" />
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center text-green-400 text-xs mt-0.5 shrink-0">b</div>
-                    <div>
-                      <div className="text-sm font-medium">Decision Maker Email Finder</div>
-                      <div className="text-xs text-neutral-500 mt-0.5">
-                        <span className="text-neutral-600">Actor:</span> snipercoder/decision-maker-email-finder
-                      </div>
-                      <div className="text-xs text-neutral-400 mt-1">
-                        Takes each company&apos;s domain, finds CEO/founder/owner contacts with name, email, title,
-                        phone, and LinkedIn URL. Up to 3 leads per company.
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {step.cmd ? (
+                  <code className="text-xs bg-neutral-900 border border-neutral-800 rounded px-2 py-1 text-green-400 block mb-2">
+                    {step.cmd}
+                  </code>
+                ) : (
+                  <div className="text-3xl mb-2">{step.icon}</div>
+                )}
+                <p className="text-neutral-400 text-sm">{step.label}</p>
               </div>
-            </div>
-
-            {/* Agent 2 */}
-            <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-              <div className="relative">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 font-bold">
-                    2
-                  </div>
-                  <h3 className="text-xl font-bold">Verification + Load Agent</h3>
-                </div>
-                <p className="text-neutral-400 text-sm mb-6">
-                  Validates emails and loads verified prospects into our Supabase CRM.
-                </p>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 text-xs mt-0.5 shrink-0">a</div>
-                    <div>
-                      <div className="text-sm font-medium">Email Verification</div>
-                      <div className="text-xs text-neutral-500 mt-0.5">
-                        <span className="text-neutral-600">Actor:</span> snipercoder/email-validator
-                      </div>
-                      <div className="text-xs text-neutral-400 mt-1">
-                        Checks DNS, MX records, and SMTP for each email. Marks valid vs. invalid so we
-                        only reach out to real addresses. ~$1/1K verifications.
-                      </div>
-                    </div>
-                  </div>
-                  <div className="border-l-2 border-dashed border-neutral-700 ml-3 h-4" />
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 text-xs mt-0.5 shrink-0">b</div>
-                    <div>
-                      <div className="text-sm font-medium">CRM Load</div>
-                      <div className="text-xs text-neutral-500 mt-0.5">
-                        <span className="text-neutral-600">Storage:</span> Supabase PostgreSQL
-                      </div>
-                      <div className="text-xs text-neutral-400 mt-1">
-                        Upserts prospects into our database with dedup on domain + email.
-                        Company info, contact details, verification status — ready for outreach.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Pipeline Flow */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8">
-            <h3 className="text-lg font-semibold mb-6 text-center">Pipeline Flow</h3>
-            <div className="flex items-center justify-between gap-2 max-w-4xl mx-auto">
-              {[
-                { label: "Keywords", sub: "GPU cloud, AI infra...", color: "green" },
-                { label: "LinkedIn Search", sub: "harvestapi actor", color: "green" },
-                { label: "Email Enrichment", sub: "snipercoder actor", color: "green" },
-                { label: "Verification", sub: "email-validator", color: "blue" },
-                { label: "CRM Load", sub: "Supabase upsert", color: "blue" },
-              ].map((step, i) => (
-                <div key={step.label} className="flex items-center gap-2 flex-1">
-                  <div className="text-center flex-1">
-                    <div className={`w-full py-3 px-2 rounded-lg border text-xs font-medium ${
-                      step.color === "green"
-                        ? "bg-green-500/10 border-green-500/20 text-green-400"
-                        : "bg-blue-500/10 border-blue-500/20 text-blue-400"
-                    }`}>
-                      {step.label}
-                    </div>
-                    <div className="text-[10px] text-neutral-500 mt-1">{step.sub}</div>
-                  </div>
-                  {i < 4 && (
-                    <div className="text-neutral-600 shrink-0">&#8594;</div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-center gap-8 mt-6 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500/30" />
-                <span className="text-neutral-500">Agent 1: Discovery</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-blue-500/20 border border-blue-500/30" />
-                <span className="text-neutral-500">Agent 2: Verify + Load</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="text-center mt-8">
-            <Link
-              href="/admin/outreach"
-              className="inline-block px-8 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-semibold transition-colors"
-            >
-              Try the Pipeline Live
-            </Link>
+            ))}
           </div>
         </div>
       </section>
@@ -247,24 +195,79 @@ export default function Home() {
           <h2 className="text-3xl font-bold mb-6">Architecture</h2>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="bg-neutral-900 rounded-xl p-6 border border-neutral-800">
-              <div className="text-green-400 font-semibold mb-2">Agent (Python)</div>
-              <p className="text-neutral-400">NVML probe, WAL, batched upload. Runs as systemd/K8s DaemonSet.</p>
+              <div className="text-green-400 font-semibold mb-2">Agent (Open Source)</div>
+              <p className="text-neutral-400">NVML probe, WAL buffer, batched upload. Runs as systemd, Docker, or K8s DaemonSet.</p>
             </div>
             <div className="bg-neutral-900 rounded-xl p-6 border border-neutral-800">
-              <div className="text-green-400 font-semibold mb-2">API (Next.js)</div>
-              <p className="text-neutral-400">Ingest, dashboard, cost, carbon, benchmarks, prospect agents.</p>
+              <div className="text-green-400 font-semibold mb-2">API</div>
+              <p className="text-neutral-400">Ingest, cost attribution, waste detection, self-learning recommendations, benchmarks.</p>
             </div>
             <div className="bg-neutral-900 rounded-xl p-6 border border-neutral-800">
-              <div className="text-green-400 font-semibold mb-2">Apify Pipeline</div>
-              <p className="text-neutral-400">LinkedIn search, email enrichment, verification, CRM load.</p>
+              <div className="text-green-400 font-semibold mb-2">Dashboard</div>
+              <p className="text-neutral-400">Real-time cost visibility, team chargeback, budget alerts, carbon tracking.</p>
             </div>
           </div>
         </div>
       </section>
 
+      {/* Open Source CTA */}
+      <section className="px-6 py-16 border-t border-neutral-800">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-4">The agent is free and open source. Always.</h2>
+          <p className="text-neutral-400 mb-8">
+            Audit the code, self-host against your own endpoint, or contribute integrations.
+            The agent that collects your data will never be paywalled.
+          </p>
+          <a
+            href="https://github.com/AgentMulder404/NemulAI"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-8 py-3 bg-neutral-800 hover:bg-neutral-700 rounded-lg font-semibold transition-colors"
+          >
+            Star on GitHub
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="border-t border-neutral-800 px-6 py-8 text-center text-neutral-500 text-sm">
-        NemulAI
+      <footer className="border-t border-neutral-800 px-6 py-12">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-sm">
+          <div>
+            <div className="font-semibold text-neutral-300 mb-3">Product</div>
+            <div className="space-y-2 text-neutral-500">
+              <div><Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></div>
+              <div><Link href="/benchmarks" className="hover:text-white transition-colors">Benchmarks</Link></div>
+              <div><Link href="/carbon" className="hover:text-white transition-colors">Carbon</Link></div>
+              <div><Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link></div>
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold text-neutral-300 mb-3">Company</div>
+            <div className="space-y-2 text-neutral-500">
+              <div><Link href="/enterprise" className="hover:text-white transition-colors">Enterprise</Link></div>
+              <div><Link href="/legal/security-questionnaire" className="hover:text-white transition-colors">Security</Link></div>
+              <div><Link href="/legal/msa" className="hover:text-white transition-colors">Legal</Link></div>
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold text-neutral-300 mb-3">Open Source</div>
+            <div className="space-y-2 text-neutral-500">
+              <div><a href="https://github.com/AgentMulder404/NemulAI" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a></div>
+              <div><a href="https://github.com/AgentMulder404/NemulAI#quick-start" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Install Guide</a></div>
+              <div><a href="https://github.com/AgentMulder404/NemulAI#api" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">API Docs</a></div>
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold text-neutral-300 mb-3">Connect</div>
+            <div className="space-y-2 text-neutral-500">
+              <div><a href="https://x.com/NemulAI_Dev" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">X / Twitter</a></div>
+              <div><a href="https://linkedin.com/company/nemulai" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a></div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto mt-8 pt-8 border-t border-neutral-800 text-sm text-neutral-600 text-center">
+          2026 NemulAI
+        </div>
       </footer>
     </div>
   );

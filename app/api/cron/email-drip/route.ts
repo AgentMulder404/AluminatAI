@@ -29,86 +29,80 @@ function getDripEmail(index: number, userEmail: string): DripEmail {
   switch (index) {
     case 0:
       return {
-        subject: "Welcome to NemulAI — GPU cost intelligence starts here",
+        subject: "You just saved your first dollar on GPU compute",
         body: `Hey there!
 
-Welcome to NemulAI. You've taken the first step toward understanding your GPU energy costs.
+Welcome to NemulAI. You've taken the first step toward cutting your GPU bill.
 
 Here's what to do next:
-1. Install the agent on your GPU machine: pip install nemulai-agent
-2. Run it: nemulai-agent run --api-key YOUR_KEY
-3. Watch your dashboard light up: https://www.nemulai.com/dashboard
+1. Install the agent: pip install nemulai
+2. Set your key: export ALUMINATAI_API_KEY=YOUR_KEY
+3. Start monitoring: nemulai
 
-If you need help, reply to this email or check the docs: https://www.nemulai.com/docs/agent
+Your dashboard will show you exactly where your money is going: https://www.nemulai.com/dashboard
+
+Takes under 2 minutes. No performance impact — the agent reads hardware counters only.
 
 — The NemulAI Team`,
       };
     case 1:
       return {
-        subject: "Step 1: Install the NemulAI agent on your GPU",
-        body: `Hi again!
+        subject: "Your first GPU cost report is ready",
+        body: `Hi!
 
-Haven't installed the agent yet? It takes under 2 minutes:
+Head to your dashboard to see what your GPUs are actually costing you:
 
-  pip install nemulai-agent
-  nemulai-agent run --api-key YOUR_KEY
+- Real-time cost per GPU and per job
+- Waste detection — idle GPUs flagged automatically
+- Cloud cost comparison vs AWS/GCP on-demand pricing
 
-The agent runs as a lightweight daemon, sampling GPU power, utilization, and temperature every 5 seconds. No performance impact — it reads NVML counters only.
+Dashboard: https://www.nemulai.com/dashboard
 
-Supports: bare metal, Docker, Kubernetes DaemonSet, SLURM prologue/epilogue.
-
-Docs: https://www.nemulai.com/docs/agent
+Not seeing data? Make sure the agent is running: nemulai service status
 
 — The NemulAI Team`,
       };
     case 2:
       return {
-        subject: "Your first GPU cost data is in — check your dashboard",
+        subject: "Here's what you're wasting on idle GPUs",
         body: `Hi!
 
-By now your agent should be reporting metrics. Head to your dashboard to see:
+NemulAI has been watching your GPUs. Here's the thing: idle GPUs still draw 60-80% of peak power. That's cash burning while nothing useful happens.
 
-- Real-time cost per GPU
-- Energy breakdown (kWh, CO2e)
-- Cloud cost comparison — see how much you're saving vs AWS/GCP on-demand
+Check your waste alerts to see which machines are costing you money for nothing: https://www.nemulai.com/dashboard
 
-Dashboard: https://www.nemulai.com/dashboard
-
-Not seeing data? Make sure the agent is running: nemulai-agent service status
+The agent is already learning your workload patterns to give you smarter optimization recommendations over time.
 
 — The NemulAI Team`,
       };
     case 3:
       return {
-        subject: "Pro tip: Set a GPU budget to avoid cost surprises",
+        subject: "Your GPU fleet is learning your patterns",
         body: `Hi!
 
-Now that you have cost data flowing, set a budget alert to stay on top of spending:
+NemulAI's self-learning agent has been studying your workload patterns for a week now. It's getting smarter about when your GPUs are productive vs idle.
 
-1. Go to Dashboard → Settings
-2. Create a budget (daily, weekly, or monthly)
-3. Choose alert channels: email, Slack, PagerDuty, or OpsGenie
+Check your optimization recommendations — they get more accurate the longer the agent runs: https://www.nemulai.com/dashboard
 
-You'll get warned when spend hits your threshold — before it becomes a problem.
-
-Dashboard: https://www.nemulai.com/dashboard/settings
+Set a budget alert to stay ahead of cost surprises: Dashboard → Settings → Budgets.
 
 — The NemulAI Team`,
       };
     case 4:
       return {
-        subject: "Invite your team — GPU cost visibility for everyone",
+        subject: "Your team should see these GPU cost savings",
         body: `Hi!
 
-NemulAI works best when the whole team can see GPU costs. Invite teammates to:
+You've been running NemulAI for two weeks. Time to bring the team in.
 
-- View cost breakdowns by team, model, or cluster
-- Get their own budget alerts
-- Track their workloads' energy efficiency
+With team chargeback, every team sees their own GPU spend:
+- Per-team cost attribution with one env var
+- Individual budget alerts
+- Shared dashboard access
 
 Invite your team: https://www.nemulai.com/dashboard/settings
 
-Running 100+ GPUs? Check out our Enterprise plan with SSO, SLA dashboard, and dedicated support: https://www.nemulai.com/enterprise
+Running 100+ GPUs? Our Enterprise plan includes fleet-wide optimization, SSO, and dedicated support at $15/GPU/mo: https://www.nemulai.com/enterprise
 
 — The NemulAI Team`,
       };

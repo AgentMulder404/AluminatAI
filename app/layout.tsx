@@ -3,38 +3,38 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "NemulAI — GPU Cost Intelligence",
+    default: "NemulAI — Cut Your GPU Bill. Automatically.",
     template: "%s | NemulAI",
   },
   description:
-    "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
+    "GPU cost intelligence that learns your workloads. Per-job attribution, waste detection, and self-learning optimization for AI teams.",
   metadataBase: new URL("https://www.nemulai.com"),
   openGraph: {
     type: "website",
     siteName: "NemulAI",
-    title: "NemulAI — GPU Cost Intelligence",
+    title: "NemulAI — Cut Your GPU Bill. Automatically.",
     description:
-      "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
+      "GPU cost intelligence that learns your workloads. Per-job attribution, waste detection, and self-learning optimization for AI teams.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "NemulAI — GPU Cost Intelligence",
+        alt: "NemulAI — Cut Your GPU Bill. Automatically.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "NemulAI — GPU Cost Intelligence",
+    title: "NemulAI — Cut Your GPU Bill. Automatically.",
     description:
-      "Real-time GPU energy monitoring, cost attribution, and cloud savings comparison.",
+      "GPU cost intelligence that learns your workloads. Per-job attribution, waste detection, and self-learning optimization for AI teams.",
     images: [
       {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "NemulAI — GPU Cost Intelligence",
+        alt: "NemulAI — Cut Your GPU Bill. Automatically.",
       },
     ],
   },

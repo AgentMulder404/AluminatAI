@@ -118,15 +118,65 @@ def detect_mig(gpu_index: int) -> MigInfo:
 def split_power_by_mig(
     total_power_w: float,
     mig_info: MigInfo,
+    utilization_by_instance: dict[int, float] | None = None,
 ) -> list[tuple[int, float]]:
     """Split total GPU power across MIG instances.
+
+    When utilization_by_instance is provided (instance_index → SM utilization %),
+    uses a weighted blend: 50% slice-proportional + 50% utilization-proportional.
+    This is more accurate than pure slice-count splitting because an idle 3g
+    instance shouldn't be billed for 3/7 of the power.
+
+    Falls back to pure slice-count splitting when utilization data is unavailable.
 
     Returns list of (instance_index, power_watts) tuples.
     """
     if not mig_info.enabled or not mig_info.instances:
         return [(0, total_power_w)]
 
-    return [
-        (inst.index, total_power_w * inst.power_fraction)
+    if not utilization_by_instance:
+        return [
+            (inst.index, total_power_w * inst.power_fraction)
+            for inst in mig_info.instances
+        ]
+
+    total_util = sum(
+        utilization_by_instance.get(inst.index, 0.0)
         for inst in mig_info.instances
-    ]
+    )
+
+    results: list[tuple[int, float]] = []
+    for inst in mig_info.instances:
+        slice_share = inst.power_fraction
+        util = utilization_by_instance.get(inst.index, 0.0)
+        util_share = (util / total_util) if total_util > 0 else slice_share
+        blended = 0.5 * slice_share + 0.5 * util_share
+        results.append((inst.index, total_power_w * blended))
+
+    return results
+
+
+def get_mig_utilization(gpu_index: int, mig_info: MigInfo) -> dict[int, float]:
+    """Query per-MIG-instance SM utilization via NVML.
+
+    Returns dict mapping instance_index → utilization percentage (0-100).
+    Falls back to empty dict if NVML calls fail.
+    """
+    if not _NVML or not mig_info.enabled:
+        return {}
+
+    try:
+        handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)
+    except pynvml.NVMLError:
+        return {}
+
+    utils: dict[int, float] = {}
+    for inst in mig_info.instances:
+        try:
+            mig_handle = pynvml.nvmlDeviceGetMigDeviceHandleByIndex(handle, inst.index)
+            rates = pynvml.nvmlDeviceGetUtilizationRates(mig_handle)
+            utils[inst.index] = float(rates.gpu)
+        except (pynvml.NVMLError, AttributeError):
+            pass
+
+    return utils

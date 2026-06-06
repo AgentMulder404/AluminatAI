@@ -91,7 +91,7 @@ async function handleCost(userId: string): Promise<string> {
   const cost = kwh * rate;
 
   return (
-    `*Today's GPU Cost*\n` +
+    `*Today's GPU Spend*\n` +
     `Energy: ${kwh.toFixed(3)} kWh\n` +
     `Cost: $${cost.toFixed(4)}\n` +
     `Rate: $${rate}/kWh`
@@ -122,7 +122,7 @@ async function handleWaste(userId: string): Promise<string> {
     0
   );
 
-  let msg = `*${rows.length} Active Waste Event${rows.length > 1 ? "s" : ""}* — $${totalWaste.toFixed(2)} estimated waste\n\n`;
+  let msg = `*${rows.length} Active Waste Event${rows.length > 1 ? "s" : ""}* — $${totalWaste.toFixed(2)} wasted spend\n\n`;
 
   for (const e of rows) {
     const typeLabel =
@@ -256,10 +256,10 @@ export async function POST(req: NextRequest) {
     default:
       responseText =
         "*NemulAI Commands*\n" +
-        "• `/nemulai cost` — Today's GPU cost & energy\n" +
-        "• `/nemulai waste` — Active waste events\n" +
-        "• `/nemulai budget` — Budget status\n" +
-        "• `/nemulai status` — Agent connectivity";
+        "• `/nemulai cost` — Today's GPU spend\n" +
+        "• `/nemulai waste` — Money you're burning on idle GPUs\n" +
+        "• `/nemulai budget` — Budget status & alerts\n" +
+        "• `/nemulai status` — Agent connectivity & fleet health";
       break;
   }
 

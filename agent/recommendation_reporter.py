@@ -211,6 +211,30 @@ class RecommendationReporter:
             self._mark_sent(key)
         return self._upload(recs)
 
+    def report_from_bandit(self, bandit_recs: list[dict]) -> int:
+        """Upload recommendations from the contextual bandit (Phase 2)."""
+        recs = []
+        for br in bandit_recs:
+            key = self._dedup_key(br.get("category", "power_cap"), br.get("gpu_index", 0))
+            if self._recently_sent(key):
+                continue
+            recs.append({
+                "machine_id": self._machine_id,
+                "gpu_index": br.get("gpu_index"),
+                "gpu_name": br.get("gpu_name"),
+                "source": "bandit",
+                "category": br.get("category", "power_cap"),
+                "priority": br.get("priority", "P2"),
+                "title": br.get("title", ""),
+                "description": br.get("description", ""),
+                "action": br.get("action", ""),
+                "estimated_savings_pct": br.get("estimated_savings_pct", 0),
+                "effort_score": br.get("effort_score", 1),
+                "action_payload": br.get("action_payload", {}),
+            })
+            self._mark_sent(key)
+        return self._upload(recs)
+
     def _upload(self, recs: list[dict]) -> int:
         if not recs:
             return 0

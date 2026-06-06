@@ -672,6 +672,45 @@ class Agent:
             )
             log.info("RecommendationReporter: enabled")
 
+        # Experience logger (self-learning agent — Phase 1)
+        self.experience_logger = None
+        try:
+            from config import LEARNER_ENABLED
+            if LEARNER_ENABLED:
+                from learner.experience_logger import ExperienceLogger
+                self.experience_logger = ExperienceLogger(
+                    data_dir=DATA_DIR,
+                    machine_id=get_machine_id(),
+                    outcome_window_s=float(os.getenv("ALUMINATAI_LEARNER_OUTCOME_WINDOW", "300")),
+                )
+                self.experience_logger.load_from_wal()
+                log.info("ExperienceLogger: enabled (outcome_window=%ss)",
+                         os.getenv("ALUMINATAI_LEARNER_OUTCOME_WINDOW", "300"))
+        except (ImportError, AttributeError):
+            pass
+
+        # Contextual bandit (self-learning agent — Phase 2)
+        self.energy_bandit = None
+        try:
+            from config import BANDIT_ENABLED, BANDIT_EPSILON, BANDIT_RETRAIN_EVERY, BANDIT_MIN_CORPUS
+            if BANDIT_ENABLED and self.experience_logger:
+                from learner.bandit import EnergyBandit
+                self.energy_bandit = EnergyBandit(
+                    data_dir=DATA_DIR,
+                    epsilon=BANDIT_EPSILON,
+                    retrain_every=BANDIT_RETRAIN_EVERY,
+                    min_corpus=BANDIT_MIN_CORPUS,
+                )
+                if not self.energy_bandit.is_ready():
+                    warm_count = self.energy_bandit.warm_start(
+                        self.experience_logger.iter_completed()
+                    )
+                    log.info("EnergyBandit: warm-started on %d tuples", warm_count)
+                log.info("EnergyBandit: enabled (epsilon=%.2f, retrain_every=%d, min_corpus=%d)",
+                         BANDIT_EPSILON, BANDIT_RETRAIN_EVERY, BANDIT_MIN_CORPUS)
+        except (ImportError, AttributeError):
+            pass
+
         # Command receiver (polls cloud for pending commands)
         self.cmd_receiver = None
         self._last_cmd_poll: float = 0.0
@@ -1207,6 +1246,7 @@ class Agent:
                     pass
 
                 # Auto-tuner — periodic roofline analysis + optional power cap
+                tune_results = []
                 if _auto_tuner and not _in_warmup and _auto_tuner.should_run():
                     try:
                         tune_results = _auto_tuner.analyze_and_tune(metrics)
@@ -1226,6 +1266,104 @@ class Agent:
                         log.warning("AutoTuner error: %s", exc)
                         if self.error_tracker:
                             self.error_tracker.record("auto_tuner", str(exc), exc=exc)
+
+                # Experience logging — log (context, action, outcome) tuples
+                if self.experience_logger and not _in_warmup:
+                    try:
+                        # Log actions from auto-tuner results
+                        if _auto_tuner and tune_results:
+                            from learner.experience_logger import WorkloadContext, ActionTaken
+                            from learner.feature_encoder import classify_workload, gpu_class
+                            for tr in tune_results:
+                                if not tr.recommended_cap_w:
+                                    continue
+                                m_match = next((m for m in metrics if m.gpu_index == tr.gpu_index), None)
+                                if not m_match:
+                                    continue
+                                ctx = WorkloadContext(
+                                    gpu_name=tr.gpu_name,
+                                    gpu_arch=gpu_class(tr.gpu_name),
+                                    workload_class=classify_workload(
+                                        m_match.model_tag, None,
+                                        m_match.utilization_gpu_pct, m_match.utilization_memory_pct,
+                                    ),
+                                    utilization_gpu_pct=m_match.utilization_gpu_pct,
+                                    utilization_memory_pct=m_match.utilization_memory_pct,
+                                    memory_pressure=(m_match.memory_used_mb / m_match.memory_total_mb
+                                                     if m_match.memory_total_mb > 0 else 0.0),
+                                    power_draw_w=m_match.power_draw_w,
+                                    power_limit_w=m_match.power_limit_w,
+                                    temperature_c=m_match.temperature_c,
+                                )
+                                act = ActionTaken(
+                                    action_type="power_cap",
+                                    source="auto_tuner",
+                                    recommended_value=tr.recommended_cap_w,
+                                    current_value=tr.current_power_w,
+                                    estimated_savings_pct=tr.estimated_savings_pct,
+                                )
+                                self.experience_logger.log_action(
+                                    context=ctx, action=act, gpu_index=tr.gpu_index,
+                                    energy_snapshot=m_match.energy_delta_j,
+                                    throughput_snapshot=m_match.utilization_gpu_pct,
+                                )
+
+                        # Resolve pending outcomes
+                        energy_by_gpu = {m.gpu_index: m.energy_delta_j for m in metrics}
+                        throughput_by_gpu = {m.gpu_index: m.utilization_gpu_pct for m in metrics}
+                        self.experience_logger.check_pending_outcomes(energy_by_gpu, throughput_by_gpu)
+                    except Exception as exc:
+                        log.debug("Experience logging error: %s", exc)
+
+                # Contextual bandit — suggest power caps alongside heuristic engine
+                if self.energy_bandit and not _in_warmup and self.energy_bandit.is_ready():
+                    try:
+                        from learner.feature_encoder import encode_context as _encode_ctx, gpu_class as _gpu_cls
+                        from efficiency.gpu_specs import resolve_arch
+                        for m in metrics:
+                            arch = resolve_arch(m.gpu_name)
+                            if not arch:
+                                continue
+                            features = _encode_ctx(
+                                gpu_name=m.gpu_name, gpu_arch=_gpu_cls(m.gpu_name),
+                                workload_class="unknown",
+                                utilization_gpu_pct=m.utilization_gpu_pct,
+                                utilization_memory_pct=m.utilization_memory_pct,
+                                memory_pressure=(m.memory_used_mb / m.memory_total_mb
+                                                 if m.memory_total_mb > 0 else 0.0),
+                                power_draw_w=m.power_draw_w,
+                                power_limit_w=m.power_limit_w,
+                                temperature_c=m.temperature_c,
+                            )
+                            suggestion = self.energy_bandit.suggest(features, arch.tdp_w)
+                            if suggestion.cap_watts < m.power_limit_w * 0.95:
+                                log.info(
+                                    "Bandit: GPU %d suggests %s (%.0fW, confidence=%.2f, explore=%s)",
+                                    m.gpu_index, suggestion.action_name,
+                                    suggestion.cap_watts, suggestion.confidence,
+                                    suggestion.is_exploration,
+                                )
+                                if self.rec_reporter:
+                                    self.rec_reporter.report_from_bandit([{
+                                        "gpu_index": m.gpu_index,
+                                        "gpu_name": m.gpu_name,
+                                        "category": "power_cap",
+                                        "priority": "P2",
+                                        "title": f"Bandit: set power cap to {int(suggestion.cap_watts)}W ({suggestion.action_name})",
+                                        "description": f"Self-learning agent suggests {suggestion.action_name} "
+                                                       f"(confidence={suggestion.confidence:.0%}, "
+                                                       f"{'exploration' if suggestion.is_exploration else 'exploitation'})",
+                                        "action": f"Set GPU {m.gpu_index} power limit to {int(suggestion.cap_watts)}W",
+                                        "estimated_savings_pct": round((1.0 - suggestion.cap_fraction) * 100, 1),
+                                        "action_payload": {
+                                            "gpu_index": m.gpu_index,
+                                            "cap_watts": int(suggestion.cap_watts),
+                                            "cap_fraction": suggestion.cap_fraction,
+                                            "bandit_action": suggestion.action_name,
+                                        },
+                                    }])
+                    except Exception as exc:
+                        log.debug("Bandit suggestion error: %s", exc)
 
                 # Carbon tracking — fetch intensity every 5 minutes, update CO2 counter
                 if _carbon_client and self.metrics_server and not _in_warmup:
@@ -1281,6 +1419,16 @@ class Agent:
                             wal_size_bytes=status["wal_bytes"],
                             wal_entries_pending=status["wal_entries_pending"],
                         )
+
+                # Experience upload (alongside metrics flush)
+                if (self.experience_logger and UPLOAD_ENABLED and API_KEY
+                        and not self.dry_run and not self.prometheus_only):
+                    try:
+                        from config import LEARNER_UPLOAD_ENABLED
+                        if LEARNER_UPLOAD_ENABLED:
+                            self.experience_logger.flush_to_cloud(API_ENDPOINT, API_KEY)
+                    except (ImportError, Exception) as exc:
+                        log.debug("Experience upload skipped: %s", exc)
 
                 # Periodic heartbeat (skipped in dry-run / prometheus-only modes)
                 if (self.uploader and API_KEY

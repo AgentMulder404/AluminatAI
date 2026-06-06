@@ -22,7 +22,7 @@ const TABLE_TS_COLUMN: Record<string, string> = {
 // Audit log retention by plan tier
 const AUDIT_RETENTION_DAYS: Record<string, number> = {
   free: 30,
-  pro: 90,
+  team: 90,
   enterprise: 365,
 };
 

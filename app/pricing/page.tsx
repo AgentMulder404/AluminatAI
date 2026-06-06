@@ -4,13 +4,14 @@ import { useState } from "react";
 import { PLAN_LIMITS, PLAN_DISPLAY, type PlanTier } from "@/lib/plans";
 import Link from "next/link";
 
-const TIERS: PlanTier[] = ["free", "pro", "enterprise"];
+const TIERS: PlanTier[] = ["free", "team", "enterprise"];
 
 const FEATURE_ROWS: {
   label: string;
   key: keyof typeof PLAN_LIMITS.free;
   format?: "boolean" | "count" | "days" | "rate";
 }[] = [
+  { label: "GPUs", key: "max_gpus", format: "count" },
   { label: "Teams", key: "max_teams", format: "count" },
   { label: "Team members", key: "max_team_members", format: "count" },
   { label: "Budgets", key: "max_budgets", format: "count" },
@@ -23,6 +24,12 @@ const FEATURE_ROWS: {
   { label: "SLA dashboard", key: "sla_dashboard", format: "boolean" },
   { label: "Priority support", key: "priority_support", format: "boolean" },
 ];
+
+const LEARNING_AGENT: Record<PlanTier, string> = {
+  free: "Basic recommendations",
+  team: "Self-learning optimizer",
+  enterprise: "Fleet-wide optimization",
+};
 
 function formatValue(value: number | boolean, format?: string): string {
   if (typeof value === "boolean") return value ? "✓" : "—";
@@ -69,11 +76,10 @@ export default function PricingPage() {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4">
-            Simple, transparent pricing
+            Pay per GPU. Scale as you grow.
           </h1>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            Start free. Upgrade when your GPU fleet needs enterprise-grade cost
-            intelligence.
+            Start free with 2 GPUs. Upgrade when your team needs more.
           </p>
 
           {/* Interval toggle */}
@@ -110,18 +116,18 @@ export default function PricingPage() {
               interval === "monthly"
                 ? display.price_monthly
                 : Math.round(display.price_yearly / 12);
-            const isPro = tier === "pro";
+            const isTeam = tier === "team";
 
             return (
               <div
                 key={tier}
                 className={`rounded-2xl border p-8 flex flex-col ${
-                  isPro
+                  isTeam
                     ? "border-blue-500 bg-gray-900/80 ring-1 ring-blue-500/50"
                     : "border-gray-800 bg-gray-900/40"
                 }`}
               >
-                {isPro && (
+                {isTeam && (
                   <div className="text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
                     Most Popular
                   </div>
@@ -133,15 +139,24 @@ export default function PricingPage() {
 
                 <div className="mb-6">
                   {tier === "enterprise" ? (
-                    <div className="text-3xl font-bold">Custom</div>
+                    <>
+                      <span className="text-4xl font-bold">${price}</span>
+                      <span className="text-gray-400 text-sm ml-1">
+                        /GPU/mo
+                        {interval === "yearly" ? " (billed yearly)" : ""}
+                      </span>
+                    </>
+                  ) : tier === "free" ? (
+                    <>
+                      <span className="text-4xl font-bold">$0</span>
+                      <span className="text-gray-400 text-sm ml-1">/mo</span>
+                    </>
                   ) : (
                     <>
                       <span className="text-4xl font-bold">${price}</span>
                       <span className="text-gray-400 text-sm ml-1">
-                        /mo
-                        {interval === "yearly" && tier !== "free"
-                          ? " (billed yearly)"
-                          : ""}
+                        /GPU/mo
+                        {interval === "yearly" ? " (billed yearly)" : ""}
                       </span>
                     </>
                   )}
@@ -153,7 +168,7 @@ export default function PricingPage() {
                   className={`w-full py-3 rounded-lg font-medium text-sm transition ${
                     tier === "free"
                       ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                      : isPro
+                      : isTeam
                       ? "bg-blue-600 text-white hover:bg-blue-500"
                       : "bg-white text-gray-900 hover:bg-gray-100"
                   } disabled:opacity-50`}
@@ -164,13 +179,13 @@ export default function PricingPage() {
                     ? "Get Started"
                     : tier === "enterprise"
                     ? "Book a Demo"
-                    : "Upgrade to Pro"}
+                    : "Start Team Plan"}
                 </button>
 
                 <ul className="mt-8 space-y-3 text-sm flex-1">
                   {FEATURE_ROWS.map((row) => {
                     const val = PLAN_LIMITS[tier][row.key];
-                    const display = formatValue(val, row.format);
+                    const formatted = formatValue(val, row.format);
                     const isEnabled =
                       typeof val === "boolean" ? val : val !== 0;
 
@@ -182,10 +197,14 @@ export default function PricingPage() {
                         }`}
                       >
                         <span>{row.label}</span>
-                        <span className="font-medium">{display}</span>
+                        <span className="font-medium">{formatted}</span>
                       </li>
                     );
                   })}
+                  <li className="flex items-center justify-between text-gray-200">
+                    <span>Learning agent</span>
+                    <span className="font-medium text-xs">{LEARNING_AGENT[tier]}</span>
+                  </li>
                 </ul>
               </div>
             );
@@ -199,20 +218,20 @@ export default function PricingPage() {
           </h2>
           <div className="space-y-6">
             <FaqItem
+              q="How does per-GPU pricing work?"
+              a="You're billed based on the number of unique GPUs reporting to NemulAI each month. The free tier includes up to 2 GPUs. Team and Enterprise tiers charge per GPU with no upper limit."
+            />
+            <FaqItem
               q="Can I change plans later?"
               a="Yes. Upgrade or downgrade anytime from your dashboard settings. When upgrading, you'll be charged a prorated amount. When downgrading, your current plan stays active until the end of the billing period."
             />
             <FaqItem
-              q="What happens when I hit a limit?"
-              a="You'll receive a clear error message telling you which limit you've reached and which plan to upgrade to. Your existing data and integrations are never affected."
-            />
-            <FaqItem
-              q="Do you offer a free trial of Pro?"
-              a="Every new account starts with a 14-day trial of Pro features. No credit card required."
+              q="Do you offer a free trial?"
+              a="Every new account starts with a 7-day trial of Team features on up to 10 GPUs. No credit card required."
             />
             <FaqItem
               q="What's included in Enterprise?"
-              a="Everything in Pro plus unlimited teams/webhooks/exports, 365-day data retention, SLA dashboard, priority support, SSO/SAML, and custom integrations. Book a demo and we'll tailor it to your needs."
+              a="Everything in Team plus unlimited teams, webhooks, and exports. 365-day data retention, SLA dashboard, fleet-wide learning agent optimization, SSO/SAML, priority support, and custom integrations."
             />
           </div>
         </div>
@@ -220,10 +239,10 @@ export default function PricingPage() {
         {/* Back link */}
         <div className="text-center mt-16">
           <Link
-            href="/dashboard"
+            href="/"
             className="text-gray-400 hover:text-white text-sm transition"
           >
-            ← Back to Dashboard
+            &larr; Back to Home
           </Link>
         </div>
       </div>

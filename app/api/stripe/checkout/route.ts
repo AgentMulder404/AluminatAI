@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
       interval: "monthly" | "yearly";
     };
 
-    if (!plan || !["pro", "enterprise"].includes(plan)) {
+    if (!plan || !["team", "enterprise"].includes(plan)) {
       return NextResponse.json(
-        { error: "Invalid plan. Must be pro or enterprise." },
+        { error: "Invalid plan. Must be team or enterprise." },
         { status: 400 }
       );
     }

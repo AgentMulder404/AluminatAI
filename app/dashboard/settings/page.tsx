@@ -159,7 +159,7 @@ export default function SettingsPage() {
               <div>
                 <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded ${
                   plan === "enterprise" ? "bg-purple-900 text-purple-300" :
-                  plan === "pro" ? "bg-blue-900 text-blue-300" :
+                  plan === "team" ? "bg-blue-900 text-blue-300" :
                   "bg-neutral-800 text-neutral-400"
                 }`}>
                   {PLAN_DISPLAY[plan].name}

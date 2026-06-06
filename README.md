@@ -2,9 +2,9 @@
 
 # ⚡ NemulAI
 
-**nvidia-smi shows you watts. NemulAI shows you dollars.**
+**Cut your GPU bill by 15-40%. Automatically.**
 
-Per-job GPU energy monitoring, cost attribution, and waste detection for AI teams.
+Self-learning GPU cost intelligence. Per-job attribution, waste detection, and automated optimization for AI teams.
 
 [![PyPI version](https://badge.fury.io/py/nemulai.svg)](https://badge.fury.io/py/nemulai)
 [![PyPI Downloads](https://static.pepy.tech/badge/nemulai)](https://pepy.tech/project/nemulai)
@@ -30,7 +30,7 @@ The hidden cost of GPU waste compounds fast:
 - No per-team attribution → no accountability → no improvement
 - Finance asks "can we cut GPU spend?" and nobody has data to answer with
 
-NemulAI closes that gap. A lightweight Python agent runs on your GPU machines, attributes energy to individual jobs in real time, and streams dollar costs to a dashboard — so you know what everything costs before the cloud bill arrives.
+NemulAI closes that gap — and gets smarter over time. A lightweight Python agent runs on your GPU machines, attributes energy to individual jobs in real time, and streams dollar costs to a dashboard. The self-learning optimizer adapts to your workload patterns and improves its recommendations the longer it runs.
 
 ---
 
@@ -38,8 +38,9 @@ NemulAI closes that gap. A lightweight Python agent runs on your GPU machines, a
 
 - **Per-job cost attribution** — tracks energy ($) per training run, not just per machine
 - **Real-time power monitoring** — samples NVML every 5 seconds via `nvidia-ml-py`
+- **Self-learning optimizer** — the agent learns your workload patterns over time; recommendations get better every week
 - **Team chargeback** — tag workloads with `ALUMINATAI_TEAM` to split costs by team
-- **Utilization & efficiency metrics** — throughput-per-watt, idle detection, utilization trends
+- **Waste detection** — idle GPUs flagged automatically, saving 15-40% on compute spend
 - **Budget alerts** — get notified before costs spike, not after
 - **WAL-backed reliability** — metrics buffer locally during API outages, replay on reconnect
 - **Multi-scheduler support** — Kubernetes, Slurm, Run:ai, and manual tagging
@@ -211,7 +212,7 @@ Full deployment docs at [nemulai.com/docs/agent](https://nemulai.com/docs/agent)
 
 ## Why Open Source?
 
-GPU cost visibility should be a solved problem, not a proprietary feature gate.
+GPU cost optimization should be a solved problem, not a proprietary feature gate.
 
 The GPU monitoring space is full of tools that show you _what's happening_ (`nvidia-smi`, Grafana) or _what happened_ (cloud billing dashboards). NemulAI is the missing link: **what each specific job cost, in real time, in dollars.**
 

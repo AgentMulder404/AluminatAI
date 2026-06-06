@@ -23,8 +23,11 @@ import concurrent.futures
 import logging
 import time
 from datetime import datetime, timezone
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, TYPE_CHECKING
 from dataclasses import dataclass, asdict
+
+if TYPE_CHECKING:
+    from efficiency.mig import MigInfo
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +108,7 @@ class GPUCollector:
     Features:
     - Low overhead (<0.5ms per GPU)
     - Energy delta calculation (E = P × Δt)
+    - MIG-aware power splitting (utilization-weighted)
     - Configurable metric collection
     - Graceful error handling
     """
@@ -132,6 +136,9 @@ class GPUCollector:
 
         # Per-GPU consecutive timeout counter
         self._timeout_count: dict[int, int] = {}
+
+        # MIG state per GPU (detected once at init, refreshed on demand)
+        self._mig_info: dict[int, "MigInfo"] = {}
 
         self._initialize()
 
@@ -163,6 +170,21 @@ class GPUCollector:
                 })
 
             self.gpu_uuids = [g['uuid'] for g in self.gpu_info]
+
+            # Detect MIG configuration per GPU
+            try:
+                from efficiency.mig import detect_mig
+                for i in range(self.gpu_count):
+                    mig = detect_mig(i)
+                    if mig.enabled:
+                        self._mig_info[i] = mig
+                        logger.info(
+                            "GPU %d: MIG enabled (%d instances, %d slices)",
+                            i, len(mig.instances), mig.total_slices,
+                        )
+            except ImportError:
+                logger.debug("MIG module not available — skipping MIG detection")
+
             self.initialized = True
 
         except pynvml.NVMLError as e:
@@ -195,7 +217,15 @@ class GPUCollector:
                         self._collect_single_gpu, handle, i, timestamp, current_time
                     )
                     gpu_metrics = future.result(timeout=_timeout)
-                metrics.append(gpu_metrics)
+
+                # MIG splitting: emit per-instance metrics instead of per-GPU
+                mig = self._mig_info.get(i)
+                if mig and mig.enabled:
+                    mig_metrics = self._split_by_mig(gpu_metrics, mig)
+                    metrics.extend(mig_metrics)
+                else:
+                    metrics.append(gpu_metrics)
+
                 self._timeout_count[i] = 0
             except concurrent.futures.TimeoutError:
                 self._timeout_count[i] = self._timeout_count.get(i, 0) + 1
@@ -212,6 +242,40 @@ class GPUCollector:
                 continue
 
         return metrics
+
+    def _split_by_mig(self, parent: GPUMetrics, mig: "MigInfo") -> List[GPUMetrics]:
+        """Split a single GPU's metrics into per-MIG-instance metrics."""
+        try:
+            from efficiency.mig import split_power_by_mig, get_mig_utilization
+        except ImportError:
+            return [parent]
+
+        utils = get_mig_utilization(parent.gpu_index, mig)
+        power_splits = split_power_by_mig(parent.power_draw_w, mig, utils or None)
+
+        results = []
+        for inst_idx, inst_power in power_splits:
+            inst = next((i for i in mig.instances if i.index == inst_idx), None)
+            energy_frac = inst.power_fraction if inst else (1.0 / len(power_splits))
+            results.append(GPUMetrics(
+                timestamp=parent.timestamp,
+                gpu_index=parent.gpu_index,
+                gpu_uuid=f"{parent.gpu_uuid}/mig{inst_idx}",
+                gpu_name=f"{parent.gpu_name} (MIG {inst_idx})",
+                power_draw_w=round(inst_power, 2),
+                power_limit_w=round(parent.power_limit_w * energy_frac, 2),
+                energy_delta_j=round(parent.energy_delta_j * energy_frac, 4) if parent.energy_delta_j else None,
+                utilization_gpu_pct=int(utils.get(inst_idx, parent.utilization_gpu_pct)),
+                utilization_memory_pct=parent.utilization_memory_pct,
+                temperature_c=parent.temperature_c,
+                fan_speed_pct=parent.fan_speed_pct,
+                sm_clock_mhz=parent.sm_clock_mhz,
+                memory_clock_mhz=parent.memory_clock_mhz,
+                memory_used_mb=round(inst.memory_mb, 1) if inst else parent.memory_used_mb,
+                memory_total_mb=round(inst.memory_mb, 1) if inst else parent.memory_total_mb,
+                processes=parent.processes,
+            ))
+        return results
 
     def _collect_single_gpu(
         self,
@@ -323,6 +387,10 @@ class GPUCollector:
     def get_gpu_info(self) -> List[Dict]:
         """Return static GPU information"""
         return self.gpu_info
+
+    def get_mig_info(self, gpu_index: int) -> Optional["MigInfo"]:
+        """Return MIG configuration for a GPU, or None if MIG is not enabled."""
+        return self._mig_info.get(gpu_index)
 
     def shutdown(self):
         """Cleanup NVML resources"""

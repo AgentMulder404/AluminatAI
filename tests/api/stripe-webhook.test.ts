@@ -72,7 +72,7 @@ describe("POST /api/stripe/webhook", () => {
       type: "checkout.session.completed",
       data: {
         object: {
-          metadata: { user_id: "user-123", plan: "pro" },
+          metadata: { user_id: "user-123", plan: "team" },
           subscription: "sub_123",
           amount_total: 2900,
         },
@@ -83,7 +83,7 @@ describe("POST /api/stripe/webhook", () => {
       id: "sub_123",
       current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
       cancel_at_period_end: false,
-      metadata: { user_id: "user-123", plan: "pro" },
+      metadata: { user_id: "user-123", plan: "team" },
     });
 
     const req = new Request(
@@ -147,7 +147,7 @@ describe("POST /api/stripe/webhook", () => {
       current_period_start: Math.floor(Date.now() / 1000),
       current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
       cancel_at_period_end: false,
-      metadata: { user_id: "user-123", plan: "pro" },
+      metadata: { user_id: "user-123", plan: "team" },
     });
 
     const req = new Request(
@@ -170,7 +170,7 @@ describe("POST /api/stripe/webhook", () => {
       type: "checkout.session.completed",
       data: {
         object: {
-          metadata: { user_id: "user-123", plan: "pro" },
+          metadata: { user_id: "user-123", plan: "team" },
           subscription: "sub_broken",
         },
       },

@@ -78,9 +78,9 @@ export async function GET(req: NextRequest) {
 
     // Build Slack message
     const dateStr = yesterday.toISOString().slice(0, 10);
-    let text = `*NemulAI Daily Summary — ${dateStr}*\n\n`;
+    let text = `*NemulAI Daily Cost Summary — ${dateStr}*\n\n`;
+    text += `Spend: *$${cost.toFixed(4)}*\n`;
     text += `Energy: *${kwh.toFixed(3)} kWh*\n`;
-    text += `Cost: *$${cost.toFixed(4)}*\n`;
     if (totalCo2eG != null) {
       const co2Display =
         totalCo2eG < 1000

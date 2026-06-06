@@ -3,9 +3,10 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase-client";
 
-export type PlanTier = "free" | "pro" | "enterprise";
+export type PlanTier = "free" | "team" | "enterprise";
 
 export interface PlanLimits {
+  max_gpus: number;
   max_teams: number;
   max_team_members: number;
   max_budgets: number;
@@ -15,25 +16,27 @@ export interface PlanLimits {
   slack_integration: boolean;
   pagerduty_opsgenie: boolean;
   sla_dashboard: boolean;
-  api_rate_limit: number; // requests per minute
+  api_rate_limit: number;
   priority_support: boolean;
 }
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
+    max_gpus: 2,
     max_teams: 1,
     max_team_members: 3,
-    max_budgets: 2,
+    max_budgets: 1,
     max_webhooks: 0,
     max_export_configs: 0,
-    retention_days: 14,
+    retention_days: 7,
     slack_integration: false,
     pagerduty_opsgenie: false,
     sla_dashboard: false,
     api_rate_limit: 60,
     priority_support: false,
   },
-  pro: {
+  team: {
+    max_gpus: -1,
     max_teams: 5,
     max_team_members: 25,
     max_budgets: 20,
@@ -47,7 +50,8 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
     priority_support: false,
   },
   enterprise: {
-    max_teams: -1, // unlimited
+    max_gpus: -1,
+    max_teams: -1,
     max_team_members: -1,
     max_budgets: -1,
     max_webhooks: -1,
@@ -63,33 +67,36 @@ export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
 
 // Stripe Price IDs — set these in environment variables
 export const STRIPE_PRICES = {
-  pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY ?? "",
-  pro_yearly: process.env.STRIPE_PRICE_PRO_YEARLY ?? "",
+  team_monthly: process.env.STRIPE_PRICE_TEAM_MONTHLY ?? "",
+  team_yearly: process.env.STRIPE_PRICE_TEAM_YEARLY ?? "",
   enterprise_monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY ?? "",
   enterprise_yearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY ?? "",
 };
 
 export const PLAN_DISPLAY: Record<
   PlanTier,
-  { name: string; price_monthly: number; price_yearly: number; tagline: string }
+  { name: string; price_monthly: number; price_yearly: number; tagline: string; per_gpu: boolean }
 > = {
   free: {
     name: "Free",
     price_monthly: 0,
     price_yearly: 0,
-    tagline: "For individuals and small experiments",
+    tagline: "For individual devs and academics",
+    per_gpu: false,
   },
-  pro: {
-    name: "Pro",
-    price_monthly: 49,
-    price_yearly: 468, // $39/mo billed yearly
-    tagline: "For teams tracking GPU spend at scale",
+  team: {
+    name: "Team",
+    price_monthly: 5,
+    price_yearly: 48, // $4/GPU/mo billed yearly
+    tagline: "For teams running 10-100 GPUs",
+    per_gpu: true,
   },
   enterprise: {
     name: "Enterprise",
-    price_monthly: 199,
-    price_yearly: 1908, // $159/mo billed yearly
-    tagline: "For organizations with compliance and SLA needs",
+    price_monthly: 15,
+    price_yearly: 144, // $12/GPU/mo billed yearly
+    tagline: "For organizations running 100+ GPU fleets",
+    per_gpu: true,
   },
 };
 
@@ -112,6 +119,9 @@ export async function getUserPlan(
   }
 
   let plan = (data.plan as PlanTier) ?? "free";
+
+  // Backward compat: treat legacy "pro" as "team"
+  if ((plan as string) === "pro") plan = "team";
 
   // If paid plan has expired and not renewed, downgrade to free
   if (plan !== "free" && data.plan_period_end) {
@@ -143,7 +153,7 @@ export async function requirePlan(
   // Boolean features
   if (typeof value === "boolean") {
     if (!value) {
-      const upgradeTo = plan === "free" ? "pro" : "enterprise";
+      const upgradeTo = plan === "free" ? "team" : "enterprise";
       return {
         allowed: false,
         reason: `${String(feature)} requires a ${upgradeTo} plan`,
@@ -179,7 +189,7 @@ export async function checkCountLimit(
   }
 
   if (currentCount >= limit) {
-    const upgradeTo = plan === "free" ? "pro" : "enterprise";
+    const upgradeTo = plan === "free" ? "team" : "enterprise";
     return {
       allowed: false,
       limit,

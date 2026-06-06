@@ -4,9 +4,15 @@ import Link from "next/link";
 
 const FEATURES = [
   {
-    title: "Unlimited Teams & Members",
+    title: "Fleet-Wide Learning Agent",
     description:
-      "Full RBAC across your entire org. No caps on teams, members, or budgets.",
+      "The agent learns patterns across your entire fleet, not just individual machines. Cross-GPU optimization recommendations improve over time.",
+    icon: "🧠",
+  },
+  {
+    title: "Unlimited Teams & Chargeback",
+    description:
+      "Full RBAC and per-team GPU cost chargeback across your entire organization. No caps on teams, members, or budgets.",
     icon: "👥",
   },
   {
@@ -60,10 +66,12 @@ export default function EnterprisePage() {
             <br />
             Cost Intelligence
           </h1>
-          <p className="text-lg text-neutral-400 max-w-2xl mx-auto">
-            Full visibility into GPU energy costs across your fleet. Built for
-            teams running 100+ GPUs with compliance, security, and dedicated
-            support.
+          <p className="text-lg text-neutral-400 max-w-2xl mx-auto mb-4">
+            Fleet-wide GPU cost optimization for teams running 100+ GPUs.
+            Self-learning agents, compliance-grade retention, and dedicated support.
+          </p>
+          <p className="text-sm text-green-400 font-medium">
+            $15/GPU/mo — billed monthly or annually with 20% discount
           </p>
         </div>
 
@@ -83,24 +91,21 @@ export default function EnterprisePage() {
           ))}
         </div>
 
-        {/* Cal.com booking section */}
+        {/* Calendly booking section */}
         <div className="text-center mb-16">
-          <h2 className="text-2xl font-bold mb-3">Book a Demo</h2>
-          <p className="text-neutral-400 mb-8">
-            30-minute call to discuss your GPU fleet, pricing, and setup.
+          <h2 className="text-2xl font-bold mb-3">Book a 30-minute demo</h2>
+          <p className="text-neutral-400 mb-6 max-w-xl mx-auto">
+            We&apos;ll walk through autonomous optimization for your fleet, answer
+            procurement questions, and scope a custom Swarm contract.
           </p>
-          <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 max-w-3xl mx-auto">
-            <iframe
-              src="https://cal.com/nemulai/enterprise-demo"
-              width="100%"
-              height="600"
-              frameBorder="0"
-              className="rounded-lg"
-              title="Schedule a demo with NemulAI"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-              loading="lazy"
-            />
-          </div>
+          <a
+            href="https://calendly.com/nemulai/enterprise-demo"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-8 py-4 bg-green-600 hover:bg-green-500 rounded-lg font-semibold text-lg transition-colors"
+          >
+            Schedule on Calendly
+          </a>
         </div>
 
         {/* CTA */}
@@ -108,10 +113,10 @@ export default function EnterprisePage() {
           <p className="text-neutral-500 text-sm">
             Prefer email?{" "}
             <a
-              href="mailto:enterprise@nemulai.com"
+              href="mailto:kevin.mello8@gmail.com"
               className="text-indigo-400 hover:text-indigo-300"
             >
-              enterprise@nemulai.com
+              kevin.mello8@gmail.com
             </a>
           </p>
         </div>

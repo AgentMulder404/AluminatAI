@@ -98,10 +98,11 @@ export async function POST(req: NextRequest) {
         const plan = subscription.metadata?.plan;
         if (!userId) break;
 
+        const resolvedPlan = plan === "pro" ? "team" : (plan ?? "team");
         await supabase
           .from("users")
           .update({
-            plan: plan ?? "pro",
+            plan: resolvedPlan,
             plan_period_end: new Date(
               subscription.current_period_end * 1000
             ).toISOString(),
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
           userId,
           stripeEventId: event.id,
           eventType: event.type,
-          plan: plan ?? "pro",
+          plan: resolvedPlan,
           amountUsd: invoice.amount_paid / 100,
           periodStart: new Date(
             subscription.current_period_start * 1000
@@ -130,7 +131,8 @@ export async function POST(req: NextRequest) {
         const userId = subscription.metadata?.user_id;
         if (!userId) break;
 
-        const plan = subscription.metadata?.plan ?? "pro";
+        const rawPlan = subscription.metadata?.plan ?? "team";
+        const plan = rawPlan === "pro" ? "team" : rawPlan;
 
         await supabase
           .from("users")

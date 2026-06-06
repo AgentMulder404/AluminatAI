@@ -74,6 +74,14 @@ _CONFIG_KEY_TO_ENV: dict[str, str] = {
     "dcgm_enabled":             "DCGM_ENABLED",
     "pid_smooth_window":        "PID_SMOOTH_WINDOW",
     "pid_stable_threshold":     "PID_STABLE_THRESHOLD",
+    "learner_enabled":          "ALUMINATAI_LEARNER_ENABLED",
+    "learner_outcome_window":   "ALUMINATAI_LEARNER_OUTCOME_WINDOW",
+    "learner_upload_enabled":   "ALUMINATAI_LEARNER_UPLOAD",
+    "bandit_enabled":           "ALUMINATAI_BANDIT_ENABLED",
+    "bandit_epsilon":           "ALUMINATAI_BANDIT_EPSILON",
+    "bandit_retrain_every":     "ALUMINATAI_BANDIT_RETRAIN_EVERY",
+    "bandit_auto_apply":        "ALUMINATAI_BANDIT_AUTO_APPLY",
+    "bandit_min_corpus":        "ALUMINATAI_BANDIT_MIN_CORPUS",
 }
 
 
@@ -302,6 +310,21 @@ SWARM_ENABLED = os.getenv("SWARM_ENABLED", "").lower() in ("1", "true", "yes")
 SWARM_EVAL_INTERVAL = int(os.getenv("SWARM_EVAL_INTERVAL", "300"))  # 5 min between policy evals
 SWARM_MAX_RECS = int(os.getenv("SWARM_MAX_RECS", "20"))
 
+# ── Self-Learning Agent ──────────────────────────────────────────────────────
+
+LEARNER_ENABLED = os.getenv("ALUMINATAI_LEARNER_ENABLED", "").lower() in ("1", "true", "yes")
+LEARNER_OUTCOME_WINDOW = int(os.getenv("ALUMINATAI_LEARNER_OUTCOME_WINDOW", "300"))
+LEARNER_UPLOAD_ENABLED = os.getenv("ALUMINATAI_LEARNER_UPLOAD", "").lower() in ("1", "true", "yes")
+EXPERIENCE_DIR = DATA_DIR / "experience"
+
+# ── Contextual Bandit (Phase 2) ──────────────────────────────────────────────
+
+BANDIT_ENABLED = os.getenv("ALUMINATAI_BANDIT_ENABLED", "").lower() in ("1", "true", "yes")
+BANDIT_EPSILON = float(os.getenv("ALUMINATAI_BANDIT_EPSILON", "0.1"))
+BANDIT_RETRAIN_EVERY = int(os.getenv("ALUMINATAI_BANDIT_RETRAIN_EVERY", "500"))
+BANDIT_AUTO_APPLY = os.getenv("ALUMINATAI_BANDIT_AUTO_APPLY", "").lower() in ("1", "true", "yes")
+BANDIT_MIN_CORPUS = int(os.getenv("ALUMINATAI_BANDIT_MIN_CORPUS", "1000"))
+
 # ── TLS / Proxy ───────────────────────────────────────────────────────────────
 
 HTTPS_PROXY = os.getenv("HTTPS_PROXY", "")
@@ -387,6 +410,8 @@ def _validate_config() -> None:
     global IDLE_BASELINE_WINDOW, WARMUP_DISCARD_SECONDS
     global MEM_LEAK_WINDOW
     global FAST_SAMPLE_INTERVAL, FAST_SAMPLE_BUFFER_SIZE
+    global LEARNER_OUTCOME_WINDOW
+    global BANDIT_EPSILON, BANDIT_RETRAIN_EVERY, BANDIT_MIN_CORPUS
 
     SAMPLE_INTERVAL       = _clamp("SAMPLE_INTERVAL",       SAMPLE_INTERVAL,       0.1, 300)
     NVML_TIMEOUT          = _clamp("NVML_TIMEOUT",          NVML_TIMEOUT,          0.5, 30.0)
@@ -408,6 +433,10 @@ def _validate_config() -> None:
     MEM_LEAK_WINDOW       = int(_clamp("MEM_LEAK_WINDOW",        MEM_LEAK_WINDOW,       10, 600))
     FAST_SAMPLE_INTERVAL  = _clamp("FAST_SAMPLE_INTERVAL",      FAST_SAMPLE_INTERVAL,  0.05, 2.0)
     FAST_SAMPLE_BUFFER_SIZE = int(_clamp("FAST_SAMPLE_BUFFER_SIZE", FAST_SAMPLE_BUFFER_SIZE, 10, 1000))
+    LEARNER_OUTCOME_WINDOW = int(_clamp("LEARNER_OUTCOME_WINDOW", LEARNER_OUTCOME_WINDOW, 60, 1800))
+    BANDIT_EPSILON = _clamp("BANDIT_EPSILON", BANDIT_EPSILON, 0.01, 0.5)
+    BANDIT_RETRAIN_EVERY = int(_clamp("BANDIT_RETRAIN_EVERY", BANDIT_RETRAIN_EVERY, 50, 10000))
+    BANDIT_MIN_CORPUS = int(_clamp("BANDIT_MIN_CORPUS", BANDIT_MIN_CORPUS, 100, 100000))
 
     if WARMUP_DISCARD_SECONDS > 0 and IDLE_BASELINE_WINDOW > 0:
         if WARMUP_DISCARD_SECONDS <= IDLE_BASELINE_WINDOW:
@@ -427,3 +456,4 @@ _validate_config()
 DATA_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
 WAL_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
 LOG_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+EXPERIENCE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
