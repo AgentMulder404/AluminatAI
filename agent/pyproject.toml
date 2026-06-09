@@ -60,6 +60,7 @@ packages = [
     "nemulai.schedulers",
     "nemulai.efficiency",
     "nemulai.learner",
+    "nemulai.intelligence",
 ]
 
 [tool.setuptools.package-dir]
@@ -69,6 +70,7 @@ nemulai               = "."
 "nemulai.schedulers"   = "schedulers"
 "nemulai.efficiency"   = "efficiency"
 "nemulai.learner"      = "learner"
+"nemulai.intelligence" = "intelligence"
 
 [tool.setuptools.package-data]
 "nemulai" = ["*.txt", "*.md"]

@@ -59,6 +59,7 @@ class ArchSpec:
             'fp32': self.fp32_tflops,
             'fp8': self.fp16_tflops * 2.0,  # FP8 ~2x FP16 on Hopper
             'int8': self.fp16_tflops * 2.0,
+            'int4': self.fp16_tflops * 4.0,
         }
         return mapping.get(precision, self.fp16_tflops)
 

@@ -82,6 +82,10 @@ _CONFIG_KEY_TO_ENV: dict[str, str] = {
     "bandit_retrain_every":     "ALUMINATAI_BANDIT_RETRAIN_EVERY",
     "bandit_auto_apply":        "ALUMINATAI_BANDIT_AUTO_APPLY",
     "bandit_min_corpus":        "ALUMINATAI_BANDIT_MIN_CORPUS",
+    "intelligence_enabled":     "ALUMINATAI_INTELLIGENCE_ENABLED",
+    "intelligence_hf_limit":    "ALUMINATAI_INTELLIGENCE_HF_LIMIT",
+    "intelligence_min_downloads": "ALUMINATAI_INTELLIGENCE_MIN_DOWNLOADS",
+    "intelligence_min_confidence": "ALUMINATAI_INTELLIGENCE_MIN_CONFIDENCE",
 }
 
 
@@ -324,6 +328,13 @@ BANDIT_EPSILON = float(os.getenv("ALUMINATAI_BANDIT_EPSILON", "0.1"))
 BANDIT_RETRAIN_EVERY = int(os.getenv("ALUMINATAI_BANDIT_RETRAIN_EVERY", "500"))
 BANDIT_AUTO_APPLY = os.getenv("ALUMINATAI_BANDIT_AUTO_APPLY", "").lower() in ("1", "true", "yes")
 BANDIT_MIN_CORPUS = int(os.getenv("ALUMINATAI_BANDIT_MIN_CORPUS", "1000"))
+
+# ── Model Intelligence Pipeline ─────────────────────────────────────────────
+
+INTELLIGENCE_ENABLED = os.getenv("ALUMINATAI_INTELLIGENCE_ENABLED", "").lower() in ("1", "true", "yes")
+INTELLIGENCE_HF_LIMIT = int(os.getenv("ALUMINATAI_INTELLIGENCE_HF_LIMIT", "20"))
+INTELLIGENCE_MIN_DOWNLOADS = int(os.getenv("ALUMINATAI_INTELLIGENCE_MIN_DOWNLOADS", "1000"))
+INTELLIGENCE_MIN_CONFIDENCE = float(os.getenv("ALUMINATAI_INTELLIGENCE_MIN_CONFIDENCE", "0.5"))
 
 # ── TLS / Proxy ───────────────────────────────────────────────────────────────
 

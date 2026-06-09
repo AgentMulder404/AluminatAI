@@ -45,7 +45,7 @@ def main() -> None:
     _pre = argparse.ArgumentParser(add_help=False)
     _pre.add_argument("subcommand", nargs="?", default="run",
                       choices=["run", "test", "doctor", "benchmark", "optimize", "ab", "demo", "report",
-                               "carbon-schedule", "query", "recommend", "learn"])
+                               "carbon-schedule", "query", "recommend", "learn", "model-intel"])
     _pre.add_argument("--config", "-c", default=None,
                       help="Path to JSON/YAML config file")
     _known, _rest = _pre.parse_known_args()
@@ -96,6 +96,10 @@ def main() -> None:
     if _known.subcommand == "learn":
         from learner.cli import make_parser as learn_parser, run_learn  # noqa: PLC0415
         sys.exit(run_learn(learn_parser().parse_args(_rest)))
+
+    if _known.subcommand == "model-intel":
+        from intelligence.cli import make_parser as intel_parser, run_model_intel  # noqa: PLC0415
+        sys.exit(run_model_intel(intel_parser().parse_args(_rest)))
 
     # Default: delegate to agent.main() — it owns the full argparse + run loop.
     from agent import main as _main  # noqa: PLC0415
