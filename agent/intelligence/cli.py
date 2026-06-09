@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 from rich.console import Console
@@ -63,18 +62,49 @@ def make_parser() -> argparse.ArgumentParser:
     bv_p.add_argument("--top", type=int, default=10)
     bv_p.add_argument("--json", action="store_true", dest="json_output")
 
+    research_p = sub.add_parser(
+        "research",
+        help="Run a research cycle: discover models, set benchmark targets, ingest measured runs",
+    )
+    research_p.add_argument("--limit", type=int, default=20)
+    research_p.add_argument("--min-downloads", type=int, default=1000)
+    research_p.add_argument("--min-confidence", type=float, default=0.5)
+    research_p.add_argument("--no-scan", action="store_true", help="Skip HuggingFace scan, only recalibrate")
+    research_p.add_argument("--watch", type=float, default=None, metavar="SECONDS",
+                            help="Keep running, repeating the cycle on this interval")
+    research_p.add_argument("--json", action="store_true", dest="json_output")
+
+    targets_p = sub.add_parser("targets", help="List benchmark targets (predicted vs measured)")
+    targets_p.add_argument("--model", default=None, help="Filter by model tag substring")
+    targets_p.add_argument("--gpu", default=None, help="Filter by GPU name substring")
+    targets_p.add_argument("--json", action="store_true", dest="json_output")
+
+    cal_p = sub.add_parser("calibrate", help="Feed measured runs back into the research agent")
+    cal_p.add_argument("results", nargs="*", help="JSON files from `nemulai test --output`")
+    cal_p.add_argument("--gpu", default=None, help="GPU name for a manual measurement")
+    cal_p.add_argument("--model", default=None, help="Model ID for a manual measurement")
+    cal_p.add_argument("--tokens-per-sec", type=float, default=None, help="Measured tokens/s")
+    cal_p.add_argument("--json", action="store_true", dest="json_output")
+
+    suggest_p = sub.add_parser("suggest", help="Best model + GPU pairings by calibrated $/1M tokens")
+    suggest_p.add_argument("query", nargs="?", default=None,
+                           help="Filter by model tag or family substring (e.g. 'llama')")
+    suggest_p.add_argument("--budget", type=float, default=None, help="Max $/hr per GPU")
+    suggest_p.add_argument("--top", type=int, default=5)
+    suggest_p.add_argument("--json", action="store_true", dest="json_output")
+
     return parser
 
 
 def run_model_intel(args: argparse.Namespace) -> int:
-    from config import DATA_DIR, SUPABASE_URL, SUPABASE_SERVICE_KEY
+    import config
     from intelligence.pipeline import IntelligencePipeline
 
-    data_dir = Path(DATA_DIR) if DATA_DIR else Path.home() / ".nemulai"
+    data_dir = Path(getattr(config, "DATA_DIR", "") or Path.home() / ".nemulai")
     pipeline = IntelligencePipeline(
         data_dir=data_dir,
-        supabase_url=SUPABASE_URL if hasattr(sys.modules.get("config", object), "SUPABASE_URL") else None,
-        supabase_key=SUPABASE_SERVICE_KEY if hasattr(sys.modules.get("config", object), "SUPABASE_SERVICE_KEY") else None,
+        supabase_url=getattr(config, "SUPABASE_URL", None),
+        supabase_key=getattr(config, "SUPABASE_SERVICE_KEY", None),
     )
 
     if args.action == "scan":
@@ -93,8 +123,21 @@ def run_model_intel(args: argparse.Namespace) -> int:
         return _cmd_prices(data_dir, args)
     elif args.action == "best-value":
         return _cmd_best_value(pipeline, data_dir, args)
+    elif args.action == "research":
+        return _cmd_research(pipeline, data_dir, args)
+    elif args.action == "targets":
+        return _cmd_targets(pipeline, data_dir, args)
+    elif args.action == "calibrate":
+        return _cmd_calibrate(pipeline, data_dir, args)
+    elif args.action == "suggest":
+        return _cmd_suggest(pipeline, data_dir, args)
 
     return 1
+
+
+def _make_research_agent(pipeline, data_dir):
+    from intelligence.research import ResearchAgent
+    return ResearchAgent(data_dir=data_dir, pipeline=pipeline)
 
 
 def _cmd_scan(pipeline, args) -> int:
@@ -512,4 +555,245 @@ def _cmd_best_value(pipeline, data_dir, args) -> int:
         )
 
     console.print(table)
+    return 0
+
+
+def _cmd_research(pipeline, data_dir, args) -> int:
+    console = Console()
+    agent = _make_research_agent(pipeline, data_dir)
+
+    def one_cycle() -> int:
+        result = agent.run_cycle(
+            limit=args.limit,
+            min_downloads=args.min_downloads,
+            min_confidence=args.min_confidence,
+            scan=not args.no_scan,
+        )
+
+        if args.json_output:
+            print(json.dumps({
+                "new_models": result.new_models,
+                "targets_total": result.targets_total,
+                "targets_new": result.targets_new,
+                "measurements_ingested": result.measurements_ingested,
+                "calibration_updates": [
+                    {
+                        "gpu": u.gpu_name, "model": u.model_tag,
+                        "predicted_tok_s": u.predicted_tokens_per_sec,
+                        "measured_tok_s": u.measured_tokens_per_sec,
+                        "ratio": u.ratio, "new_factor": u.new_factor,
+                        "samples": u.samples,
+                    }
+                    for u in result.calibration_updates
+                ],
+                "errors": result.errors,
+                "duration_s": result.duration_s,
+            }, indent=2))
+            return 0
+
+        console.print(
+            f"[bold]Research cycle complete[/bold] ({result.duration_s}s): "
+            f"{result.new_models} new models, "
+            f"{result.targets_total} benchmark targets ({result.targets_new} new), "
+            f"{result.measurements_ingested} measured runs ingested"
+        )
+        for u in result.calibration_updates:
+            console.print(
+                f"  [green]calibrated[/green] {u.model_tag} on {u.gpu_name}: "
+                f"predicted {u.predicted_tokens_per_sec:.0f} tok/s, "
+                f"measured {u.measured_tokens_per_sec:.0f} tok/s "
+                f"(factor → {u.new_factor:.2f}, n={u.samples})"
+            )
+        if result.errors:
+            console.print(f"[yellow]{len(result.errors)} errors[/yellow]")
+            for err in result.errors:
+                console.print(f"  - {err}")
+        console.print(
+            f"\n[dim]Drop `nemulai test --output` JSON files in {agent.watch_dir} "
+            f"to keep calibrating predictions.[/dim]"
+        )
+        return 0
+
+    if args.watch:
+        import time as _time
+        console.print(f"[bold]Research agent watching (every {args.watch:.0f}s, Ctrl-C to stop)[/bold]\n")
+        try:
+            while True:
+                one_cycle()
+                _time.sleep(args.watch)
+        except KeyboardInterrupt:
+            console.print("\n[dim]Stopped.[/dim]")
+            return 0
+
+    return one_cycle()
+
+
+def _cmd_targets(pipeline, data_dir, args) -> int:
+    console = Console()
+    agent = _make_research_agent(pipeline, data_dir)
+
+    targets = agent.targets
+    if args.model:
+        targets = [t for t in targets if args.model.lower() in t.model_tag.lower()]
+    if args.gpu:
+        targets = [t for t in targets if args.gpu.lower() in t.gpu_name.lower()]
+
+    if args.json_output:
+        print(json.dumps([t.to_dict() for t in targets], indent=2))
+        return 0
+
+    if not targets:
+        console.print("No benchmark targets. Run [bold]nemulai model-intel research[/bold] first.")
+        return 0
+
+    table = Table(title=f"Benchmark Targets ({len(targets)})")
+    table.add_column("Model", style="cyan")
+    table.add_column("GPU", style="yellow")
+    table.add_column("Predicted tok/s", justify="right")
+    table.add_column("J/token", justify="right")
+    table.add_column("$/1M tok", justify="right", style="green")
+    table.add_column("Measured tok/s", justify="right")
+    table.add_column("Calibration", justify="right")
+
+    for t in targets:
+        measured = f"{t.measured_tokens_per_sec:.0f}" if t.measured_tokens_per_sec else "—"
+        cal = (
+            f"{t.calibration_factor:.2f} (n={t.calibration_samples})"
+            if t.calibration_samples else "—"
+        )
+        cost = f"${t.calibrated_cost_per_1m_tokens_usd:.2f}" if t.calibrated_cost_per_1m_tokens_usd else "?"
+        table.add_row(
+            t.model_tag,
+            t.gpu_name,
+            f"{t.calibrated_tokens_per_sec:.0f}",
+            f"{t.calibrated_joules_per_token:.3f}",
+            cost,
+            measured,
+            cal,
+        )
+
+    console.print(table)
+    return 0
+
+
+def _cmd_calibrate(pipeline, data_dir, args) -> int:
+    console = Console()
+    agent = _make_research_agent(pipeline, data_dir)
+
+    updates = []
+
+    if args.gpu and args.model and args.tokens_per_sec:
+        update = agent.record_measurement(args.gpu, args.model, args.tokens_per_sec)
+        if update:
+            updates.append(update)
+    elif args.results:
+        for raw_path in args.results:
+            path = Path(raw_path)
+            if not path.exists():
+                console.print(f"[red]File not found: {path}[/red]")
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except json.JSONDecodeError as exc:
+                console.print(f"[red]Invalid JSON in {path}: {exc}[/red]")
+                continue
+            if not data.get("nemulai_test") or not data.get("model"):
+                console.print(f"[yellow]{path} is not a `nemulai test` model-mode result, skipping[/yellow]")
+                continue
+            tok_per_sec = (data.get("throughput") or {}).get("tok_per_sec", 0.0)
+            update = agent.record_measurement(data.get("gpu", ""), data["model"], tok_per_sec)
+            if update:
+                updates.append(update)
+    else:
+        console.print("Provide result files, or --gpu/--model/--tokens-per-sec for a manual entry.")
+        return 1
+
+    if args.json_output:
+        print(json.dumps([
+            {
+                "gpu": u.gpu_name, "model": u.model_tag,
+                "predicted_tok_s": u.predicted_tokens_per_sec,
+                "measured_tok_s": u.measured_tokens_per_sec,
+                "ratio": u.ratio, "new_factor": u.new_factor, "samples": u.samples,
+            }
+            for u in updates
+        ], indent=2))
+        return 0
+
+    if not updates:
+        console.print("[yellow]No measurements could be matched to benchmark targets.[/yellow]")
+        return 1
+
+    for u in updates:
+        console.print(
+            f"[green]Calibrated[/green] {u.model_tag} on {u.gpu_name}: "
+            f"predicted {u.predicted_tokens_per_sec:.0f} → measured {u.measured_tokens_per_sec:.0f} tok/s "
+            f"(ratio {u.ratio:.2f}, factor → {u.new_factor:.2f}, n={u.samples})"
+        )
+    return 0
+
+
+def _cmd_suggest(pipeline, data_dir, args) -> int:
+    console = Console()
+    agent = _make_research_agent(pipeline, data_dir)
+
+    suggestions = agent.suggest(
+        query=args.query,
+        budget_per_hr=args.budget,
+        top_n=args.top,
+    )
+
+    if args.json_output:
+        print(json.dumps([s.to_dict() for s in suggestions], indent=2))
+        return 0
+
+    if not suggestions:
+        console.print(
+            "No pairings available. Run [bold]nemulai model-intel research[/bold] first"
+            + (" or relax --budget." if args.budget else ".")
+        )
+        return 0
+
+    title = "Best Model + GPU Pairings"
+    if args.query:
+        title += f" — '{args.query}'"
+    if args.budget:
+        title += f" (≤ ${args.budget:.2f}/hr)"
+
+    table = Table(title=title)
+    table.add_column("#", justify="right", style="dim")
+    table.add_column("Model", style="cyan")
+    table.add_column("GPU", style="yellow")
+    table.add_column("tok/s", justify="right")
+    table.add_column("J/token", justify="right")
+    table.add_column("$/1M tok", justify="right", style="green")
+    table.add_column("$/hr", justify="right")
+    table.add_column("Quantize", style="magenta")
+    table.add_column("Source", style="dim")
+
+    for i, s in enumerate(suggestions, 1):
+        cost_1m = f"${s.cost_per_1m_tokens_usd:.2f}" if s.cost_per_1m_tokens_usd else "?"
+        cost_hr = f"${s.cost_per_hr:.2f}" if s.cost_per_hr else "?"
+        source = f"calibrated (n={s.calibration_samples})" if s.calibrated else "estimated"
+        table.add_row(
+            str(i),
+            s.model_tag,
+            s.gpu_name,
+            f"{s.tokens_per_sec:.0f}",
+            f"{s.joules_per_token:.3f}",
+            cost_1m,
+            cost_hr,
+            s.quantization,
+            source,
+            style="bold" if i == 1 else "",
+        )
+
+    console.print(table)
+
+    best = suggestions[0]
+    console.print(
+        f"\n[bold]Best pairing:[/bold] [cyan]{best.model_tag}[/cyan] on "
+        f"[yellow]{best.gpu_name}[/yellow] with [magenta]{best.quantization}[/magenta]"
+        + (f" — {best.quantization_note}" if best.quantization_note else "")
+    )
     return 0

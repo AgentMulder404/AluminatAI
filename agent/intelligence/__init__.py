@@ -12,6 +12,13 @@ from intelligence.quantization import QuantizationAdvisor, QuantizationVariant, 
 from intelligence.pricing import GPUPricingTracker, PricePerformanceMetrics, PriceAlert
 from intelligence.pipeline import IntelligencePipeline, PipelineResult
 from intelligence.registry import ModelRegistry, RegistryEntry
+from intelligence.research import (
+    ResearchAgent,
+    ResearchCycleResult,
+    BenchmarkTarget,
+    CalibrationUpdate,
+    PairingSuggestion,
+)
 
 __all__ = [
     "ModelDetector", "DetectedModel",
@@ -21,4 +28,6 @@ __all__ = [
     "GPUPricingTracker", "PricePerformanceMetrics", "PriceAlert",
     "IntelligencePipeline", "PipelineResult",
     "ModelRegistry", "RegistryEntry",
+    "ResearchAgent", "ResearchCycleResult", "BenchmarkTarget",
+    "CalibrationUpdate", "PairingSuggestion",
 ]
